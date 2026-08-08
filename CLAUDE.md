@@ -75,11 +75,18 @@ npm run test:browser:update
 
 This updates whichever platform suffix matches your machine. To regenerate the
 `chromium-linux` set from Windows (needed before most PRs, since CI only checks that set),
-run it inside a Linux container so the pixels actually match what CI will compare against:
+run it inside a Linux container so the pixels actually match what CI will compare against.
+
+**Use a plain `node:24` image with `playwright install --with-deps`, not the
+`mcr.microsoft.com/playwright` image** — its bundled Chromium build renders text a few
+pixels taller at every non-320px width than the Chromium `playwright install --with-deps`
+downloads on `ubuntu-latest`, which is exactly the mismatch that broke this repo's first CI
+run (baselines that passed locally under the Microsoft image failed in CI). Match what the
+workflow actually does:
 
 ```bash
-docker run --rm -v "${PWD}:/w" -w /w mcr.microsoft.com/playwright:v1.62.1-noble \
-  bash -c "npm ci && npm run test:browser:update"
+docker run --rm -v "${PWD}:/w" -w /w node:24 \
+  bash -c "npm ci && npx playwright install --with-deps chromium && npm run test:browser:update"
 ```
 
 Commit both the regenerated PNGs and the source change together — a screenshot diff with no

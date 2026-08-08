@@ -204,7 +204,7 @@ function PlayAppReady({ demo }: { demo: BrowserDemo }) {
   const [arrivalChoice, setArrivalChoice] = useState<string>();
   const [journey, setJourney] = useState<readonly JourneyEntry[]>([]);
   const [busy, setBusy] = useState(false);
-  /** Bumped on every return to the shelf, so the BBS prompt can clear its stale response/input independently of ordinary in-game state changes. */
+  /** Bumped on every game load and every return to the shelf, so the BBS prompt can clear its stale response/input independently of ordinary in-game state changes (choosing an action, selecting a disk). */
   const [bbsResetToken, setBbsResetToken] = useState(0);
   const [displayTheme, setDisplayTheme] = useState<ThemeId>(DEFAULT_THEME);
   const sceneRegion = useRef<HTMLElement>(null);
@@ -288,6 +288,7 @@ function PlayAppReady({ demo }: { demo: BrowserDemo }) {
       setCampaignId(id);
       setArrivalChoice(undefined);
       setJourney([{ excerpt: excerpt(next.scene.body.text) }]);
+      setBbsResetToken((resetToken) => resetToken + 1);
       try {
         await client.save(next.sessionId);
       } catch {
@@ -314,6 +315,7 @@ function PlayAppReady({ demo }: { demo: BrowserDemo }) {
       setCampaignId(id);
       setArrivalChoice(undefined);
       setJourney([{ excerpt: excerpt(next.scene.body.text) }]);
+      setBbsResetToken((resetToken) => resetToken + 1);
     } catch {
       if (runToken.current === token)
         setMessage("This saved run could not be loaded.");

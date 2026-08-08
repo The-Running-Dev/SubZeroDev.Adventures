@@ -1,17 +1,32 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
 /**
+ * Stealing focus is a desktop-only convenience. On a touch device it pops
+ * the on-screen keyboard the instant the shelf renders, before the player
+ * has even seen it -- exactly the surprise-keyboard problem the rest of
+ * this theme's "type-first" design shouldn't create. Coarse pointer is a
+ * closer proxy for "has a keyboard already" than viewport width, since a
+ * touch device can still be wide (a tablet) and a mouse-driven window can
+ * still be narrow.
+ */
+function shouldAutoFocus(): boolean {
+  return !window.matchMedia("(pointer: coarse)").matches;
+}
+
+/**
  * Deliberately dumb: it owns only its own input value and the last response
  * string, and knows nothing about the game. `onCommand` gets the trimmed,
  * non-empty text and returns a response to echo, or `undefined` for none.
  *
- * This theme's whole point is playing without touching the mouse, so the
- * input grabs focus on mount, reclaims it after every typed command, and
- * reclaims it again whenever `focusToken` changes -- which `PlayApp.tsx`
- * derives from the game state, so a *mouse* click (a dossier tile, an
- * on-screen action, Quit to library) hands focus straight back to the
- * command line too, not just a typed one. `PlayApp.tsx` also skips its own
- * scene-focus effect while this theme is active, so nothing fights this.
+ * This theme's whole point is playing without touching the mouse, so on a
+ * device that has one, the input grabs focus on mount, reclaims it after
+ * every typed command, and reclaims it again whenever `focusToken`
+ * changes -- which `PlayApp.tsx` derives from the game state, so a *mouse*
+ * click (a dossier tile, an on-screen action, Quit to library) hands focus
+ * straight back to the command line too, not just a typed one. `PlayApp.tsx`
+ * also skips its own scene-focus effect while this theme is active, so
+ * nothing fights this. On a touch device none of that focus-stealing
+ * happens at all -- see `shouldAutoFocus` above.
  */
 export function BbsPrompt({
   sigil,
@@ -34,10 +49,10 @@ export function BbsPrompt({
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (!busy) inputRef.current?.focus();
+    if (!busy && shouldAutoFocus()) inputRef.current?.focus();
   }, [focusToken, busy]);
 
-  /** `resetToken` only bumps on a return to the shelf -- a stale "Invalid choice" or echoed action from the last run shouldn't linger into the next one. */
+  /** `resetToken` bumps on a game load and on a return to the shelf -- a stale "Invalid choice" or echoed action from the last context shouldn't linger into the next one. */
   useEffect(() => {
     setResponse(undefined);
     setValue("");
@@ -51,7 +66,7 @@ export function BbsPrompt({
       setResponse(onCommand(command));
       setValue("");
     }
-    inputRef.current?.focus();
+    if (shouldAutoFocus()) inputRef.current?.focus();
   }
 
   return (
@@ -72,7 +87,6 @@ export function BbsPrompt({
           type="text"
           aria-label="Command"
           autoComplete="off"
-          autoFocus
           disabled={busy}
           spellCheck={false}
           value={value}

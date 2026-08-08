@@ -910,7 +910,8 @@
    * verify against every reader's actual font stack.
    */
   max-width: min(80ch, 100%);
-  padding-bottom: 6rem;
+  /* Must clear the fixed `.bbs-prompt` below, including its own safe-area padding, or the last line of content sits behind it. */
+  padding-bottom: calc(6rem + env(safe-area-inset-bottom));
 }
 
 [data-theme="bbs"] .archive,
@@ -1023,11 +1024,13 @@
 }
 
 [data-theme="bbs"] .dossier {
+  align-content: center;
   background: none;
   border: 0;
   border-bottom: 1px dashed var(--rule);
   gap: 0.15rem;
-  min-height: 0;
+  /* Visually tight, but still a real touch target -- see the same note on `.action-card button` below. */
+  min-height: 44px;
   padding: 0.4rem 0 0.4rem 1.25rem;
 }
 
@@ -1096,8 +1099,11 @@
 }
 
 [data-theme="bbs"] .action-card button {
+  align-items: center;
   background: none;
   line-height: 1.35;
+  /* `padding` alone shrank this well under the 44px touch-target floor -- `min-height` restores it without puffing the button back up visually, since the text still sits close to its own line-height. */
+  min-height: 44px;
   padding: 0.35rem 0.4rem;
 }
 
@@ -1133,10 +1139,14 @@
 }
 
 [data-theme="bbs"] .cabinet-button {
+  align-items: center;
   background: none;
   border: 0;
   box-shadow: none;
+  display: inline-flex;
   margin: 0.25rem 0.5rem 0 0;
+  /* `padding` alone shrank this well under the 44px touch-target floor; `inline-flex` + `align-items: center` keeps the text centered in the taller box instead of pinned to its top. */
+  min-height: 44px;
   /* As a flex item of `.briefing-actions`/`.marquee-controls`, this would otherwise refuse to shrink below its unwrapped text width -- see the `.arrival-receipt strong` fix above for the same defect. */
   min-width: 0;
   overflow-wrap: break-word;
@@ -1214,7 +1224,8 @@
   border-top: 1px solid var(--rule);
   bottom: 0;
   left: 0;
-  padding: 0.6rem var(--page-inline);
+  /* `env(safe-area-inset-bottom)` keeps the input clear of an iPhone's home-indicator gesture strip instead of sitting flush behind it. */
+  padding: 0.6rem var(--page-inline) calc(0.6rem + env(safe-area-inset-bottom));
   position: fixed;
   right: 0;
   z-index: 4;

@@ -1,0 +1,1093 @@
+{
+  "formatVersion": 1,
+  "catalog": {
+    "title": "The Return",
+    "description": "Return to Bulgaria through city, village, or temporary-home routes.",
+    "duration": "8–12 min per route",
+    "contentNotice": "Themes of migration, family pressure, housing, and homesickness.",
+    "featured": false
+  },
+  "campaign": {
+    "id": "bulgaria-return",
+    "kindId": "story-graph",
+    "version": "2.0.0",
+    "titleKey": "return.campaign.title",
+    "content": {
+      "descriptionKey": "return.campaign.description",
+      "variables": {
+        "route": {
+          "type": "enum",
+          "initial": "city_return",
+          "values": [
+            "city_return",
+            "village_return",
+            "temporary_return"
+          ]
+        },
+        "preparation": {
+          "type": "int",
+          "initial": 0,
+          "min": 0,
+          "max": 12,
+          "visible": true,
+          "labelKey": "return.var_preparation.label"
+        },
+        "connections": {
+          "type": "int",
+          "initial": 0,
+          "min": 0,
+          "max": 12,
+          "visible": true,
+          "labelKey": "return.var_connections.label"
+        },
+        "pressure": {
+          "type": "int",
+          "initial": 0,
+          "min": 0,
+          "max": 12,
+          "visible": true,
+          "labelKey": "return.var_pressure.label"
+        },
+        "remembered_city_return": {
+          "type": "bool",
+          "initial": false
+        },
+        "remembered_village_return": {
+          "type": "bool",
+          "initial": false
+        },
+        "remembered_temporary_return": {
+          "type": "bool",
+          "initial": false
+        }
+      },
+      "nodes": {
+        "expat_returns": {
+          "id": "expat_returns",
+          "kind": "choice",
+          "textKey": "return.expat_returns.text",
+          "choices": [
+            {
+              "id": "smile",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "route",
+                  "value": "city_return"
+                }
+              ],
+              "goto": "city_return_1",
+              "labelKey": "return.expat_returns.choice_smile"
+            },
+            {
+              "id": "explain",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "route",
+                  "value": "village_return"
+                }
+              ],
+              "goto": "village_return_1",
+              "labelKey": "return.expat_returns.choice_explain"
+            },
+            {
+              "id": "laugh",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "route",
+                  "value": "temporary_return"
+                }
+              ],
+              "goto": "temporary_return_1",
+              "labelKey": "return.expat_returns.choice_laugh"
+            },
+            {
+              "id": "accept_destiny",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "route",
+                  "value": "city_return"
+                }
+              ],
+              "goto": "city_return_1",
+              "labelKey": "return.expat_returns.choice_accept_destiny"
+            }
+          ]
+        },
+        "city_return_1": {
+          "id": "city_return_1",
+          "kind": "choice",
+          "textKey": "return.city_return_1.text",
+          "choices": [
+            {
+              "id": "city_return_listen",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "remembered_city_return",
+                  "value": true
+                },
+                {
+                  "op": "increment",
+                  "var": "connections",
+                  "by": 1
+                }
+              ],
+              "goto": "city_return_event_1",
+              "labelKey": "return.city_return_1.listen"
+            },
+            {
+              "id": "city_return_push",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "remembered_city_return",
+                  "value": true
+                },
+                {
+                  "op": "increment",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "city_return_event_1",
+              "labelKey": "return.city_return_1.push"
+            }
+          ]
+        },
+        "city_return_event_1": {
+          "id": "city_return_event_1",
+          "kind": "random",
+          "textKey": "return.city_return_event_1.text",
+          "transitions": [
+            {
+              "weight": 1,
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "preparation",
+                  "by": 1
+                }
+              ],
+              "goto": "city_return_event_1a"
+            },
+            {
+              "weight": 1,
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "city_return_event_1b"
+            }
+          ]
+        },
+        "city_return_event_1a": {
+          "id": "city_return_event_1a",
+          "kind": "choice",
+          "textKey": "return.city_return_event_1a.text",
+          "choices": [
+            {
+              "id": "city_return_event_1a_proceed",
+              "goto": "city_return_2",
+              "labelKey": "return.city_return_event_1a.proceed"
+            }
+          ]
+        },
+        "city_return_event_1b": {
+          "id": "city_return_event_1b",
+          "kind": "choice",
+          "textKey": "return.city_return_event_1b.text",
+          "choices": [
+            {
+              "id": "city_return_event_1b_proceed",
+              "goto": "city_return_2",
+              "labelKey": "return.city_return_event_1b.proceed"
+            }
+          ]
+        },
+        "city_return_2": {
+          "id": "city_return_2",
+          "kind": "choice",
+          "textKey": "return.city_return_2.text",
+          "choices": [
+            {
+              "id": "city_return_prepare",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "preparation",
+                  "by": 1
+                }
+              ],
+              "goto": "city_return_event_2",
+              "labelKey": "return.city_return_2.prepare"
+            },
+            {
+              "id": "city_return_improvise",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "city_return_event_2",
+              "labelKey": "return.city_return_2.improvise"
+            }
+          ]
+        },
+        "city_return_event_2": {
+          "id": "city_return_event_2",
+          "kind": "random",
+          "textKey": "return.city_return_event_2.text",
+          "transitions": [
+            {
+              "weight": 1,
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "connections",
+                  "by": 1
+                }
+              ],
+              "goto": "city_return_event_2a"
+            },
+            {
+              "weight": 1,
+              "goto": "city_return_event_2b"
+            }
+          ]
+        },
+        "city_return_event_2a": {
+          "id": "city_return_event_2a",
+          "kind": "choice",
+          "textKey": "return.city_return_event_2a.text",
+          "choices": [
+            {
+              "id": "city_return_event_2a_proceed",
+              "goto": "city_return_3",
+              "labelKey": "return.city_return_event_2a.proceed"
+            }
+          ]
+        },
+        "city_return_event_2b": {
+          "id": "city_return_event_2b",
+          "kind": "choice",
+          "textKey": "return.city_return_event_2b.text",
+          "choices": [
+            {
+              "id": "city_return_event_2b_proceed",
+              "goto": "city_return_3",
+              "labelKey": "return.city_return_event_2b.proceed"
+            }
+          ]
+        },
+        "city_return_3": {
+          "id": "city_return_3",
+          "kind": "choice",
+          "textKey": "return.city_return_3.text",
+          "choices": [
+            {
+              "id": "city_return_steady",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "preparation",
+                  "by": 1
+                }
+              ],
+              "goto": "city_return_4",
+              "labelKey": "return.city_return_3.steady"
+            },
+            {
+              "id": "city_return_call_in_favour",
+              "requirements": {
+                "field": "var.connections",
+                "operator": "greater_or_equal",
+                "value": 1
+              },
+              "effects": [
+                {
+                  "op": "decrement",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "city_return_4",
+              "labelKey": "return.city_return_3.favour",
+              "requirementFailKey": "return.city_return_3.favour_fail"
+            }
+          ]
+        },
+        "city_return_4": {
+          "id": "city_return_4",
+          "kind": "choice",
+          "textKey": "return.city_return_4.text",
+          "choices": [
+            {
+              "id": "choose_optimistic_return",
+              "goto": "ending_optimistic_return",
+              "labelKey": "return.city_return_4.ending_optimistic_return"
+            },
+            {
+              "id": "choose_city_with_open_eyes",
+              "showWhen": {
+                "field": "var.remembered_city_return",
+                "operator": "equals",
+                "value": true
+              },
+              "goto": "ending_city_with_open_eyes",
+              "labelKey": "return.city_return_4.ending_city_with_open_eyes"
+            }
+          ]
+        },
+        "ending_optimistic_return": {
+          "id": "ending_optimistic_return",
+          "kind": "ending",
+          "textKey": "return.ending_optimistic_return.text",
+          "endingId": "optimistic_return",
+          "outcome": "win"
+        },
+        "ending_city_with_open_eyes": {
+          "id": "ending_city_with_open_eyes",
+          "kind": "ending",
+          "textKey": "return.ending_city_with_open_eyes.text",
+          "endingId": "city_with_open_eyes",
+          "outcome": "neutral"
+        },
+        "village_return_1": {
+          "id": "village_return_1",
+          "kind": "choice",
+          "textKey": "return.village_return_1.text",
+          "choices": [
+            {
+              "id": "village_return_listen",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "remembered_village_return",
+                  "value": true
+                },
+                {
+                  "op": "increment",
+                  "var": "connections",
+                  "by": 1
+                }
+              ],
+              "goto": "village_return_event_1",
+              "labelKey": "return.village_return_1.listen"
+            },
+            {
+              "id": "village_return_push",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "remembered_village_return",
+                  "value": true
+                },
+                {
+                  "op": "increment",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "village_return_event_1",
+              "labelKey": "return.village_return_1.push"
+            }
+          ]
+        },
+        "village_return_event_1": {
+          "id": "village_return_event_1",
+          "kind": "random",
+          "textKey": "return.village_return_event_1.text",
+          "transitions": [
+            {
+              "weight": 1,
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "preparation",
+                  "by": 1
+                }
+              ],
+              "goto": "village_return_event_1a"
+            },
+            {
+              "weight": 1,
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "village_return_event_1b"
+            }
+          ]
+        },
+        "village_return_event_1a": {
+          "id": "village_return_event_1a",
+          "kind": "choice",
+          "textKey": "return.village_return_event_1a.text",
+          "choices": [
+            {
+              "id": "village_return_event_1a_proceed",
+              "goto": "village_return_2",
+              "labelKey": "return.village_return_event_1a.proceed"
+            }
+          ]
+        },
+        "village_return_event_1b": {
+          "id": "village_return_event_1b",
+          "kind": "choice",
+          "textKey": "return.village_return_event_1b.text",
+          "choices": [
+            {
+              "id": "village_return_event_1b_proceed",
+              "goto": "village_return_2",
+              "labelKey": "return.village_return_event_1b.proceed"
+            }
+          ]
+        },
+        "village_return_2": {
+          "id": "village_return_2",
+          "kind": "choice",
+          "textKey": "return.village_return_2.text",
+          "choices": [
+            {
+              "id": "village_return_prepare",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "preparation",
+                  "by": 1
+                }
+              ],
+              "goto": "village_return_event_2",
+              "labelKey": "return.village_return_2.prepare"
+            },
+            {
+              "id": "village_return_improvise",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "village_return_event_2",
+              "labelKey": "return.village_return_2.improvise"
+            }
+          ]
+        },
+        "village_return_event_2": {
+          "id": "village_return_event_2",
+          "kind": "random",
+          "textKey": "return.village_return_event_2.text",
+          "transitions": [
+            {
+              "weight": 1,
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "connections",
+                  "by": 1
+                }
+              ],
+              "goto": "village_return_event_2a"
+            },
+            {
+              "weight": 1,
+              "goto": "village_return_event_2b"
+            }
+          ]
+        },
+        "village_return_event_2a": {
+          "id": "village_return_event_2a",
+          "kind": "choice",
+          "textKey": "return.village_return_event_2a.text",
+          "choices": [
+            {
+              "id": "village_return_event_2a_proceed",
+              "goto": "village_return_3",
+              "labelKey": "return.village_return_event_2a.proceed"
+            }
+          ]
+        },
+        "village_return_event_2b": {
+          "id": "village_return_event_2b",
+          "kind": "choice",
+          "textKey": "return.village_return_event_2b.text",
+          "choices": [
+            {
+              "id": "village_return_event_2b_proceed",
+              "goto": "village_return_3",
+              "labelKey": "return.village_return_event_2b.proceed"
+            }
+          ]
+        },
+        "village_return_3": {
+          "id": "village_return_3",
+          "kind": "choice",
+          "textKey": "return.village_return_3.text",
+          "choices": [
+            {
+              "id": "village_return_steady",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "preparation",
+                  "by": 1
+                }
+              ],
+              "goto": "village_return_4",
+              "labelKey": "return.village_return_3.steady"
+            },
+            {
+              "id": "village_return_call_in_favour",
+              "requirements": {
+                "field": "var.connections",
+                "operator": "greater_or_equal",
+                "value": 1
+              },
+              "effects": [
+                {
+                  "op": "decrement",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "village_return_4",
+              "labelKey": "return.village_return_3.favour",
+              "requirementFailKey": "return.village_return_3.favour_fail"
+            }
+          ]
+        },
+        "village_return_4": {
+          "id": "village_return_4",
+          "kind": "choice",
+          "textKey": "return.village_return_4.text",
+          "choices": [
+            {
+              "id": "choose_settled_in_the_village",
+              "showWhen": {
+                "field": "var.remembered_village_return",
+                "operator": "equals",
+                "value": true
+              },
+              "goto": "ending_settled_in_the_village",
+              "labelKey": "return.village_return_4.ending_settled_in_the_village"
+            }
+          ]
+        },
+        "ending_settled_in_the_village": {
+          "id": "ending_settled_in_the_village",
+          "kind": "ending",
+          "textKey": "return.ending_settled_in_the_village.text",
+          "endingId": "settled_in_the_village",
+          "outcome": "win"
+        },
+        "temporary_return_1": {
+          "id": "temporary_return_1",
+          "kind": "choice",
+          "textKey": "return.temporary_return_1.text",
+          "choices": [
+            {
+              "id": "temporary_return_listen",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "remembered_temporary_return",
+                  "value": true
+                },
+                {
+                  "op": "increment",
+                  "var": "connections",
+                  "by": 1
+                }
+              ],
+              "goto": "temporary_return_event_1",
+              "labelKey": "return.temporary_return_1.listen"
+            },
+            {
+              "id": "temporary_return_push",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "remembered_temporary_return",
+                  "value": true
+                },
+                {
+                  "op": "increment",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "temporary_return_event_1",
+              "labelKey": "return.temporary_return_1.push"
+            }
+          ]
+        },
+        "temporary_return_event_1": {
+          "id": "temporary_return_event_1",
+          "kind": "random",
+          "textKey": "return.temporary_return_event_1.text",
+          "transitions": [
+            {
+              "weight": 1,
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "preparation",
+                  "by": 1
+                }
+              ],
+              "goto": "temporary_return_event_1a"
+            },
+            {
+              "weight": 1,
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "temporary_return_event_1b"
+            }
+          ]
+        },
+        "temporary_return_event_1a": {
+          "id": "temporary_return_event_1a",
+          "kind": "choice",
+          "textKey": "return.temporary_return_event_1a.text",
+          "choices": [
+            {
+              "id": "temporary_return_event_1a_proceed",
+              "goto": "temporary_return_2",
+              "labelKey": "return.temporary_return_event_1a.proceed"
+            }
+          ]
+        },
+        "temporary_return_event_1b": {
+          "id": "temporary_return_event_1b",
+          "kind": "choice",
+          "textKey": "return.temporary_return_event_1b.text",
+          "choices": [
+            {
+              "id": "temporary_return_event_1b_proceed",
+              "goto": "temporary_return_2",
+              "labelKey": "return.temporary_return_event_1b.proceed"
+            }
+          ]
+        },
+        "temporary_return_2": {
+          "id": "temporary_return_2",
+          "kind": "choice",
+          "textKey": "return.temporary_return_2.text",
+          "choices": [
+            {
+              "id": "temporary_return_prepare",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "preparation",
+                  "by": 1
+                }
+              ],
+              "goto": "temporary_return_event_2",
+              "labelKey": "return.temporary_return_2.prepare"
+            },
+            {
+              "id": "temporary_return_improvise",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "temporary_return_event_2",
+              "labelKey": "return.temporary_return_2.improvise"
+            }
+          ]
+        },
+        "temporary_return_event_2": {
+          "id": "temporary_return_event_2",
+          "kind": "random",
+          "textKey": "return.temporary_return_event_2.text",
+          "transitions": [
+            {
+              "weight": 1,
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "connections",
+                  "by": 1
+                }
+              ],
+              "goto": "temporary_return_event_2a"
+            },
+            {
+              "weight": 1,
+              "goto": "temporary_return_event_2b"
+            }
+          ]
+        },
+        "temporary_return_event_2a": {
+          "id": "temporary_return_event_2a",
+          "kind": "choice",
+          "textKey": "return.temporary_return_event_2a.text",
+          "choices": [
+            {
+              "id": "temporary_return_event_2a_proceed",
+              "goto": "temporary_return_3",
+              "labelKey": "return.temporary_return_event_2a.proceed"
+            }
+          ]
+        },
+        "temporary_return_event_2b": {
+          "id": "temporary_return_event_2b",
+          "kind": "choice",
+          "textKey": "return.temporary_return_event_2b.text",
+          "choices": [
+            {
+              "id": "temporary_return_event_2b_proceed",
+              "goto": "temporary_return_3",
+              "labelKey": "return.temporary_return_event_2b.proceed"
+            }
+          ]
+        },
+        "temporary_return_3": {
+          "id": "temporary_return_3",
+          "kind": "choice",
+          "textKey": "return.temporary_return_3.text",
+          "choices": [
+            {
+              "id": "temporary_return_steady",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "preparation",
+                  "by": 1
+                }
+              ],
+              "goto": "temporary_return_4",
+              "labelKey": "return.temporary_return_3.steady"
+            },
+            {
+              "id": "temporary_return_call_in_favour",
+              "requirements": {
+                "field": "var.connections",
+                "operator": "greater_or_equal",
+                "value": 1
+              },
+              "effects": [
+                {
+                  "op": "decrement",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "temporary_return_4",
+              "labelKey": "return.temporary_return_3.favour",
+              "requirementFailKey": "return.temporary_return_3.favour_fail"
+            }
+          ]
+        },
+        "temporary_return_4": {
+          "id": "temporary_return_4",
+          "kind": "choice",
+          "textKey": "return.temporary_return_4.text",
+          "choices": [
+            {
+              "id": "choose_exhausted_departure",
+              "goto": "ending_exhausted_departure",
+              "labelKey": "return.temporary_return_4.ending_exhausted_departure"
+            },
+            {
+              "id": "choose_home_again",
+              "showWhen": {
+                "field": "var.remembered_temporary_return",
+                "operator": "equals",
+                "value": true
+              },
+              "goto": "ending_home_again",
+              "labelKey": "return.temporary_return_4.ending_home_again"
+            }
+          ]
+        },
+        "ending_exhausted_departure": {
+          "id": "ending_exhausted_departure",
+          "kind": "ending",
+          "textKey": "return.ending_exhausted_departure.text",
+          "endingId": "exhausted_departure",
+          "outcome": "neutral"
+        },
+        "ending_home_again": {
+          "id": "ending_home_again",
+          "kind": "ending",
+          "textKey": "return.ending_home_again.text",
+          "endingId": "home_again",
+          "outcome": "win"
+        }
+      },
+      "startNodeId": "expat_returns",
+      "achievements": [
+        {
+          "id": "found_city_return_event_1a",
+          "hidden": true,
+          "condition": {
+            "field": "visited.city_return_event_1a",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "return.achievement_city_return_event_1a.name",
+          "descriptionKey": "return.achievement_city_return_event_1a.description"
+        },
+        {
+          "id": "found_city_return_event_1b",
+          "hidden": true,
+          "condition": {
+            "field": "visited.city_return_event_1b",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "return.achievement_city_return_event_1b.name",
+          "descriptionKey": "return.achievement_city_return_event_1b.description"
+        },
+        {
+          "id": "found_city_return_event_2a",
+          "hidden": true,
+          "condition": {
+            "field": "visited.city_return_event_2a",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "return.achievement_city_return_event_2a.name",
+          "descriptionKey": "return.achievement_city_return_event_2a.description"
+        },
+        {
+          "id": "found_city_return_event_2b",
+          "hidden": true,
+          "condition": {
+            "field": "visited.city_return_event_2b",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "return.achievement_city_return_event_2b.name",
+          "descriptionKey": "return.achievement_city_return_event_2b.description"
+        },
+        {
+          "id": "found_village_return_event_1a",
+          "hidden": true,
+          "condition": {
+            "field": "visited.village_return_event_1a",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "return.achievement_village_return_event_1a.name",
+          "descriptionKey": "return.achievement_village_return_event_1a.description"
+        },
+        {
+          "id": "found_village_return_event_1b",
+          "hidden": true,
+          "condition": {
+            "field": "visited.village_return_event_1b",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "return.achievement_village_return_event_1b.name",
+          "descriptionKey": "return.achievement_village_return_event_1b.description"
+        },
+        {
+          "id": "found_village_return_event_2a",
+          "hidden": true,
+          "condition": {
+            "field": "visited.village_return_event_2a",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "return.achievement_village_return_event_2a.name",
+          "descriptionKey": "return.achievement_village_return_event_2a.description"
+        },
+        {
+          "id": "found_village_return_event_2b",
+          "hidden": true,
+          "condition": {
+            "field": "visited.village_return_event_2b",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "return.achievement_village_return_event_2b.name",
+          "descriptionKey": "return.achievement_village_return_event_2b.description"
+        },
+        {
+          "id": "found_temporary_return_event_1a",
+          "hidden": true,
+          "condition": {
+            "field": "visited.temporary_return_event_1a",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "return.achievement_temporary_return_event_1a.name",
+          "descriptionKey": "return.achievement_temporary_return_event_1a.description"
+        },
+        {
+          "id": "found_temporary_return_event_1b",
+          "hidden": true,
+          "condition": {
+            "field": "visited.temporary_return_event_1b",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "return.achievement_temporary_return_event_1b.name",
+          "descriptionKey": "return.achievement_temporary_return_event_1b.description"
+        },
+        {
+          "id": "found_temporary_return_event_2a",
+          "hidden": true,
+          "condition": {
+            "field": "visited.temporary_return_event_2a",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "return.achievement_temporary_return_event_2a.name",
+          "descriptionKey": "return.achievement_temporary_return_event_2a.description"
+        },
+        {
+          "id": "found_temporary_return_event_2b",
+          "hidden": true,
+          "condition": {
+            "field": "visited.temporary_return_event_2b",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "return.achievement_temporary_return_event_2b.name",
+          "descriptionKey": "return.achievement_temporary_return_event_2b.description"
+        }
+      ]
+    }
+  },
+  "migration": {
+    "fromVersion": "1.0.0",
+    "nodeMap": {
+      "home_again": "ending_home_again"
+    }
+  },
+  "strings": {
+    "return.achievement_city_return_event_1a.description": "Discover an optional page on this route.",
+    "return.achievement_city_return_event_1a.name": "Found: the city welcome",
+    "return.achievement_city_return_event_1b.description": "Discover an optional page on this route.",
+    "return.achievement_city_return_event_1b.name": "Found: the city welcome",
+    "return.achievement_city_return_event_2a.description": "Discover an optional page on this route.",
+    "return.achievement_city_return_event_2a.name": "Found: the city welcome",
+    "return.achievement_city_return_event_2b.description": "Discover an optional page on this route.",
+    "return.achievement_city_return_event_2b.name": "Found: the city welcome",
+    "return.achievement_temporary_return_event_1a.description": "Discover an optional page on this route.",
+    "return.achievement_temporary_return_event_1a.name": "Found: the hotel ledger",
+    "return.achievement_temporary_return_event_1b.description": "Discover an optional page on this route.",
+    "return.achievement_temporary_return_event_1b.name": "Found: the hotel ledger",
+    "return.achievement_temporary_return_event_2a.description": "Discover an optional page on this route.",
+    "return.achievement_temporary_return_event_2a.name": "Found: the hotel ledger",
+    "return.achievement_temporary_return_event_2b.description": "Discover an optional page on this route.",
+    "return.achievement_temporary_return_event_2b.name": "Found: the hotel ledger",
+    "return.achievement_village_return_event_1a.description": "Discover an optional page on this route.",
+    "return.achievement_village_return_event_1a.name": "Found: the neighbour's map",
+    "return.achievement_village_return_event_1b.description": "Discover an optional page on this route.",
+    "return.achievement_village_return_event_1b.name": "Found: the neighbour's map",
+    "return.achievement_village_return_event_2a.description": "Discover an optional page on this route.",
+    "return.achievement_village_return_event_2a.name": "Found: the neighbour's map",
+    "return.achievement_village_return_event_2b.description": "Discover an optional page on this route.",
+    "return.achievement_village_return_event_2b.name": "Found: the neighbour's map",
+    "return.campaign.description": "A homecoming in three acts: arrival, reality, and the difficult art of settling.",
+    "return.campaign.title": "Return",
+    "return.city_return_1.listen": "Answer every question without performing expatriate expertise",
+    "return.city_return_1.push": "Explain how customs works elsewhere",
+    "return.city_return_1.text": "The customs officer studies the espresso machine in your luggage as if it has requested citizenship.",
+    "return.city_return_2.improvise": "Trust the photographs",
+    "return.city_return_2.prepare": "Call the landlord before viewing",
+    "return.city_return_2.text": "Your first landlord quotes rent in euros and nostalgia in leva. The apartment has a view of three parking disputes.",
+    "return.city_return_3.favour": "Call in the favour you earned",
+    "return.city_return_3.favour_fail": "No one owes you that favour yet.",
+    "return.city_return_3.steady": "Use what you prepared",
+    "return.city_return_3.text": "An old colleague offers introductions, warnings, and a desk that becomes available whenever its owner moves the printer.",
+    "return.city_return_4.ending_city_with_open_eyes": "The Sceptical Returner",
+    "return.city_return_4.ending_optimistic_return": "The Returner",
+    "return.city_return_4.text": "A month later the city no longer feels foreign, which is not the same thing as feeling easy. You decide what returning will mean.",
+    "return.city_return_event_1.text": "The day contributes its own amendment.",
+    "return.city_return_event_1a.proceed": "Keep the stamped luggage slip",
+    "return.city_return_event_1a.text": "The luggage slip gets you through a second inspection in twelve seconds.",
+    "return.city_return_event_1b.proceed": "Accept the officer's improvised declaration",
+    "return.city_return_event_1b.text": "A shift change starts the entire conversation again, now with chairs.",
+    "return.city_return_event_2.text": "A seeded interruption arrives on schedule.",
+    "return.city_return_event_2a.proceed": "Meet the old colleague for coffee",
+    "return.city_return_event_2a.text": "Your colleague remembers the one clerk who still answers email.",
+    "return.city_return_event_2b.proceed": "Follow a cheaper-flat lead",
+    "return.city_return_event_2b.text": "The cheaper flat is real; the bathroom is an interpretive proposal.",
+    "return.ending_city_with_open_eyes.text": "The Sceptical Returner\n\nYou stay without pretending the city is perfect or that abroad ever was.",
+    "return.ending_exhausted_departure.text": "The Open Return Ticket\n\nYou leave exhausted, keeping the key. Some decisions need distance before they become answers.",
+    "return.ending_home_again.text": "Home Again\n\nThe questions become routine, the advice ambient, and the mechanic recommendation useful. You stay.",
+    "return.ending_optimistic_return.text": "The Returner\n\nYou build a life from old streets and new boundaries. Home becomes a verb again.",
+    "return.ending_settled_in_the_village.text": "A Light in the Village\n\nYou stay. The roof holds, the neighbours knock, and the silence finally includes you.",
+    "return.expat_returns.choice_accept_destiny": "Accept your destiny and stay in the city",
+    "return.expat_returns.choice_explain": "Explain nothing; take the village road",
+    "return.expat_returns.choice_laugh": "Laugh and book a room for one more week",
+    "return.expat_returns.choice_smile": "Smile and try the city again",
+    "return.expat_returns.text": "After years abroad, you land in Sofia with two suitcases and a theory that coming home will be simpler than leaving. Customs, family, and the airport taxi rank have prepared counterarguments.",
+    "return.temporary_return_1.listen": "Ask the receptionist what changed",
+    "return.temporary_return_1.push": "Keep the booking strictly temporary",
+    "return.temporary_return_1.text": "The hotel receptionist recognizes your accent, upgrades your opinion, and asks when you are leaving again.",
+    "return.temporary_return_2.improvise": "Open the airline app instead",
+    "return.temporary_return_2.prepare": "Inspect the apartment key",
+    "return.temporary_return_2.text": "Family lunches expand to occupy every decision you postponed while abroad.",
+    "return.temporary_return_3.favour": "Call in the favour you earned",
+    "return.temporary_return_3.favour_fail": "No one owes you that favour yet.",
+    "return.temporary_return_3.steady": "Use what you prepared",
+    "return.temporary_return_3.text": "A return ticket sits in your inbox while an aunt quietly leaves an apartment key beside your coffee.",
+    "return.temporary_return_4.ending_exhausted_departure": "The Open Return Ticket",
+    "return.temporary_return_4.ending_home_again": "Home Again",
+    "return.temporary_return_4.text": "The final morning arrives without resolving whether departure is failure, wisdom, or simply another route home.",
+    "return.temporary_return_event_1.text": "The day contributes its own amendment.",
+    "return.temporary_return_event_1a.proceed": "Write down the family promises",
+    "return.temporary_return_event_1a.text": "The old hotel ledger still carries your family's name from a wedding in 1986.",
+    "return.temporary_return_event_1b.proceed": "Let lunch decide the afternoon",
+    "return.temporary_return_event_1b.text": "A conference fills the hotel and relocates you to a room above the kitchen.",
+    "return.temporary_return_event_2.text": "A seeded interruption arrives on schedule.",
+    "return.temporary_return_event_2a.proceed": "Walk the neighbourhood at dawn",
+    "return.temporary_return_event_2a.text": "The apartment is small, sunny, and legally entangled only in ordinary ways.",
+    "return.temporary_return_event_2b.proceed": "Take one last airport taxi",
+    "return.temporary_return_event_2b.text": "The taxi driver gives a complete economic forecast before the ring road.",
+    "return.var_connections.label": "Old Connections",
+    "return.var_preparation.label": "Local Knowledge",
+    "return.var_pressure.label": "Homesickness",
+    "return.village_return_1.listen": "Listen to the neighbour's full history",
+    "return.village_return_1.push": "Start repairs before anyone can advise you",
+    "return.village_return_1.text": "The village house is beautiful from the road and urgently educational from inside. A neighbour arrives before the electricity does.",
+    "return.village_return_2.improvise": "Buy tiles and hope",
+    "return.village_return_2.prepare": "Check the deeds before the roof",
+    "return.village_return_2.text": "The well works, the roof mostly works, and four relatives disagree about which wall technically belongs to whom.",
+    "return.village_return_3.favour": "Call in the favour you earned",
+    "return.village_return_3.favour_fail": "No one owes you that favour yet.",
+    "return.village_return_3.steady": "Use what you prepared",
+    "return.village_return_3.text": "You trade a day of clearing weeds for a hand-drawn map of pipes, boundaries, and grudges.",
+    "return.village_return_4.ending_settled_in_the_village": "A Light in the Village",
+    "return.village_return_4.text": "Winter makes the village honest. The quiet is generous; the distance to everything is not.",
+    "return.village_return_event_1.text": "The day contributes its own amendment.",
+    "return.village_return_event_1a.proceed": "Photograph the map",
+    "return.village_return_event_1a.text": "The map reveals a stopcock hidden beneath a plum tree and two decades of leaves.",
+    "return.village_return_event_1b.proceed": "Follow the pipe that sounds least theoretical",
+    "return.village_return_event_1b.text": "The first pipe you touch introduces itself by flooding the pantry.",
+    "return.village_return_event_2.text": "A seeded interruption arrives on schedule.",
+    "return.village_return_event_2a.proceed": "Ask who has the tractor",
+    "return.village_return_event_2a.text": "The tractor owner arrives with rope, coffee, and no interest in payment.",
+    "return.village_return_event_2b.proceed": "Wait for the mobile shop",
+    "return.village_return_event_2b.text": "The mobile shop skips Tuesday because Tuesday has become Wednesday locally."
+  }
+}

@@ -1,0 +1,1123 @@
+{
+  "formatVersion": 1,
+  "catalog": {
+    "title": "The Bureaucracy",
+    "description": "Municipal, cadastral, archive, notary, and translation routes through one determined folder.",
+    "duration": "10–15 min per route",
+    "contentNotice": "Satirical depictions of public offices, administrative failure, and financial frustration.",
+    "featured": false
+  },
+  "campaign": {
+    "id": "bulgaria-bureaucracy",
+    "kindId": "story-graph",
+    "version": "2.0.0",
+    "titleKey": "bureaucracy.campaign.title",
+    "content": {
+      "descriptionKey": "bureaucracy.campaign.description",
+      "variables": {
+        "route": {
+          "type": "enum",
+          "initial": "registry_route",
+          "values": [
+            "registry_route",
+            "archive_route",
+            "supervisor_route"
+          ]
+        },
+        "preparation": {
+          "type": "int",
+          "initial": 0,
+          "min": 0,
+          "max": 12,
+          "visible": true,
+          "labelKey": "bureaucracy.var_preparation.label"
+        },
+        "connections": {
+          "type": "int",
+          "initial": 0,
+          "min": 0,
+          "max": 12,
+          "visible": true,
+          "labelKey": "bureaucracy.var_connections.label"
+        },
+        "pressure": {
+          "type": "int",
+          "initial": 0,
+          "min": 0,
+          "max": 12,
+          "visible": true,
+          "labelKey": "bureaucracy.var_pressure.label"
+        },
+        "remembered_registry_route": {
+          "type": "bool",
+          "initial": false
+        },
+        "remembered_archive_route": {
+          "type": "bool",
+          "initial": false
+        },
+        "remembered_supervisor_route": {
+          "type": "bool",
+          "initial": false
+        }
+      },
+      "nodes": {
+        "municipality": {
+          "id": "municipality",
+          "kind": "choice",
+          "textKey": "bureaucracy.municipality.text",
+          "choices": [
+            {
+              "id": "wait",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "route",
+                  "value": "registry_route"
+                }
+              ],
+              "goto": "registry_route_1",
+              "labelKey": "bureaucracy.municipality.choice_wait"
+            },
+            {
+              "id": "ask_guard",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "route",
+                  "value": "archive_route"
+                }
+              ],
+              "goto": "archive_route_1",
+              "labelKey": "bureaucracy.municipality.choice_ask_guard"
+            },
+            {
+              "id": "coffee",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "route",
+                  "value": "supervisor_route"
+                }
+              ],
+              "goto": "supervisor_route_1",
+              "labelKey": "bureaucracy.municipality.choice_coffee"
+            },
+            {
+              "id": "try_another_entrance",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "route",
+                  "value": "archive_route"
+                }
+              ],
+              "goto": "archive_route_1",
+              "labelKey": "bureaucracy.municipality.choice_try_another_entrance"
+            }
+          ]
+        },
+        "registry_route_1": {
+          "id": "registry_route_1",
+          "kind": "choice",
+          "textKey": "bureaucracy.registry_route_1.text",
+          "choices": [
+            {
+              "id": "registry_route_listen",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "remembered_registry_route",
+                  "value": true
+                },
+                {
+                  "op": "increment",
+                  "var": "connections",
+                  "by": 1
+                }
+              ],
+              "goto": "registry_route_event_1",
+              "labelKey": "bureaucracy.registry_route_1.listen"
+            },
+            {
+              "id": "registry_route_push",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "remembered_registry_route",
+                  "value": true
+                },
+                {
+                  "op": "increment",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "registry_route_event_1",
+              "labelKey": "bureaucracy.registry_route_1.push"
+            }
+          ]
+        },
+        "registry_route_event_1": {
+          "id": "registry_route_event_1",
+          "kind": "random",
+          "textKey": "bureaucracy.registry_route_event_1.text",
+          "transitions": [
+            {
+              "weight": 1,
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "preparation",
+                  "by": 1
+                }
+              ],
+              "goto": "registry_route_event_1a"
+            },
+            {
+              "weight": 1,
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "registry_route_event_1b"
+            }
+          ]
+        },
+        "registry_route_event_1a": {
+          "id": "registry_route_event_1a",
+          "kind": "choice",
+          "textKey": "bureaucracy.registry_route_event_1a.text",
+          "choices": [
+            {
+              "id": "registry_route_event_1a_proceed",
+              "goto": "registry_route_2",
+              "labelKey": "bureaucracy.registry_route_event_1a.proceed"
+            }
+          ]
+        },
+        "registry_route_event_1b": {
+          "id": "registry_route_event_1b",
+          "kind": "choice",
+          "textKey": "bureaucracy.registry_route_event_1b.text",
+          "choices": [
+            {
+              "id": "registry_route_event_1b_proceed",
+              "goto": "registry_route_2",
+              "labelKey": "bureaucracy.registry_route_event_1b.proceed"
+            }
+          ]
+        },
+        "registry_route_2": {
+          "id": "registry_route_2",
+          "kind": "choice",
+          "textKey": "bureaucracy.registry_route_2.text",
+          "choices": [
+            {
+              "id": "registry_route_prepare",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "preparation",
+                  "by": 1
+                }
+              ],
+              "goto": "registry_route_event_2",
+              "labelKey": "bureaucracy.registry_route_2.prepare"
+            },
+            {
+              "id": "registry_route_improvise",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "registry_route_event_2",
+              "labelKey": "bureaucracy.registry_route_2.improvise"
+            }
+          ]
+        },
+        "registry_route_event_2": {
+          "id": "registry_route_event_2",
+          "kind": "random",
+          "textKey": "bureaucracy.registry_route_event_2.text",
+          "transitions": [
+            {
+              "weight": 1,
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "connections",
+                  "by": 1
+                }
+              ],
+              "goto": "registry_route_event_2a"
+            },
+            {
+              "weight": 1,
+              "goto": "registry_route_event_2b"
+            }
+          ]
+        },
+        "registry_route_event_2a": {
+          "id": "registry_route_event_2a",
+          "kind": "choice",
+          "textKey": "bureaucracy.registry_route_event_2a.text",
+          "choices": [
+            {
+              "id": "registry_route_event_2a_proceed",
+              "goto": "registry_route_3",
+              "labelKey": "bureaucracy.registry_route_event_2a.proceed"
+            }
+          ]
+        },
+        "registry_route_event_2b": {
+          "id": "registry_route_event_2b",
+          "kind": "choice",
+          "textKey": "bureaucracy.registry_route_event_2b.text",
+          "choices": [
+            {
+              "id": "registry_route_event_2b_proceed",
+              "goto": "registry_route_3",
+              "labelKey": "bureaucracy.registry_route_event_2b.proceed"
+            }
+          ]
+        },
+        "registry_route_3": {
+          "id": "registry_route_3",
+          "kind": "choice",
+          "textKey": "bureaucracy.registry_route_3.text",
+          "choices": [
+            {
+              "id": "registry_route_steady",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "preparation",
+                  "by": 1
+                }
+              ],
+              "goto": "registry_route_4",
+              "labelKey": "bureaucracy.registry_route_3.steady"
+            },
+            {
+              "id": "registry_route_call_in_favour",
+              "requirements": {
+                "field": "var.connections",
+                "operator": "greater_or_equal",
+                "value": 1
+              },
+              "effects": [
+                {
+                  "op": "decrement",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "registry_route_4",
+              "labelKey": "bureaucracy.registry_route_3.favour",
+              "requirementFailKey": "bureaucracy.registry_route_3.favour_fail"
+            }
+          ]
+        },
+        "registry_route_4": {
+          "id": "registry_route_4",
+          "kind": "choice",
+          "textKey": "bureaucracy.registry_route_4.text",
+          "choices": [
+            {
+              "id": "choose_document_obtained",
+              "goto": "ending_document_obtained",
+              "labelKey": "bureaucracy.registry_route_4.ending_document_obtained"
+            },
+            {
+              "id": "choose_miracle",
+              "showWhen": {
+                "field": "var.remembered_registry_route",
+                "operator": "equals",
+                "value": true
+              },
+              "goto": "ending_miracle",
+              "labelKey": "bureaucracy.registry_route_4.ending_miracle"
+            }
+          ]
+        },
+        "ending_document_obtained": {
+          "id": "ending_document_obtained",
+          "kind": "ending",
+          "textKey": "bureaucracy.ending_document_obtained.text",
+          "endingId": "document_obtained",
+          "outcome": "win"
+        },
+        "ending_miracle": {
+          "id": "ending_miracle",
+          "kind": "ending",
+          "textKey": "bureaucracy.ending_miracle.text",
+          "endingId": "miracle",
+          "outcome": "win"
+        },
+        "archive_route_1": {
+          "id": "archive_route_1",
+          "kind": "choice",
+          "textKey": "bureaucracy.archive_route_1.text",
+          "choices": [
+            {
+              "id": "archive_route_listen",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "remembered_archive_route",
+                  "value": true
+                },
+                {
+                  "op": "increment",
+                  "var": "connections",
+                  "by": 1
+                }
+              ],
+              "goto": "archive_route_event_1",
+              "labelKey": "bureaucracy.archive_route_1.listen"
+            },
+            {
+              "id": "archive_route_push",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "remembered_archive_route",
+                  "value": true
+                },
+                {
+                  "op": "increment",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "archive_route_event_1",
+              "labelKey": "bureaucracy.archive_route_1.push"
+            }
+          ]
+        },
+        "archive_route_event_1": {
+          "id": "archive_route_event_1",
+          "kind": "random",
+          "textKey": "bureaucracy.archive_route_event_1.text",
+          "transitions": [
+            {
+              "weight": 1,
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "preparation",
+                  "by": 1
+                }
+              ],
+              "goto": "archive_route_event_1a"
+            },
+            {
+              "weight": 1,
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "archive_route_event_1b"
+            }
+          ]
+        },
+        "archive_route_event_1a": {
+          "id": "archive_route_event_1a",
+          "kind": "choice",
+          "textKey": "bureaucracy.archive_route_event_1a.text",
+          "choices": [
+            {
+              "id": "archive_route_event_1a_proceed",
+              "goto": "archive_route_2",
+              "labelKey": "bureaucracy.archive_route_event_1a.proceed"
+            }
+          ]
+        },
+        "archive_route_event_1b": {
+          "id": "archive_route_event_1b",
+          "kind": "choice",
+          "textKey": "bureaucracy.archive_route_event_1b.text",
+          "choices": [
+            {
+              "id": "archive_route_event_1b_proceed",
+              "goto": "archive_route_2",
+              "labelKey": "bureaucracy.archive_route_event_1b.proceed"
+            }
+          ]
+        },
+        "archive_route_2": {
+          "id": "archive_route_2",
+          "kind": "choice",
+          "textKey": "bureaucracy.archive_route_2.text",
+          "choices": [
+            {
+              "id": "archive_route_prepare",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "preparation",
+                  "by": 1
+                }
+              ],
+              "goto": "archive_route_event_2",
+              "labelKey": "bureaucracy.archive_route_2.prepare"
+            },
+            {
+              "id": "archive_route_improvise",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "archive_route_event_2",
+              "labelKey": "bureaucracy.archive_route_2.improvise"
+            }
+          ]
+        },
+        "archive_route_event_2": {
+          "id": "archive_route_event_2",
+          "kind": "random",
+          "textKey": "bureaucracy.archive_route_event_2.text",
+          "transitions": [
+            {
+              "weight": 1,
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "connections",
+                  "by": 1
+                }
+              ],
+              "goto": "archive_route_event_2a"
+            },
+            {
+              "weight": 1,
+              "goto": "archive_route_event_2b"
+            }
+          ]
+        },
+        "archive_route_event_2a": {
+          "id": "archive_route_event_2a",
+          "kind": "choice",
+          "textKey": "bureaucracy.archive_route_event_2a.text",
+          "choices": [
+            {
+              "id": "archive_route_event_2a_proceed",
+              "goto": "archive_route_3",
+              "labelKey": "bureaucracy.archive_route_event_2a.proceed"
+            }
+          ]
+        },
+        "archive_route_event_2b": {
+          "id": "archive_route_event_2b",
+          "kind": "choice",
+          "textKey": "bureaucracy.archive_route_event_2b.text",
+          "choices": [
+            {
+              "id": "archive_route_event_2b_proceed",
+              "goto": "archive_route_3",
+              "labelKey": "bureaucracy.archive_route_event_2b.proceed"
+            }
+          ]
+        },
+        "archive_route_3": {
+          "id": "archive_route_3",
+          "kind": "choice",
+          "textKey": "bureaucracy.archive_route_3.text",
+          "choices": [
+            {
+              "id": "archive_route_steady",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "preparation",
+                  "by": 1
+                }
+              ],
+              "goto": "archive_route_4",
+              "labelKey": "bureaucracy.archive_route_3.steady"
+            },
+            {
+              "id": "archive_route_call_in_favour",
+              "requirements": {
+                "field": "var.connections",
+                "operator": "greater_or_equal",
+                "value": 1
+              },
+              "effects": [
+                {
+                  "op": "decrement",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "archive_route_4",
+              "labelKey": "bureaucracy.archive_route_3.favour",
+              "requirementFailKey": "bureaucracy.archive_route_3.favour_fail"
+            }
+          ]
+        },
+        "archive_route_4": {
+          "id": "archive_route_4",
+          "kind": "choice",
+          "textKey": "bureaucracy.archive_route_4.text",
+          "choices": [
+            {
+              "id": "choose_lawyer_solved",
+              "showWhen": {
+                "field": "var.remembered_archive_route",
+                "operator": "equals",
+                "value": true
+              },
+              "goto": "ending_lawyer_solved",
+              "labelKey": "bureaucracy.archive_route_4.ending_lawyer_solved"
+            },
+            {
+              "id": "choose_gave_up",
+              "goto": "ending_gave_up",
+              "labelKey": "bureaucracy.archive_route_4.ending_gave_up"
+            }
+          ]
+        },
+        "ending_lawyer_solved": {
+          "id": "ending_lawyer_solved",
+          "kind": "ending",
+          "textKey": "bureaucracy.ending_lawyer_solved.text",
+          "endingId": "lawyer_solved",
+          "outcome": "win"
+        },
+        "ending_gave_up": {
+          "id": "ending_gave_up",
+          "kind": "ending",
+          "textKey": "bureaucracy.ending_gave_up.text",
+          "endingId": "gave_up",
+          "outcome": "neutral"
+        },
+        "supervisor_route_1": {
+          "id": "supervisor_route_1",
+          "kind": "choice",
+          "textKey": "bureaucracy.supervisor_route_1.text",
+          "choices": [
+            {
+              "id": "supervisor_route_listen",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "remembered_supervisor_route",
+                  "value": true
+                },
+                {
+                  "op": "increment",
+                  "var": "connections",
+                  "by": 1
+                }
+              ],
+              "goto": "supervisor_route_event_1",
+              "labelKey": "bureaucracy.supervisor_route_1.listen"
+            },
+            {
+              "id": "supervisor_route_push",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "remembered_supervisor_route",
+                  "value": true
+                },
+                {
+                  "op": "increment",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "supervisor_route_event_1",
+              "labelKey": "bureaucracy.supervisor_route_1.push"
+            }
+          ]
+        },
+        "supervisor_route_event_1": {
+          "id": "supervisor_route_event_1",
+          "kind": "random",
+          "textKey": "bureaucracy.supervisor_route_event_1.text",
+          "transitions": [
+            {
+              "weight": 1,
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "preparation",
+                  "by": 1
+                }
+              ],
+              "goto": "supervisor_route_event_1a"
+            },
+            {
+              "weight": 1,
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "supervisor_route_event_1b"
+            }
+          ]
+        },
+        "supervisor_route_event_1a": {
+          "id": "supervisor_route_event_1a",
+          "kind": "choice",
+          "textKey": "bureaucracy.supervisor_route_event_1a.text",
+          "choices": [
+            {
+              "id": "supervisor_route_event_1a_proceed",
+              "goto": "supervisor_route_2",
+              "labelKey": "bureaucracy.supervisor_route_event_1a.proceed"
+            }
+          ]
+        },
+        "supervisor_route_event_1b": {
+          "id": "supervisor_route_event_1b",
+          "kind": "choice",
+          "textKey": "bureaucracy.supervisor_route_event_1b.text",
+          "choices": [
+            {
+              "id": "supervisor_route_event_1b_proceed",
+              "goto": "supervisor_route_2",
+              "labelKey": "bureaucracy.supervisor_route_event_1b.proceed"
+            }
+          ]
+        },
+        "supervisor_route_2": {
+          "id": "supervisor_route_2",
+          "kind": "choice",
+          "textKey": "bureaucracy.supervisor_route_2.text",
+          "choices": [
+            {
+              "id": "supervisor_route_prepare",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "preparation",
+                  "by": 1
+                }
+              ],
+              "goto": "supervisor_route_event_2",
+              "labelKey": "bureaucracy.supervisor_route_2.prepare"
+            },
+            {
+              "id": "supervisor_route_improvise",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "supervisor_route_event_2",
+              "labelKey": "bureaucracy.supervisor_route_2.improvise"
+            }
+          ]
+        },
+        "supervisor_route_event_2": {
+          "id": "supervisor_route_event_2",
+          "kind": "random",
+          "textKey": "bureaucracy.supervisor_route_event_2.text",
+          "transitions": [
+            {
+              "weight": 1,
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "connections",
+                  "by": 1
+                }
+              ],
+              "goto": "supervisor_route_event_2a"
+            },
+            {
+              "weight": 1,
+              "goto": "supervisor_route_event_2b"
+            }
+          ]
+        },
+        "supervisor_route_event_2a": {
+          "id": "supervisor_route_event_2a",
+          "kind": "choice",
+          "textKey": "bureaucracy.supervisor_route_event_2a.text",
+          "choices": [
+            {
+              "id": "supervisor_route_event_2a_proceed",
+              "goto": "supervisor_route_3",
+              "labelKey": "bureaucracy.supervisor_route_event_2a.proceed"
+            }
+          ]
+        },
+        "supervisor_route_event_2b": {
+          "id": "supervisor_route_event_2b",
+          "kind": "choice",
+          "textKey": "bureaucracy.supervisor_route_event_2b.text",
+          "choices": [
+            {
+              "id": "supervisor_route_event_2b_proceed",
+              "goto": "supervisor_route_3",
+              "labelKey": "bureaucracy.supervisor_route_event_2b.proceed"
+            }
+          ]
+        },
+        "supervisor_route_3": {
+          "id": "supervisor_route_3",
+          "kind": "choice",
+          "textKey": "bureaucracy.supervisor_route_3.text",
+          "choices": [
+            {
+              "id": "supervisor_route_steady",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "preparation",
+                  "by": 1
+                }
+              ],
+              "goto": "supervisor_route_4",
+              "labelKey": "bureaucracy.supervisor_route_3.steady"
+            },
+            {
+              "id": "supervisor_route_call_in_favour",
+              "requirements": {
+                "field": "var.connections",
+                "operator": "greater_or_equal",
+                "value": 1
+              },
+              "effects": [
+                {
+                  "op": "decrement",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "supervisor_route_4",
+              "labelKey": "bureaucracy.supervisor_route_3.favour",
+              "requirementFailKey": "bureaucracy.supervisor_route_3.favour_fail"
+            }
+          ]
+        },
+        "supervisor_route_4": {
+          "id": "supervisor_route_4",
+          "kind": "choice",
+          "textKey": "bureaucracy.supervisor_route_4.text",
+          "choices": [
+            {
+              "id": "choose_system_failure",
+              "showWhen": {
+                "field": "var.remembered_supervisor_route",
+                "operator": "equals",
+                "value": true
+              },
+              "goto": "ending_system_failure",
+              "labelKey": "bureaucracy.supervisor_route_4.ending_system_failure"
+            },
+            {
+              "id": "choose_ultimate_reward",
+              "goto": "ending_ultimate_reward",
+              "labelKey": "bureaucracy.supervisor_route_4.ending_ultimate_reward"
+            }
+          ]
+        },
+        "ending_system_failure": {
+          "id": "ending_system_failure",
+          "kind": "ending",
+          "textKey": "bureaucracy.ending_system_failure.text",
+          "endingId": "system_failure",
+          "outcome": "neutral"
+        },
+        "ending_ultimate_reward": {
+          "id": "ending_ultimate_reward",
+          "kind": "ending",
+          "textKey": "bureaucracy.ending_ultimate_reward.text",
+          "endingId": "ultimate_reward",
+          "outcome": "win"
+        }
+      },
+      "startNodeId": "municipality",
+      "achievements": [
+        {
+          "id": "it_builds_character",
+          "condition": {
+            "field": "ending",
+            "operator": "not_equals"
+          },
+          "hidden": false,
+          "nameKey": "bureaucracy.ach.it_builds_character.name",
+          "descriptionKey": "bureaucracy.ach.it_builds_character.description"
+        },
+        {
+          "id": "found_registry_route_event_1a",
+          "hidden": true,
+          "condition": {
+            "field": "visited.registry_route_event_1a",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "bureaucracy.achievement_registry_route_event_1a.name",
+          "descriptionKey": "bureaucracy.achievement_registry_route_event_1a.description"
+        },
+        {
+          "id": "found_registry_route_event_1b",
+          "hidden": true,
+          "condition": {
+            "field": "visited.registry_route_event_1b",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "bureaucracy.achievement_registry_route_event_1b.name",
+          "descriptionKey": "bureaucracy.achievement_registry_route_event_1b.description"
+        },
+        {
+          "id": "found_registry_route_event_2a",
+          "hidden": true,
+          "condition": {
+            "field": "visited.registry_route_event_2a",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "bureaucracy.achievement_registry_route_event_2a.name",
+          "descriptionKey": "bureaucracy.achievement_registry_route_event_2a.description"
+        },
+        {
+          "id": "found_registry_route_event_2b",
+          "hidden": true,
+          "condition": {
+            "field": "visited.registry_route_event_2b",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "bureaucracy.achievement_registry_route_event_2b.name",
+          "descriptionKey": "bureaucracy.achievement_registry_route_event_2b.description"
+        },
+        {
+          "id": "found_archive_route_event_1a",
+          "hidden": true,
+          "condition": {
+            "field": "visited.archive_route_event_1a",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "bureaucracy.achievement_archive_route_event_1a.name",
+          "descriptionKey": "bureaucracy.achievement_archive_route_event_1a.description"
+        },
+        {
+          "id": "found_archive_route_event_1b",
+          "hidden": true,
+          "condition": {
+            "field": "visited.archive_route_event_1b",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "bureaucracy.achievement_archive_route_event_1b.name",
+          "descriptionKey": "bureaucracy.achievement_archive_route_event_1b.description"
+        },
+        {
+          "id": "found_archive_route_event_2a",
+          "hidden": true,
+          "condition": {
+            "field": "visited.archive_route_event_2a",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "bureaucracy.achievement_archive_route_event_2a.name",
+          "descriptionKey": "bureaucracy.achievement_archive_route_event_2a.description"
+        },
+        {
+          "id": "found_archive_route_event_2b",
+          "hidden": true,
+          "condition": {
+            "field": "visited.archive_route_event_2b",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "bureaucracy.achievement_archive_route_event_2b.name",
+          "descriptionKey": "bureaucracy.achievement_archive_route_event_2b.description"
+        },
+        {
+          "id": "found_supervisor_route_event_1a",
+          "hidden": true,
+          "condition": {
+            "field": "visited.supervisor_route_event_1a",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "bureaucracy.achievement_supervisor_route_event_1a.name",
+          "descriptionKey": "bureaucracy.achievement_supervisor_route_event_1a.description"
+        },
+        {
+          "id": "found_supervisor_route_event_1b",
+          "hidden": true,
+          "condition": {
+            "field": "visited.supervisor_route_event_1b",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "bureaucracy.achievement_supervisor_route_event_1b.name",
+          "descriptionKey": "bureaucracy.achievement_supervisor_route_event_1b.description"
+        },
+        {
+          "id": "found_supervisor_route_event_2a",
+          "hidden": true,
+          "condition": {
+            "field": "visited.supervisor_route_event_2a",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "bureaucracy.achievement_supervisor_route_event_2a.name",
+          "descriptionKey": "bureaucracy.achievement_supervisor_route_event_2a.description"
+        },
+        {
+          "id": "found_supervisor_route_event_2b",
+          "hidden": true,
+          "condition": {
+            "field": "visited.supervisor_route_event_2b",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "bureaucracy.achievement_supervisor_route_event_2b.name",
+          "descriptionKey": "bureaucracy.achievement_supervisor_route_event_2b.description"
+        }
+      ]
+    }
+  },
+  "migration": {
+    "fromVersion": "1.0.0",
+    "nodeMap": {
+      "clerk_review": "registry_route_event_1",
+      "expired": "registry_route_1",
+      "room_14": "registry_route_event_2",
+      "room_6": "registry_route_3",
+      "reward": "ending_ultimate_reward"
+    }
+  },
+  "strings": {
+    "bureaucracy.ach.it_builds_character.description": "Reach a resolution after the offices have tested every available kind of patience.",
+    "bureaucracy.ach.it_builds_character.name": "It Builds Character",
+    "bureaucracy.achievement_archive_route_event_1a.description": "Discover an optional page on this route.",
+    "bureaucracy.achievement_archive_route_event_1a.name": "Found: the archive favour",
+    "bureaucracy.achievement_archive_route_event_1b.description": "Discover an optional page on this route.",
+    "bureaucracy.achievement_archive_route_event_1b.name": "Found: the archive favour",
+    "bureaucracy.achievement_archive_route_event_2a.description": "Discover an optional page on this route.",
+    "bureaucracy.achievement_archive_route_event_2a.name": "Found: the archive favour",
+    "bureaucracy.achievement_archive_route_event_2b.description": "Discover an optional page on this route.",
+    "bureaucracy.achievement_archive_route_event_2b.name": "Found: the archive favour",
+    "bureaucracy.achievement_registry_route_event_1a.description": "Discover an optional page on this route.",
+    "bureaucracy.achievement_registry_route_event_1a.name": "Found: the helpful clerk",
+    "bureaucracy.achievement_registry_route_event_1b.description": "Discover an optional page on this route.",
+    "bureaucracy.achievement_registry_route_event_1b.name": "Found: the helpful clerk",
+    "bureaucracy.achievement_registry_route_event_2a.description": "Discover an optional page on this route.",
+    "bureaucracy.achievement_registry_route_event_2a.name": "Found: the helpful clerk",
+    "bureaucracy.achievement_registry_route_event_2b.description": "Discover an optional page on this route.",
+    "bureaucracy.achievement_registry_route_event_2b.name": "Found: the helpful clerk",
+    "bureaucracy.achievement_supervisor_route_event_1a.description": "Discover an optional page on this route.",
+    "bureaucracy.achievement_supervisor_route_event_1a.name": "Found: the supervisor's promise",
+    "bureaucracy.achievement_supervisor_route_event_1b.description": "Discover an optional page on this route.",
+    "bureaucracy.achievement_supervisor_route_event_1b.name": "Found: the supervisor's promise",
+    "bureaucracy.achievement_supervisor_route_event_2a.description": "Discover an optional page on this route.",
+    "bureaucracy.achievement_supervisor_route_event_2a.name": "Found: the supervisor's promise",
+    "bureaucracy.achievement_supervisor_route_event_2b.description": "Discover an optional page on this route.",
+    "bureaucracy.achievement_supervisor_route_event_2b.name": "Found: the supervisor's promise",
+    "bureaucracy.archive_route_1.listen": "Write down the guard's room numbers",
+    "bureaucracy.archive_route_1.push": "Treat the directions as folklore",
+    "bureaucracy.archive_route_1.text": "The guard sends you through civil registry, down one floor, and twenty-seven years backward.",
+    "bureaucracy.archive_route_2.improvise": "Visit the notary without calling",
+    "bureaucracy.archive_route_2.prepare": "Ask the translator to explain the mismatch",
+    "bureaucracy.archive_route_2.text": "The archive catalog lists your file under a spelling used once by a tired typist in 1987.",
+    "bureaucracy.archive_route_3.favour": "Call in the favour you earned",
+    "bureaucracy.archive_route_3.favour_fail": "No one owes you that favour yet.",
+    "bureaucracy.archive_route_3.steady": "Use what you prepared",
+    "bureaucracy.archive_route_3.text": "A translation office can certify the old spelling if a notary certifies that the new spelling is yours.",
+    "bureaucracy.archive_route_4.ending_gave_up": "The Folder in the Cupboard",
+    "bureaucracy.archive_route_4.ending_lawyer_solved": "Counsel for the Living",
+    "bureaucracy.archive_route_4.text": "The recovered folder reaches a lawyer whose calm costs less than another week of queues and more than lunch.",
+    "bureaucracy.archive_route_event_1.text": "The day contributes its own amendment.",
+    "bureaucracy.archive_route_event_1a.proceed": "Search the handwritten archive index",
+    "bureaucracy.archive_route_event_1a.text": "The handwritten index contains a cross-reference in immaculate blue ink.",
+    "bureaucracy.archive_route_event_1b.proceed": "Pay for a computerized search",
+    "bureaucracy.archive_route_event_1b.text": "The database returns nine citizens, two streets, and a livestock permit.",
+    "bureaucracy.archive_route_event_2.text": "A seeded interruption arrives on schedule.",
+    "bureaucracy.archive_route_event_2a.proceed": "Let the lawyer carry the folder",
+    "bureaucracy.archive_route_event_2a.text": "The translator knows the notary and corrects the appointment before it disappears.",
+    "bureaucracy.archive_route_event_2b.proceed": "Return personally to Room 14",
+    "bureaucracy.archive_route_event_2b.text": "Room 14 sends you to Room 6; Room 6 has redecorated but remembers the arrangement.",
+    "bureaucracy.campaign.description": "A municipal casebook through cadastral, tax, registry, archive, notary, and translation offices.",
+    "bureaucracy.campaign.title": "The Bureaucracy",
+    "bureaucracy.ending_document_obtained.text": "Document Obtained\n\nThe paper arrives with three seals and no apology. It proves the fact everyone knew before breakfast.",
+    "bureaucracy.ending_gave_up.text": "The Folder in the Cupboard\n\nYou put the folder away. The municipality records no defeat; it merely stops hearing from you.",
+    "bureaucracy.ending_lawyer_solved.text": "Counsel for the Living\n\nThe lawyer submits one precise letter. The system, confronted by grammar, yields.",
+    "bureaucracy.ending_miracle.text": "The Administrative Miracle\n\nThe clerk remembers your courtesy, finds the missing entry, and performs an act future staff will deny was possible.",
+    "bureaucracy.ending_system_failure.text": "System Failure, Human Success\n\nThe registry crashes while everyone is watching. The supervisor signs a paper fallback last used before Wi-Fi.",
+    "bureaucracy.ending_ultimate_reward.text": "The Ultimate Bulgarian Reward\n\nAfter seven years of paperwork, you receive €300 and twenty-eight years of unresolved legal responsibility.",
+    "bureaucracy.municipality.choice_ask_guard": "Ask the guard for the unofficial route",
+    "bureaucracy.municipality.choice_coffee": "Get coffee and find the supervisor",
+    "bureaucracy.municipality.choice_try_another_entrance": "Try the archive entrance",
+    "bureaucracy.municipality.choice_wait": "Wait for the municipal registry",
+    "bureaucracy.municipality.text": "You arrive at the municipality at 08:03. The office opened at 08:00. A handwritten note says the meeting ends at 11:30; three nearby doors disagree about the year.",
+    "bureaucracy.registry_route_1.listen": "Thank the clerk and note the expiry date",
+    "bureaucracy.registry_route_1.push": "Demand the supervisor immediately",
+    "bureaucracy.registry_route_1.text": "A clerk checks your folder and quietly circles the one certificate that will expire first.",
+    "bureaucracy.registry_route_2.improvise": "Bring the tax receipt you already have",
+    "bureaucracy.registry_route_2.prepare": "Order the cadastral sketch first",
+    "bureaucracy.registry_route_2.text": "The cadastral office recognizes the address but not the building, while the building recognizes neither.",
+    "bureaucracy.registry_route_3.favour": "Call in the favour you earned",
+    "bureaucracy.registry_route_3.favour_fail": "No one owes you that favour yet.",
+    "bureaucracy.registry_route_3.steady": "Use what you prepared",
+    "bureaucracy.registry_route_3.text": "The tax desk needs proof that the property exists before it can explain why it owes tax.",
+    "bureaucracy.registry_route_4.ending_document_obtained": "Document Obtained",
+    "bureaucracy.registry_route_4.ending_miracle": "The Administrative Miracle",
+    "bureaucracy.registry_route_4.text": "Back at the registry, your folder is thick enough to command professional respect. The final stamp is now a matter of method.",
+    "bureaucracy.registry_route_event_1.text": "The day contributes its own amendment.",
+    "bureaucracy.registry_route_event_1a.proceed": "Copy the clerk's pencilled checklist",
+    "bureaucracy.registry_route_event_1a.text": "The pencilled checklist names the only copying shop whose stamp faces the correct direction.",
+    "bureaucracy.registry_route_event_1b.proceed": "Use the official checklist from 2019",
+    "bureaucracy.registry_route_event_1b.text": "The official checklist omits a certificate now required by the official who printed it.",
+    "bureaucracy.registry_route_event_2.text": "A seeded interruption arrives on schedule.",
+    "bureaucracy.registry_route_event_2a.proceed": "Ask the tax clerk to call upstairs",
+    "bureaucracy.registry_route_event_2a.text": "The tax clerk reaches the cadastral desk by phone and both discover a shared cousin.",
+    "bureaucracy.registry_route_event_2b.proceed": "Queue again with a fresh number",
+    "bureaucracy.registry_route_event_2b.text": "Your queue number is called during the twelve seconds you spend reading the display.",
+    "bureaucracy.supervisor_route_1.listen": "Let the supervisor finish her coffee",
+    "bureaucracy.supervisor_route_1.push": "Lead with the seven-year history",
+    "bureaucracy.supervisor_route_1.text": "At the cafe you meet a deputy supervisor who remembers your case and, more dangerously, promises to look at it.",
+    "bureaucracy.supervisor_route_2.improvise": "Add another certificate just in case",
+    "bureaucracy.supervisor_route_2.prepare": "Answer the notary's question honestly",
+    "bureaucracy.supervisor_route_2.text": "The civil registry accepts the promise as evidence but the translation office requests it in writing.",
+    "bureaucracy.supervisor_route_3.favour": "Call in the favour you earned",
+    "bureaucracy.supervisor_route_3.favour_fail": "No one owes you that favour yet.",
+    "bureaucracy.supervisor_route_3.steady": "Use what you prepared",
+    "bureaucracy.supervisor_route_3.text": "A notary reviews the growing stack and asks the only useful question anyone has asked all day.",
+    "bureaucracy.supervisor_route_4.ending_system_failure": "System Failure, Human Success",
+    "bureaucracy.supervisor_route_4.ending_ultimate_reward": "The Ultimate Bulgarian Reward",
+    "bureaucracy.supervisor_route_4.text": "The supervisor convenes three desks around one computer. Either the case will resolve or the system will finally describe its objection.",
+    "bureaucracy.supervisor_route_event_1.text": "The day contributes its own amendment.",
+    "bureaucracy.supervisor_route_event_1a.proceed": "Request the promise by email",
+    "bureaucracy.supervisor_route_event_1a.text": "The supervisor writes her direct extension on a napkin, the municipality's most durable medium.",
+    "bureaucracy.supervisor_route_event_1b.proceed": "Quote the promise from memory",
+    "bureaucracy.supervisor_route_event_1b.text": "Your complete chronology triggers a second coffee and no measurable progress.",
+    "bureaucracy.supervisor_route_event_2.text": "A seeded interruption arrives on schedule.",
+    "bureaucracy.supervisor_route_event_2a.proceed": "Bring everyone to the same counter",
+    "bureaucracy.supervisor_route_event_2a.text": "The email arrives with a subject line that makes three offices suddenly cooperative.",
+    "bureaucracy.supervisor_route_event_2b.proceed": "Submit separate copies to each desk",
+    "bureaucracy.supervisor_route_event_2b.text": "The extra certificate contradicts a form nobody had noticed until now.",
+    "bureaucracy.var_connections.label": "Clerk Goodwill",
+    "bureaucracy.var_preparation.label": "Documents",
+    "bureaucracy.var_pressure.label": "Administrative Pressure"
+  }
+}

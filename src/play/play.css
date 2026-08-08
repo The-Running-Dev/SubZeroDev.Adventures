@@ -1,0 +1,847 @@
+.play-main {
+  --screen: #060b21;
+  --screen-blue: #07134a;
+  --ink: #fff2b6;
+  --muted: #a9b9c9;
+  --amber: #ffb000;
+  --cyan: #31e6e2;
+  --cyan-hover: #1b9c9a;
+  --magenta: #ef4eb8;
+  --shadow: #000;
+  font-family: "Lucida Console", "Courier New", ui-monospace, monospace;
+  margin: 0 auto;
+  max-width: 82rem;
+  padding: 1.25rem var(--page-inline) 4rem;
+  text-rendering: geometricPrecision;
+}
+
+.play-main button,
+.play-main summary {
+  font-family: inherit;
+}
+
+.archive,
+.cabinet {
+  background: var(--screen);
+  border: 4px double var(--cyan);
+  box-shadow:
+    8px 8px 0 var(--shadow),
+    inset 0 0 40px #08135a66;
+  overflow: hidden;
+  position: relative;
+}
+
+.archive::after,
+.cabinet::after {
+  background: repeating-linear-gradient(0deg, #0000 0, #0000 3px, #0003 4px);
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+  z-index: 3;
+}
+
+.archive > *,
+.cabinet > * {
+  position: relative;
+  z-index: 2;
+}
+
+.archive {
+  padding: clamp(1rem, 3vw, 2.25rem);
+}
+
+.archive::before {
+  color: var(--cyan);
+  content: "SUBZERO STORY SYSTEM v2.0  //  640K OK  //  READY_";
+  display: block;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  margin-bottom: 2.25rem;
+  position: relative;
+  z-index: 2;
+}
+
+.archive-heading {
+  max-width: 52rem;
+}
+
+.archive h1,
+.cabinet h1,
+.briefing h2,
+.status-console h2 {
+  font-family: inherit;
+  font-weight: 700;
+  letter-spacing: -0.05em;
+  text-transform: uppercase;
+}
+
+.archive h1,
+.cabinet h1 {
+  color: var(--ink);
+  font-size: clamp(1.75rem, 4.2vw, 3.1rem);
+  line-height: 1;
+  margin: 0.5rem 0 1rem;
+  text-shadow: 4px 4px 0 #7c255f;
+}
+
+.archive-heading > p:last-child {
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.eyebrow,
+.scene-kicker,
+.deck-label {
+  color: var(--amber);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.sr-only {
+  border: 0;
+  clip: rect(0, 0, 0, 0);
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  padding: 0;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
+
+.dossier-grid {
+  border: 2px solid #6574bd;
+  display: grid;
+  gap: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 2rem 0 1.25rem;
+}
+
+.dossier {
+  align-content: start;
+  background: #090f2e;
+  border: 0;
+  border-bottom: 1px solid #47548f;
+  color: var(--muted);
+  cursor: pointer;
+  display: grid;
+  gap: 0.4rem;
+  min-height: 6rem;
+  padding: 0.85rem 1rem 0.85rem 2.2rem;
+  position: relative;
+  text-align: left;
+}
+
+.dossier:nth-child(odd) {
+  border-right: 1px solid #47548f;
+}
+
+.dossier::before {
+  color: #68729f;
+  content: "·";
+  font-weight: 900;
+  left: 1rem;
+  position: absolute;
+  top: 1.65rem;
+}
+
+.dossier:hover,
+.dossier.is-selected {
+  background: var(--cyan-hover);
+  color: #d7fbfa;
+}
+
+.dossier:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.dossier:hover::before,
+.dossier.is-selected::before {
+  color: #16342f;
+  content: ">";
+}
+
+.dossier-featured:not(:hover, .is-selected) {
+  background: #26103a;
+  box-shadow: inset 5px 0 0 var(--magenta);
+}
+
+.dossier-number,
+.briefing-meta {
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.dossier-number {
+  color: var(--amber);
+  font-size: 0.75rem;
+}
+
+.briefing-meta {
+  font-size: 0.875rem;
+}
+
+.dossier:hover .dossier-number,
+.dossier.is-selected .dossier-number {
+  color: #16342f;
+}
+
+.dossier strong {
+  color: var(--ink);
+  font-size: clamp(1rem, 2vw, 1.25rem);
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.dossier:hover strong,
+.dossier.is-selected strong {
+  color: #ffffff;
+}
+
+.briefing {
+  align-items: stretch;
+  background: #11183c;
+  border: 2px solid var(--amber);
+  color: var(--muted);
+  display: grid;
+  gap: 1.25rem;
+  grid-template-columns: 6rem 1fr;
+  padding: clamp(1rem, 3vw, 1.6rem);
+}
+
+.briefing h2 {
+  color: var(--ink);
+  font-size: clamp(1.35rem, 3vw, 2.2rem);
+  margin: 0.35rem 0;
+}
+
+.briefing p {
+  line-height: 1.5;
+}
+
+.briefing-emblem {
+  align-items: center;
+  background: #020615;
+  border: 2px solid var(--magenta);
+  box-shadow: 4px 4px 0 #641e59;
+  color: var(--cyan);
+  display: grid;
+  font-size: 2.5rem;
+  justify-content: center;
+  min-height: 6rem;
+}
+
+.briefing-advisory {
+  border-left: 3px solid var(--amber);
+  color: var(--ink);
+  font-size: 0.875rem;
+  padding-left: 0.75rem;
+}
+
+.briefing-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.briefing-permalink {
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+}
+
+.briefing-permalink a {
+  color: var(--cyan);
+}
+
+.cabinet-marquee {
+  align-items: center;
+  background: #11183c;
+  border-bottom: 3px solid var(--magenta);
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  padding: 1rem clamp(1rem, 3vw, 1.75rem);
+}
+
+.cabinet h1 {
+  font-size: clamp(1.45rem, 4vw, 2.8rem);
+  margin-bottom: 0.3rem;
+  text-shadow: 3px 3px 0 #6b2359;
+}
+
+.marquee-controls {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: end;
+}
+
+.save-lamp {
+  color: var(--cyan);
+  font-size: 0.875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+.save-lamp span {
+  background: var(--cyan);
+  box-shadow: 0 0 8px var(--cyan);
+  display: inline-block;
+  height: 0.55rem;
+  width: 0.55rem;
+}
+
+.save-lamp.warning {
+  color: #ff6b63;
+}
+
+.save-lamp.warning span {
+  background: #ff6b63;
+  box-shadow: 0 0 8px #ff6b63;
+}
+
+.cabinet-layout {
+  display: grid;
+  gap: 0;
+  grid-template-columns: minmax(0, 1fr) minmax(17rem, 0.34fr);
+}
+
+.scene-viewport {
+  background: var(--screen-blue);
+  color: var(--ink);
+  min-width: 0;
+  padding: clamp(1.25rem, 4vw, 2.75rem);
+}
+
+.scene-region {
+  display: block;
+  outline: none;
+}
+
+.scene-body {
+  font-size: clamp(1.125rem, 2vw, 1.3rem);
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: 1.8;
+  margin: 0.75rem 0 1.5rem;
+  min-height: 8rem;
+  white-space: pre-wrap;
+}
+
+.scene-body::after {
+  animation: cursor-blink 1s steps(1) infinite;
+  color: var(--amber);
+  content: "_";
+}
+
+@keyframes cursor-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+.arrival-receipt {
+  background: #020615;
+  border-left: 5px solid var(--magenta);
+  color: #c2c9dd;
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 0.875rem;
+  gap: 0.55rem;
+  margin: 0 0 1.5rem;
+  padding: 0.7rem 0.8rem;
+  text-transform: uppercase;
+}
+
+.arrival-receipt span:first-child,
+.arrival-receipt strong {
+  color: var(--amber);
+}
+
+.arrival-link {
+  color: var(--cyan);
+}
+
+.action-deck,
+.ending-controls {
+  border-top: 2px dashed #6874a8;
+  padding-top: 1.25rem;
+}
+
+.deck-label {
+  margin-bottom: 0.75rem;
+}
+
+.deck-label::before {
+  color: var(--cyan);
+  content: "C:\\STORY> ";
+}
+
+.action-card {
+  border: 1px solid #34417e;
+  margin-bottom: 0.6rem;
+}
+
+.action-card:last-child {
+  margin-bottom: 0;
+}
+
+.action-card button {
+  align-items: baseline;
+  background: #03081c;
+  border: 0;
+  color: #e9ebef;
+  cursor: pointer;
+  display: flex;
+  font-size: 1.0625rem;
+  gap: 0.8rem;
+  justify-content: start;
+  line-height: 1.45;
+  padding: 0.8rem;
+  text-align: left;
+  width: 100%;
+}
+
+.action-card button::before {
+  color: var(--cyan);
+  content: ">";
+}
+
+.action-card button:hover:not(:disabled),
+.action-card button:focus-visible {
+  background: var(--cyan);
+  color: #001c2d;
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.action-card button:hover:not(:disabled)::before,
+.action-card button:focus-visible::before,
+.action-card button:hover:not(:disabled) .action-number,
+.action-card button:focus-visible .action-number {
+  color: #633600;
+}
+
+.action-number {
+  color: var(--amber);
+  font-weight: 900;
+}
+
+.action-card.unavailable button {
+  color: #737c94;
+  cursor: not-allowed;
+}
+
+.play-reason {
+  background: #170d24;
+  color: #eaa1ce;
+  font-size: 0.875rem;
+  margin: 0;
+  padding: 0.45rem 2.8rem;
+}
+
+.status-console {
+  background: #090f2e;
+  border-left: 3px solid var(--magenta);
+  min-width: 0;
+  padding: 1.25rem;
+}
+
+.status-console h2 {
+  color: var(--cyan);
+  font-size: 1.2rem;
+  margin: 0.35rem 0 1.25rem;
+}
+
+.stat-readouts {
+  border: 1px solid #4d5892;
+  display: grid;
+  gap: 0;
+  margin: 0;
+}
+
+.stat-readouts div {
+  border-bottom: 1px solid #303b71;
+  display: flex;
+  font-size: 0.9375rem;
+  gap: 0.75rem;
+  justify-content: space-between;
+  padding: 0.6rem;
+}
+
+.stat-readouts div:last-child {
+  border-bottom: 0;
+}
+
+.stat-readouts dt {
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.stat-readouts dd {
+  color: var(--amber);
+  font-variant-numeric: tabular-nums;
+  font-weight: 900;
+  margin: 0;
+}
+
+.console-empty,
+.console-footnote,
+.achievement-note {
+  color: #8f9ab6;
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+.achievement-note {
+  color: var(--amber);
+}
+
+.journey-log {
+  border-top: 2px dashed #4d5892;
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+}
+
+.journey-log summary {
+  align-items: center;
+  color: var(--ink);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 1rem;
+  font-weight: 700;
+  list-style: none;
+  min-height: 44px;
+  text-transform: uppercase;
+}
+
+.journey-log summary::before {
+  color: var(--cyan);
+  content: "[+] ";
+}
+
+.journey-log[open] summary::before {
+  content: "[-] ";
+}
+
+.journey-log ol {
+  display: grid;
+  gap: 0.65rem;
+  margin: 0.85rem 0;
+  padding-left: 1.4rem;
+}
+
+.journey-log li {
+  color: #8f9ab6;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.journey-log li[aria-current="step"] {
+  color: var(--ink);
+}
+
+.journey-log em {
+  color: var(--cyan);
+  display: block;
+  font-style: normal;
+  text-transform: uppercase;
+}
+
+.journey-origin {
+  background: #020615;
+  border-left: 3px solid var(--amber);
+  color: #aeb6cd;
+  font-size: 0.875rem;
+  padding: 0.6rem;
+}
+
+.source-links {
+  border-top: 1px solid #303b71;
+  display: grid;
+  font-size: 0.875rem;
+  gap: 0.4rem;
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+}
+
+.source-links h3 {
+  color: var(--amber);
+  font-size: inherit;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.cabinet-button {
+  background: #11183c;
+  border: 2px solid var(--cyan);
+  box-shadow: 3px 3px 0 #005e75;
+  color: var(--cyan);
+  cursor: pointer;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0.5rem 0.5rem 0 0;
+  padding: 0.85rem 1rem;
+  text-transform: uppercase;
+}
+
+.cabinet-button:hover:not(:disabled),
+.cabinet-button:focus-visible {
+  background: var(--cyan);
+  color: #001c2d;
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.cabinet-button:active:not(:disabled) {
+  box-shadow: 1px 1px 0 #005e75;
+  transform: translate(2px, 2px);
+}
+
+.cabinet-button.primary {
+  background: var(--amber);
+  border-color: #ffe291;
+  box-shadow: 3px 3px 0 #7f3c00;
+  color: #241300;
+}
+
+.cabinet-button.quiet {
+  background: #020615;
+  border-color: #6874a8;
+  box-shadow: none;
+  color: #b5bfd8;
+}
+
+.ending-placard {
+  background: #160c24;
+  border: 2px solid var(--magenta);
+  color: #f3a5d3;
+  font-size: 0.875rem;
+  padding: 0.8rem;
+  text-transform: uppercase;
+}
+
+.play-message {
+  background: #2d0b23;
+  border: 2px solid #ff6961;
+  color: #ffc5c1;
+  font-size: 0.875rem;
+  margin: 1.25rem 0 0;
+  padding: 0.75rem;
+  text-transform: uppercase;
+}
+
+.accent-ember {
+  --magenta: #ff5e3a;
+  --cyan: #ffba39;
+}
+
+.accent-red {
+  --magenta: #ff4d6d;
+  --cyan: #67e8f9;
+}
+
+.accent-teal {
+  --magenta: #ff54b0;
+  --cyan: #3fffd2;
+}
+
+.accent-yellow {
+  --magenta: #ff8a30;
+  --cyan: #ffe14a;
+}
+
+.accent-green {
+  --magenta: #a5d83f;
+  --cyan: #52f5a3;
+}
+
+.accent-violet {
+  --magenta: #d85cff;
+  --cyan: #65c8ff;
+}
+
+/*
+ * §8.2's two snapped pages are structural only below 768px. Above it,
+ * `display: contents` removes both wrappers from the box model entirely so
+ * the desktop composition (§8.3's two upper rows) is unaffected by their
+ * presence in the DOM.
+ */
+.scene-page,
+.choice-page {
+  display: contents;
+}
+
+.scene-cue,
+.scene-echo {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .dossier-grid,
+  .cabinet-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .dossier:nth-child(odd) {
+    border-right: 0;
+  }
+
+  .status-console {
+    border-left: 0;
+    border-top: 3px solid var(--magenta);
+  }
+
+  .cabinet-marquee {
+    align-items: start;
+    flex-direction: column;
+  }
+
+  .marquee-controls {
+    justify-content: start;
+  }
+
+  /* Full-bleed cabinet (14 §8.4): an offset shadow outside a full-width
+     element is a horizontal-overflow defect at 320px, not decoration. */
+  .play-main {
+    padding-inline: 0;
+  }
+
+  .archive,
+  .cabinet {
+    border-style: solid;
+    border-width: 0 0 3px;
+    box-shadow: inset 0 0 40px #08135a66;
+  }
+
+  html {
+    scroll-snap-type: y proximity;
+  }
+
+  .scene-page,
+  .choice-page {
+    display: block;
+    min-height: 100dvh;
+    scroll-snap-align: start;
+  }
+
+  .scene-cue {
+    align-items: center;
+    background: #03081c;
+    border: 2px solid var(--cyan);
+    color: var(--cyan);
+    display: flex;
+    font-size: 1rem;
+    font-weight: 700;
+    justify-content: center;
+    margin-top: 1.5rem;
+    min-height: 44px;
+    padding: 0.85rem 1rem calc(0.85rem + env(safe-area-inset-bottom));
+    text-transform: uppercase;
+    width: 100%;
+  }
+
+  .scene-echo {
+    background: var(--screen-blue);
+    border-bottom: 2px dashed var(--cyan);
+    display: block;
+    padding-top: env(safe-area-inset-top);
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+
+  .scene-echo button {
+    background: transparent;
+    border: 0;
+    color: var(--ink);
+    cursor: pointer;
+    display: block;
+    font-size: 0.875rem;
+    min-height: 44px;
+    overflow: hidden;
+    padding: 0.6rem 0.9rem;
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    width: 100%;
+  }
+
+  .action-deck,
+  .ending-controls {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .ending-controls .cabinet-button:last-child {
+    margin-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+@media (max-width: 389px) {
+  .archive,
+  .scene-viewport,
+  .status-console {
+    padding: 0.9rem;
+  }
+
+  .archive::before {
+    font-size: 0.58rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .briefing {
+    grid-template-columns: 1fr;
+  }
+
+  .briefing-emblem {
+    min-height: 3.5rem;
+  }
+
+  .arrival-receipt {
+    align-items: start;
+    flex-direction: column;
+  }
+
+  .scene-body {
+    min-height: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@media (forced-colors: active) {
+  .archive,
+  .cabinet,
+  .scene-viewport,
+  .status-console,
+  .dossier,
+  .briefing,
+  .action-card button {
+    border: 2px solid CanvasText;
+    box-shadow: none;
+  }
+
+  .dossier:focus-visible,
+  .action-card button:focus-visible,
+  .cabinet-button:focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+}

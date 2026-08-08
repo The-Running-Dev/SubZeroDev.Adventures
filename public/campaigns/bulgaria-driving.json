@@ -1,0 +1,1112 @@
+{
+  "formatVersion": 1,
+  "catalog": {
+    "title": "Driving",
+    "description": "Inspection, road trouble, insurance, towing, and mechanical optimism.",
+    "duration": "10–15 min per route",
+    "contentNotice": "Dangerous-driving anecdotes, police encounters, breakdowns, and financial loss.",
+    "featured": false
+  },
+  "campaign": {
+    "id": "bulgaria-driving",
+    "kindId": "story-graph",
+    "version": "2.0.0",
+    "titleKey": "driving.campaign.title",
+    "content": {
+      "descriptionKey": "driving.campaign.description",
+      "variables": {
+        "route": {
+          "type": "enum",
+          "initial": "repair_route",
+          "values": [
+            "repair_route",
+            "road_route",
+            "escape_route"
+          ]
+        },
+        "preparation": {
+          "type": "int",
+          "initial": 0,
+          "min": 0,
+          "max": 12,
+          "visible": true,
+          "labelKey": "driving.var_preparation.label"
+        },
+        "connections": {
+          "type": "int",
+          "initial": 0,
+          "min": 0,
+          "max": 12,
+          "visible": true,
+          "labelKey": "driving.var_connections.label"
+        },
+        "pressure": {
+          "type": "int",
+          "initial": 0,
+          "min": 0,
+          "max": 12,
+          "visible": true,
+          "labelKey": "driving.var_pressure.label"
+        },
+        "remembered_repair_route": {
+          "type": "bool",
+          "initial": false
+        },
+        "remembered_road_route": {
+          "type": "bool",
+          "initial": false
+        },
+        "remembered_escape_route": {
+          "type": "bool",
+          "initial": false
+        }
+      },
+      "nodes": {
+        "driving": {
+          "id": "driving",
+          "kind": "choice",
+          "textKey": "driving.driving.text",
+          "choices": [
+            {
+              "id": "believe_him",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "route",
+                  "value": "repair_route"
+                }
+              ],
+              "goto": "repair_route_1",
+              "labelKey": "driving.driving.choice_believe_him"
+            },
+            {
+              "id": "ask_another_opinion",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "route",
+                  "value": "road_route"
+                }
+              ],
+              "goto": "road_route_1",
+              "labelKey": "driving.driving.choice_ask_another_opinion"
+            },
+            {
+              "id": "ignore_warning",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "route",
+                  "value": "escape_route"
+                }
+              ],
+              "goto": "escape_route_1",
+              "labelKey": "driving.driving.choice_ignore_warning"
+            },
+            {
+              "id": "turn_up_music",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "route",
+                  "value": "road_route"
+                }
+              ],
+              "goto": "road_route_1",
+              "labelKey": "driving.driving.choice_turn_up_music"
+            }
+          ]
+        },
+        "repair_route_1": {
+          "id": "repair_route_1",
+          "kind": "choice",
+          "textKey": "driving.repair_route_1.text",
+          "choices": [
+            {
+              "id": "repair_route_listen",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "remembered_repair_route",
+                  "value": true
+                },
+                {
+                  "op": "increment",
+                  "var": "connections",
+                  "by": 1
+                }
+              ],
+              "goto": "repair_route_event_1",
+              "labelKey": "driving.repair_route_1.listen"
+            },
+            {
+              "id": "repair_route_push",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "remembered_repair_route",
+                  "value": true
+                },
+                {
+                  "op": "increment",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "repair_route_event_1",
+              "labelKey": "driving.repair_route_1.push"
+            }
+          ]
+        },
+        "repair_route_event_1": {
+          "id": "repair_route_event_1",
+          "kind": "random",
+          "textKey": "driving.repair_route_event_1.text",
+          "transitions": [
+            {
+              "weight": 1,
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "preparation",
+                  "by": 1
+                }
+              ],
+              "goto": "repair_route_event_1a"
+            },
+            {
+              "weight": 1,
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "repair_route_event_1b"
+            }
+          ]
+        },
+        "repair_route_event_1a": {
+          "id": "repair_route_event_1a",
+          "kind": "choice",
+          "textKey": "driving.repair_route_event_1a.text",
+          "choices": [
+            {
+              "id": "repair_route_event_1a_proceed",
+              "goto": "repair_route_2",
+              "labelKey": "driving.repair_route_event_1a.proceed"
+            }
+          ]
+        },
+        "repair_route_event_1b": {
+          "id": "repair_route_event_1b",
+          "kind": "choice",
+          "textKey": "driving.repair_route_event_1b.text",
+          "choices": [
+            {
+              "id": "repair_route_event_1b_proceed",
+              "goto": "repair_route_2",
+              "labelKey": "driving.repair_route_event_1b.proceed"
+            }
+          ]
+        },
+        "repair_route_2": {
+          "id": "repair_route_2",
+          "kind": "choice",
+          "textKey": "driving.repair_route_2.text",
+          "choices": [
+            {
+              "id": "repair_route_prepare",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "preparation",
+                  "by": 1
+                }
+              ],
+              "goto": "repair_route_event_2",
+              "labelKey": "driving.repair_route_2.prepare"
+            },
+            {
+              "id": "repair_route_improvise",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "repair_route_event_2",
+              "labelKey": "driving.repair_route_2.improvise"
+            }
+          ]
+        },
+        "repair_route_event_2": {
+          "id": "repair_route_event_2",
+          "kind": "random",
+          "textKey": "driving.repair_route_event_2.text",
+          "transitions": [
+            {
+              "weight": 1,
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "connections",
+                  "by": 1
+                }
+              ],
+              "goto": "repair_route_event_2a"
+            },
+            {
+              "weight": 1,
+              "goto": "repair_route_event_2b"
+            }
+          ]
+        },
+        "repair_route_event_2a": {
+          "id": "repair_route_event_2a",
+          "kind": "choice",
+          "textKey": "driving.repair_route_event_2a.text",
+          "choices": [
+            {
+              "id": "repair_route_event_2a_proceed",
+              "goto": "repair_route_3",
+              "labelKey": "driving.repair_route_event_2a.proceed"
+            }
+          ]
+        },
+        "repair_route_event_2b": {
+          "id": "repair_route_event_2b",
+          "kind": "choice",
+          "textKey": "driving.repair_route_event_2b.text",
+          "choices": [
+            {
+              "id": "repair_route_event_2b_proceed",
+              "goto": "repair_route_3",
+              "labelKey": "driving.repair_route_event_2b.proceed"
+            }
+          ]
+        },
+        "repair_route_3": {
+          "id": "repair_route_3",
+          "kind": "choice",
+          "textKey": "driving.repair_route_3.text",
+          "choices": [
+            {
+              "id": "repair_route_steady",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "preparation",
+                  "by": 1
+                }
+              ],
+              "goto": "repair_route_4",
+              "labelKey": "driving.repair_route_3.steady"
+            },
+            {
+              "id": "repair_route_call_in_favour",
+              "requirements": {
+                "field": "var.connections",
+                "operator": "greater_or_equal",
+                "value": 1
+              },
+              "effects": [
+                {
+                  "op": "decrement",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "repair_route_4",
+              "labelKey": "driving.repair_route_3.favour",
+              "requirementFailKey": "driving.repair_route_3.favour_fail"
+            }
+          ]
+        },
+        "repair_route_4": {
+          "id": "repair_route_4",
+          "kind": "choice",
+          "textKey": "driving.repair_route_4.text",
+          "choices": [
+            {
+              "id": "choose_reliable_car",
+              "showWhen": {
+                "field": "var.remembered_repair_route",
+                "operator": "equals",
+                "value": true
+              },
+              "goto": "ending_reliable_car",
+              "labelKey": "driving.repair_route_4.ending_reliable_car"
+            },
+            {
+              "id": "choose_endless_repairs",
+              "goto": "ending_endless_repairs",
+              "labelKey": "driving.repair_route_4.ending_endless_repairs"
+            }
+          ]
+        },
+        "ending_reliable_car": {
+          "id": "ending_reliable_car",
+          "kind": "ending",
+          "textKey": "driving.ending_reliable_car.text",
+          "endingId": "reliable_car",
+          "outcome": "win"
+        },
+        "ending_endless_repairs": {
+          "id": "ending_endless_repairs",
+          "kind": "ending",
+          "textKey": "driving.ending_endless_repairs.text",
+          "endingId": "endless_repairs",
+          "outcome": "neutral"
+        },
+        "road_route_1": {
+          "id": "road_route_1",
+          "kind": "choice",
+          "textKey": "driving.road_route_1.text",
+          "choices": [
+            {
+              "id": "road_route_listen",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "remembered_road_route",
+                  "value": true
+                },
+                {
+                  "op": "increment",
+                  "var": "connections",
+                  "by": 1
+                }
+              ],
+              "goto": "road_route_event_1",
+              "labelKey": "driving.road_route_1.listen"
+            },
+            {
+              "id": "road_route_push",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "remembered_road_route",
+                  "value": true
+                },
+                {
+                  "op": "increment",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "road_route_event_1",
+              "labelKey": "driving.road_route_1.push"
+            }
+          ]
+        },
+        "road_route_event_1": {
+          "id": "road_route_event_1",
+          "kind": "random",
+          "textKey": "driving.road_route_event_1.text",
+          "transitions": [
+            {
+              "weight": 1,
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "preparation",
+                  "by": 1
+                }
+              ],
+              "goto": "road_route_event_1a"
+            },
+            {
+              "weight": 1,
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "road_route_event_1b"
+            }
+          ]
+        },
+        "road_route_event_1a": {
+          "id": "road_route_event_1a",
+          "kind": "choice",
+          "textKey": "driving.road_route_event_1a.text",
+          "choices": [
+            {
+              "id": "road_route_event_1a_proceed",
+              "goto": "road_route_2",
+              "labelKey": "driving.road_route_event_1a.proceed"
+            }
+          ]
+        },
+        "road_route_event_1b": {
+          "id": "road_route_event_1b",
+          "kind": "choice",
+          "textKey": "driving.road_route_event_1b.text",
+          "choices": [
+            {
+              "id": "road_route_event_1b_proceed",
+              "goto": "road_route_2",
+              "labelKey": "driving.road_route_event_1b.proceed"
+            }
+          ]
+        },
+        "road_route_2": {
+          "id": "road_route_2",
+          "kind": "choice",
+          "textKey": "driving.road_route_2.text",
+          "choices": [
+            {
+              "id": "road_route_prepare",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "preparation",
+                  "by": 1
+                }
+              ],
+              "goto": "road_route_event_2",
+              "labelKey": "driving.road_route_2.prepare"
+            },
+            {
+              "id": "road_route_improvise",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "road_route_event_2",
+              "labelKey": "driving.road_route_2.improvise"
+            }
+          ]
+        },
+        "road_route_event_2": {
+          "id": "road_route_event_2",
+          "kind": "random",
+          "textKey": "driving.road_route_event_2.text",
+          "transitions": [
+            {
+              "weight": 1,
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "connections",
+                  "by": 1
+                }
+              ],
+              "goto": "road_route_event_2a"
+            },
+            {
+              "weight": 1,
+              "goto": "road_route_event_2b"
+            }
+          ]
+        },
+        "road_route_event_2a": {
+          "id": "road_route_event_2a",
+          "kind": "choice",
+          "textKey": "driving.road_route_event_2a.text",
+          "choices": [
+            {
+              "id": "road_route_event_2a_proceed",
+              "goto": "road_route_3",
+              "labelKey": "driving.road_route_event_2a.proceed"
+            }
+          ]
+        },
+        "road_route_event_2b": {
+          "id": "road_route_event_2b",
+          "kind": "choice",
+          "textKey": "driving.road_route_event_2b.text",
+          "choices": [
+            {
+              "id": "road_route_event_2b_proceed",
+              "goto": "road_route_3",
+              "labelKey": "driving.road_route_event_2b.proceed"
+            }
+          ]
+        },
+        "road_route_3": {
+          "id": "road_route_3",
+          "kind": "choice",
+          "textKey": "driving.road_route_3.text",
+          "choices": [
+            {
+              "id": "road_route_steady",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "preparation",
+                  "by": 1
+                }
+              ],
+              "goto": "road_route_4",
+              "labelKey": "driving.road_route_3.steady"
+            },
+            {
+              "id": "road_route_call_in_favour",
+              "requirements": {
+                "field": "var.connections",
+                "operator": "greater_or_equal",
+                "value": 1
+              },
+              "effects": [
+                {
+                  "op": "decrement",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "road_route_4",
+              "labelKey": "driving.road_route_3.favour",
+              "requirementFailKey": "driving.road_route_3.favour_fail"
+            }
+          ]
+        },
+        "road_route_4": {
+          "id": "road_route_4",
+          "kind": "choice",
+          "textKey": "driving.road_route_4.text",
+          "choices": [
+            {
+              "id": "choose_sold_car",
+              "goto": "ending_sold_car",
+              "labelKey": "driving.road_route_4.ending_sold_car"
+            },
+            {
+              "id": "choose_collector_item",
+              "showWhen": {
+                "field": "var.remembered_road_route",
+                "operator": "equals",
+                "value": true
+              },
+              "goto": "ending_collector_item",
+              "labelKey": "driving.road_route_4.ending_collector_item"
+            }
+          ]
+        },
+        "ending_sold_car": {
+          "id": "ending_sold_car",
+          "kind": "ending",
+          "textKey": "driving.ending_sold_car.text",
+          "endingId": "sold_car",
+          "outcome": "neutral"
+        },
+        "ending_collector_item": {
+          "id": "ending_collector_item",
+          "kind": "ending",
+          "textKey": "driving.ending_collector_item.text",
+          "endingId": "collector_item",
+          "outcome": "win"
+        },
+        "escape_route_1": {
+          "id": "escape_route_1",
+          "kind": "choice",
+          "textKey": "driving.escape_route_1.text",
+          "choices": [
+            {
+              "id": "escape_route_listen",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "remembered_escape_route",
+                  "value": true
+                },
+                {
+                  "op": "increment",
+                  "var": "connections",
+                  "by": 1
+                }
+              ],
+              "goto": "escape_route_event_1",
+              "labelKey": "driving.escape_route_1.listen"
+            },
+            {
+              "id": "escape_route_push",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "remembered_escape_route",
+                  "value": true
+                },
+                {
+                  "op": "increment",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "escape_route_event_1",
+              "labelKey": "driving.escape_route_1.push"
+            }
+          ]
+        },
+        "escape_route_event_1": {
+          "id": "escape_route_event_1",
+          "kind": "random",
+          "textKey": "driving.escape_route_event_1.text",
+          "transitions": [
+            {
+              "weight": 1,
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "preparation",
+                  "by": 1
+                }
+              ],
+              "goto": "escape_route_event_1a"
+            },
+            {
+              "weight": 1,
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "escape_route_event_1b"
+            }
+          ]
+        },
+        "escape_route_event_1a": {
+          "id": "escape_route_event_1a",
+          "kind": "choice",
+          "textKey": "driving.escape_route_event_1a.text",
+          "choices": [
+            {
+              "id": "escape_route_event_1a_proceed",
+              "goto": "escape_route_2",
+              "labelKey": "driving.escape_route_event_1a.proceed"
+            }
+          ]
+        },
+        "escape_route_event_1b": {
+          "id": "escape_route_event_1b",
+          "kind": "choice",
+          "textKey": "driving.escape_route_event_1b.text",
+          "choices": [
+            {
+              "id": "escape_route_event_1b_proceed",
+              "goto": "escape_route_2",
+              "labelKey": "driving.escape_route_event_1b.proceed"
+            }
+          ]
+        },
+        "escape_route_2": {
+          "id": "escape_route_2",
+          "kind": "choice",
+          "textKey": "driving.escape_route_2.text",
+          "choices": [
+            {
+              "id": "escape_route_prepare",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "preparation",
+                  "by": 1
+                }
+              ],
+              "goto": "escape_route_event_2",
+              "labelKey": "driving.escape_route_2.prepare"
+            },
+            {
+              "id": "escape_route_improvise",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "escape_route_event_2",
+              "labelKey": "driving.escape_route_2.improvise"
+            }
+          ]
+        },
+        "escape_route_event_2": {
+          "id": "escape_route_event_2",
+          "kind": "random",
+          "textKey": "driving.escape_route_event_2.text",
+          "transitions": [
+            {
+              "weight": 1,
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "connections",
+                  "by": 1
+                }
+              ],
+              "goto": "escape_route_event_2a"
+            },
+            {
+              "weight": 1,
+              "goto": "escape_route_event_2b"
+            }
+          ]
+        },
+        "escape_route_event_2a": {
+          "id": "escape_route_event_2a",
+          "kind": "choice",
+          "textKey": "driving.escape_route_event_2a.text",
+          "choices": [
+            {
+              "id": "escape_route_event_2a_proceed",
+              "goto": "escape_route_3",
+              "labelKey": "driving.escape_route_event_2a.proceed"
+            }
+          ]
+        },
+        "escape_route_event_2b": {
+          "id": "escape_route_event_2b",
+          "kind": "choice",
+          "textKey": "driving.escape_route_event_2b.text",
+          "choices": [
+            {
+              "id": "escape_route_event_2b_proceed",
+              "goto": "escape_route_3",
+              "labelKey": "driving.escape_route_event_2b.proceed"
+            }
+          ]
+        },
+        "escape_route_3": {
+          "id": "escape_route_3",
+          "kind": "choice",
+          "textKey": "driving.escape_route_3.text",
+          "choices": [
+            {
+              "id": "escape_route_steady",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "preparation",
+                  "by": 1
+                }
+              ],
+              "goto": "escape_route_4",
+              "labelKey": "driving.escape_route_3.steady"
+            },
+            {
+              "id": "escape_route_call_in_favour",
+              "requirements": {
+                "field": "var.connections",
+                "operator": "greater_or_equal",
+                "value": 1
+              },
+              "effects": [
+                {
+                  "op": "decrement",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "escape_route_4",
+              "labelKey": "driving.escape_route_3.favour",
+              "requirementFailKey": "driving.escape_route_3.favour_fail"
+            }
+          ]
+        },
+        "escape_route_4": {
+          "id": "escape_route_4",
+          "kind": "choice",
+          "textKey": "driving.escape_route_4.text",
+          "choices": [
+            {
+              "id": "choose_abandoned_project",
+              "goto": "ending_abandoned_project",
+              "labelKey": "driving.escape_route_4.ending_abandoned_project"
+            },
+            {
+              "id": "choose_trusting_the_mechanic",
+              "showWhen": {
+                "field": "var.remembered_escape_route",
+                "operator": "equals",
+                "value": true
+              },
+              "goto": "ending_trusting_the_mechanic",
+              "labelKey": "driving.escape_route_4.ending_trusting_the_mechanic"
+            }
+          ]
+        },
+        "ending_abandoned_project": {
+          "id": "ending_abandoned_project",
+          "kind": "ending",
+          "textKey": "driving.ending_abandoned_project.text",
+          "endingId": "abandoned_project",
+          "outcome": "loss"
+        },
+        "ending_trusting_the_mechanic": {
+          "id": "ending_trusting_the_mechanic",
+          "kind": "ending",
+          "textKey": "driving.ending_trusting_the_mechanic.text",
+          "endingId": "trusting_the_mechanic",
+          "outcome": "neutral"
+        }
+      },
+      "startNodeId": "driving",
+      "achievements": [
+        {
+          "id": "found_repair_route_event_1a",
+          "hidden": true,
+          "condition": {
+            "field": "visited.repair_route_event_1a",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "driving.achievement_repair_route_event_1a.name",
+          "descriptionKey": "driving.achievement_repair_route_event_1a.description"
+        },
+        {
+          "id": "found_repair_route_event_1b",
+          "hidden": true,
+          "condition": {
+            "field": "visited.repair_route_event_1b",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "driving.achievement_repair_route_event_1b.name",
+          "descriptionKey": "driving.achievement_repair_route_event_1b.description"
+        },
+        {
+          "id": "found_repair_route_event_2a",
+          "hidden": true,
+          "condition": {
+            "field": "visited.repair_route_event_2a",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "driving.achievement_repair_route_event_2a.name",
+          "descriptionKey": "driving.achievement_repair_route_event_2a.description"
+        },
+        {
+          "id": "found_repair_route_event_2b",
+          "hidden": true,
+          "condition": {
+            "field": "visited.repair_route_event_2b",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "driving.achievement_repair_route_event_2b.name",
+          "descriptionKey": "driving.achievement_repair_route_event_2b.description"
+        },
+        {
+          "id": "found_road_route_event_1a",
+          "hidden": true,
+          "condition": {
+            "field": "visited.road_route_event_1a",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "driving.achievement_road_route_event_1a.name",
+          "descriptionKey": "driving.achievement_road_route_event_1a.description"
+        },
+        {
+          "id": "found_road_route_event_1b",
+          "hidden": true,
+          "condition": {
+            "field": "visited.road_route_event_1b",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "driving.achievement_road_route_event_1b.name",
+          "descriptionKey": "driving.achievement_road_route_event_1b.description"
+        },
+        {
+          "id": "found_road_route_event_2a",
+          "hidden": true,
+          "condition": {
+            "field": "visited.road_route_event_2a",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "driving.achievement_road_route_event_2a.name",
+          "descriptionKey": "driving.achievement_road_route_event_2a.description"
+        },
+        {
+          "id": "found_road_route_event_2b",
+          "hidden": true,
+          "condition": {
+            "field": "visited.road_route_event_2b",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "driving.achievement_road_route_event_2b.name",
+          "descriptionKey": "driving.achievement_road_route_event_2b.description"
+        },
+        {
+          "id": "found_escape_route_event_1a",
+          "hidden": true,
+          "condition": {
+            "field": "visited.escape_route_event_1a",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "driving.achievement_escape_route_event_1a.name",
+          "descriptionKey": "driving.achievement_escape_route_event_1a.description"
+        },
+        {
+          "id": "found_escape_route_event_1b",
+          "hidden": true,
+          "condition": {
+            "field": "visited.escape_route_event_1b",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "driving.achievement_escape_route_event_1b.name",
+          "descriptionKey": "driving.achievement_escape_route_event_1b.description"
+        },
+        {
+          "id": "found_escape_route_event_2a",
+          "hidden": true,
+          "condition": {
+            "field": "visited.escape_route_event_2a",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "driving.achievement_escape_route_event_2a.name",
+          "descriptionKey": "driving.achievement_escape_route_event_2a.description"
+        },
+        {
+          "id": "found_escape_route_event_2b",
+          "hidden": true,
+          "condition": {
+            "field": "visited.escape_route_event_2b",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "driving.achievement_escape_route_event_2b.name",
+          "descriptionKey": "driving.achievement_escape_route_event_2b.description"
+        }
+      ]
+    }
+  },
+  "migration": {
+    "fromVersion": "1.0.0",
+    "nodeMap": {
+      "bmw_ownership": "repair_route_4",
+      "ending_trusting": "ending_trusting_the_mechanic",
+      "ending_skeptical": "ending_sold_car"
+    },
+    "endingMap": {
+      "asked_for_a_second_opinion": "sold_car"
+    }
+  },
+  "strings": {
+    "driving.achievement_escape_route_event_1a.description": "Discover an optional page on this route.",
+    "driving.achievement_escape_route_event_1a.name": "Found: the tow driver's card",
+    "driving.achievement_escape_route_event_1b.description": "Discover an optional page on this route.",
+    "driving.achievement_escape_route_event_1b.name": "Found: the tow driver's card",
+    "driving.achievement_escape_route_event_2a.description": "Discover an optional page on this route.",
+    "driving.achievement_escape_route_event_2a.name": "Found: the tow driver's card",
+    "driving.achievement_escape_route_event_2b.description": "Discover an optional page on this route.",
+    "driving.achievement_escape_route_event_2b.name": "Found: the tow driver's card",
+    "driving.achievement_repair_route_event_1a.description": "Discover an optional page on this route.",
+    "driving.achievement_repair_route_event_1a.name": "Found: the mechanic's trust",
+    "driving.achievement_repair_route_event_1b.description": "Discover an optional page on this route.",
+    "driving.achievement_repair_route_event_1b.name": "Found: the mechanic's trust",
+    "driving.achievement_repair_route_event_2a.description": "Discover an optional page on this route.",
+    "driving.achievement_repair_route_event_2a.name": "Found: the mechanic's trust",
+    "driving.achievement_repair_route_event_2b.description": "Discover an optional page on this route.",
+    "driving.achievement_repair_route_event_2b.name": "Found: the mechanic's trust",
+    "driving.achievement_road_route_event_1a.description": "Discover an optional page on this route.",
+    "driving.achievement_road_route_event_1a.name": "Found: the police warning",
+    "driving.achievement_road_route_event_1b.description": "Discover an optional page on this route.",
+    "driving.achievement_road_route_event_1b.name": "Found: the police warning",
+    "driving.achievement_road_route_event_2a.description": "Discover an optional page on this route.",
+    "driving.achievement_road_route_event_2a.name": "Found: the police warning",
+    "driving.achievement_road_route_event_2b.description": "Discover an optional page on this route.",
+    "driving.achievement_road_route_event_2b.name": "Found: the police warning",
+    "driving.campaign.description": "Inspection stickers, mechanic trust, police, parking, weather, parts, towing, and one very opinionated car.",
+    "driving.campaign.title": "Driving",
+    "driving.driving.choice_ask_another_opinion": "Ask another opinion and test it on the road",
+    "driving.driving.choice_believe_him": "Believe him and build a repair plan",
+    "driving.driving.choice_ignore_warning": "Ignore the warning and plan an exit",
+    "driving.driving.choice_turn_up_music": "Turn up the music and head for the road",
+    "driving.driving.text": "You pass the annual inspection. Five minutes later the dashboard lights up like a Christmas tree. The mechanic says it was already like that, which is technically a diagnosis.",
+    "driving.ending_abandoned_project.text": "The Abandoned Project\n\nYou hand over the keys and walk home lighter than you have in months.",
+    "driving.ending_collector_item.text": "The Accidental Collector\n\nThe police warning proves the model's rare specification. What was old becomes collectable overnight.",
+    "driving.ending_endless_repairs.text": "The Perpetual Repair\n\nEvery repaired sound reveals a quieter one beneath it. You learn to budget by frequency.",
+    "driving.ending_reliable_car.text": "The Reliable Car\n\nIt starts in winter, stops on purpose, and asks nothing more dramatic than fuel.",
+    "driving.ending_sold_car.text": "Sold Before Sunset\n\nYou describe every fault honestly. The buyer calls them character and transfers the money.",
+    "driving.ending_trusting_the_mechanic.text": "Trust the Hammer\n\nYour original mechanic buys the project, fixes it with one strike, and refuses to explain.",
+    "driving.escape_route_1.listen": "Accept the neighbour's careful signals",
+    "driving.escape_route_1.push": "Mount the kerb decisively",
+    "driving.escape_route_1.text": "A parking space narrows around the car while neighbours direct from five incompatible angles.",
+    "driving.escape_route_2.improvise": "Call the insurer first",
+    "driving.escape_route_2.prepare": "Take the tow driver's card",
+    "driving.escape_route_2.text": "The warning light becomes a warning noise halfway to the marketplace and a warning smell near the ring road.",
+    "driving.escape_route_3.favour": "Call in the favour you earned",
+    "driving.escape_route_3.favour_fail": "No one owes you that favour yet.",
+    "driving.escape_route_3.steady": "Use what you prepared",
+    "driving.escape_route_3.text": "A tow driver arrives with the calm of someone who has met this car before.",
+    "driving.escape_route_4.ending_abandoned_project": "The Abandoned Project",
+    "driving.escape_route_4.ending_trusting_the_mechanic": "Trust the Hammer",
+    "driving.escape_route_4.text": "At the yard, insurer, marketplace buyer, and scrap dealer offer three definitions of value.",
+    "driving.escape_route_event_1.text": "The day contributes its own amendment.",
+    "driving.escape_route_event_1a.proceed": "Save the parking receipt",
+    "driving.escape_route_event_1a.text": "The receipt proves the bay was legal yesterday, which is the strongest available form of legality.",
+    "driving.escape_route_event_1b.proceed": "Leave before anyone writes a note",
+    "driving.escape_route_event_1b.text": "A mirror acquires a neat scar and the neighbour acquires a complete theory.",
+    "driving.escape_route_event_2.text": "A seeded interruption arrives on schedule.",
+    "driving.escape_route_event_2a.proceed": "Ask for one last repair estimate",
+    "driving.escape_route_event_2a.text": "The tow driver knows an insurer assessor who answers on the first ring.",
+    "driving.escape_route_event_2b.proceed": "List the car as a project",
+    "driving.escape_route_event_2b.text": "The online listing receives nineteen offers, all beginning with 'final price?'",
+    "driving.repair_route_1.listen": "Ask the mechanic to prioritize safety",
+    "driving.repair_route_1.push": "Approve every repair at once",
+    "driving.repair_route_1.text": "The mechanic offers a handwritten repair order: brakes first, mystery noise second, dignity when parts arrive.",
+    "driving.repair_route_2.improvise": "Order parts before checking the policy",
+    "driving.repair_route_2.prepare": "Pay insurance before ordering parts",
+    "driving.repair_route_2.text": "Insurance and vehicle tax occupy neighbouring windows whose lunch breaks overlap with mathematical precision.",
+    "driving.repair_route_3.favour": "Call in the favour you earned",
+    "driving.repair_route_3.favour_fail": "No one owes you that favour yet.",
+    "driving.repair_route_3.steady": "Use what you prepared",
+    "driving.repair_route_3.text": "A parts seller finds the exact component in a warehouse described only as 'after the roundabout'.",
+    "driving.repair_route_4.ending_endless_repairs": "The Perpetual Repair",
+    "driving.repair_route_4.ending_reliable_car": "The Reliable Car",
+    "driving.repair_route_4.text": "The car returns to the lift for the final decision: restore it properly, keep negotiating with entropy, or admit the project owns you.",
+    "driving.repair_route_event_1.text": "The day contributes its own amendment.",
+    "driving.repair_route_event_1a.proceed": "Keep the inspection sheet",
+    "driving.repair_route_event_1a.text": "The inspection sheet proves the warning light appeared after the test, earning an unusually respectful shrug.",
+    "driving.repair_route_event_1b.proceed": "Trust the dashboard's temporary silence",
+    "driving.repair_route_event_1b.text": "The light turns off by itself and creates six hours of false peace.",
+    "driving.repair_route_event_2.text": "A seeded interruption arrives on schedule.",
+    "driving.repair_route_event_2a.proceed": "Follow the warehouse directions",
+    "driving.repair_route_event_2a.text": "The warehouse owner recognizes the mechanic and finds an original part under three alternators.",
+    "driving.repair_route_event_2b.proceed": "Buy the almost-identical component",
+    "driving.repair_route_event_2b.text": "The almost-identical part fits perfectly except for the part where it connects.",
+    "driving.road_route_1.listen": "Listen to the road-test instructions",
+    "driving.road_route_1.push": "Prove the first mechanic wrong",
+    "driving.road_route_1.text": "A second mechanic diagnoses the weather, the fuel, and your relationship with the accelerator.",
+    "driving.road_route_2.improvise": "Debate the meaning of the road sign",
+    "driving.road_route_2.prepare": "Keep the officer's written warning",
+    "driving.road_route_2.text": "Rain turns the mountain road into a practical examination no licensing office could legally administer.",
+    "driving.road_route_3.favour": "Call in the favour you earned",
+    "driving.road_route_3.favour_fail": "No one owes you that favour yet.",
+    "driving.road_route_3.steady": "Use what you prepared",
+    "driving.road_route_3.text": "Police stop you beside a fuel station where LPG, petrol, and coffee share one queue.",
+    "driving.road_route_4.ending_collector_item": "The Accidental Collector",
+    "driving.road_route_4.ending_sold_car": "Sold Before Sunset",
+    "driving.road_route_4.text": "With the storm behind you, the car feels either proven or forgiven. The distinction matters at the marketplace.",
+    "driving.road_route_event_1.text": "The day contributes its own amendment.",
+    "driving.road_route_event_1a.proceed": "Check the forecast and tyres",
+    "driving.road_route_event_1a.text": "The road test reveals a loose heat shield, a cheap and almost emotionally disappointing answer.",
+    "driving.road_route_event_1b.proceed": "Trust the summer tyres' confidence",
+    "driving.road_route_event_1b.text": "A pothole silences the original noise and introduces two apprentices.",
+    "driving.road_route_event_2.text": "A seeded interruption arrives on schedule.",
+    "driving.road_route_event_2a.proceed": "Refuel before the pass",
+    "driving.road_route_event_2a.text": "The officer notices the inspection receipt and recommends a safer descent.",
+    "driving.road_route_event_2b.proceed": "Follow the cheaper LPG sign",
+    "driving.road_route_event_2b.text": "The cheap LPG station is open, but its card terminal is participating remotely.",
+    "driving.var_connections.label": "Mechanic Trust",
+    "driving.var_preparation.label": "Car Reliability",
+    "driving.var_pressure.label": "Repair Pressure"
+  }
+}

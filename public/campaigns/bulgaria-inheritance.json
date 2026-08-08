@@ -1,0 +1,1129 @@
+{
+  "formatVersion": 1,
+  "catalog": {
+    "title": "Inheritance",
+    "description": "Family property, evidence, neighbours, court, and tomato-adjacent law.",
+    "duration": "10–15 min per route",
+    "contentNotice": "Family conflict, police and court proceedings, property damage, and abandonment.",
+    "featured": false
+  },
+  "campaign": {
+    "id": "bulgaria-inheritance",
+    "kindId": "story-graph",
+    "version": "2.0.0",
+    "titleKey": "inheritance.campaign.title",
+    "content": {
+      "descriptionKey": "inheritance.campaign.description",
+      "variables": {
+        "route": {
+          "type": "enum",
+          "initial": "records_route",
+          "values": [
+            "records_route",
+            "neighbour_route",
+            "police_route"
+          ]
+        },
+        "preparation": {
+          "type": "int",
+          "initial": 0,
+          "min": 0,
+          "max": 12,
+          "visible": true,
+          "labelKey": "inheritance.var_preparation.label"
+        },
+        "connections": {
+          "type": "int",
+          "initial": 0,
+          "min": 0,
+          "max": 12,
+          "visible": true,
+          "labelKey": "inheritance.var_connections.label"
+        },
+        "pressure": {
+          "type": "int",
+          "initial": 0,
+          "min": 0,
+          "max": 12,
+          "visible": true,
+          "labelKey": "inheritance.var_pressure.label"
+        },
+        "remembered_records_route": {
+          "type": "bool",
+          "initial": false
+        },
+        "remembered_neighbour_route": {
+          "type": "bool",
+          "initial": false
+        },
+        "remembered_police_route": {
+          "type": "bool",
+          "initial": false
+        }
+      },
+      "nodes": {
+        "property_inheritance": {
+          "id": "property_inheritance",
+          "kind": "choice",
+          "textKey": "inheritance.property_inheritance.text",
+          "choices": [
+            {
+              "id": "request_records",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "route",
+                  "value": "records_route"
+                }
+              ],
+              "goto": "records_route_1",
+              "labelKey": "inheritance.property_inheritance.choice_request_records"
+            },
+            {
+              "id": "call_mother",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "route",
+                  "value": "neighbour_route"
+                }
+              ],
+              "goto": "neighbour_route_1",
+              "labelKey": "inheritance.property_inheritance.choice_call_mother"
+            },
+            {
+              "id": "cut_padlock",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "route",
+                  "value": "police_route"
+                }
+              ],
+              "goto": "police_route_1",
+              "labelKey": "inheritance.property_inheritance.choice_cut_padlock"
+            },
+            {
+              "id": "consult_lawyer",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "route",
+                  "value": "records_route"
+                }
+              ],
+              "goto": "records_route_1",
+              "labelKey": "inheritance.property_inheritance.choice_consult_lawyer"
+            },
+            {
+              "id": "accept_tomato_logic",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "route",
+                  "value": "neighbour_route"
+                }
+              ],
+              "goto": "neighbour_route_1",
+              "labelKey": "inheritance.property_inheritance.choice_accept_tomato_logic"
+            }
+          ]
+        },
+        "records_route_1": {
+          "id": "records_route_1",
+          "kind": "choice",
+          "textKey": "inheritance.records_route_1.text",
+          "choices": [
+            {
+              "id": "records_route_listen",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "remembered_records_route",
+                  "value": true
+                },
+                {
+                  "op": "increment",
+                  "var": "connections",
+                  "by": 1
+                }
+              ],
+              "goto": "records_route_event_1",
+              "labelKey": "inheritance.records_route_1.listen"
+            },
+            {
+              "id": "records_route_push",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "remembered_records_route",
+                  "value": true
+                },
+                {
+                  "op": "increment",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "records_route_event_1",
+              "labelKey": "inheritance.records_route_1.push"
+            }
+          ]
+        },
+        "records_route_event_1": {
+          "id": "records_route_event_1",
+          "kind": "random",
+          "textKey": "inheritance.records_route_event_1.text",
+          "transitions": [
+            {
+              "weight": 1,
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "preparation",
+                  "by": 1
+                }
+              ],
+              "goto": "records_route_event_1a"
+            },
+            {
+              "weight": 1,
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "records_route_event_1b"
+            }
+          ]
+        },
+        "records_route_event_1a": {
+          "id": "records_route_event_1a",
+          "kind": "choice",
+          "textKey": "inheritance.records_route_event_1a.text",
+          "choices": [
+            {
+              "id": "records_route_event_1a_proceed",
+              "goto": "records_route_2",
+              "labelKey": "inheritance.records_route_event_1a.proceed"
+            }
+          ]
+        },
+        "records_route_event_1b": {
+          "id": "records_route_event_1b",
+          "kind": "choice",
+          "textKey": "inheritance.records_route_event_1b.text",
+          "choices": [
+            {
+              "id": "records_route_event_1b_proceed",
+              "goto": "records_route_2",
+              "labelKey": "inheritance.records_route_event_1b.proceed"
+            }
+          ]
+        },
+        "records_route_2": {
+          "id": "records_route_2",
+          "kind": "choice",
+          "textKey": "inheritance.records_route_2.text",
+          "choices": [
+            {
+              "id": "records_route_prepare",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "preparation",
+                  "by": 1
+                }
+              ],
+              "goto": "records_route_event_2",
+              "labelKey": "inheritance.records_route_2.prepare"
+            },
+            {
+              "id": "records_route_improvise",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "records_route_event_2",
+              "labelKey": "inheritance.records_route_2.improvise"
+            }
+          ]
+        },
+        "records_route_event_2": {
+          "id": "records_route_event_2",
+          "kind": "random",
+          "textKey": "inheritance.records_route_event_2.text",
+          "transitions": [
+            {
+              "weight": 1,
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "connections",
+                  "by": 1
+                }
+              ],
+              "goto": "records_route_event_2a"
+            },
+            {
+              "weight": 1,
+              "goto": "records_route_event_2b"
+            }
+          ]
+        },
+        "records_route_event_2a": {
+          "id": "records_route_event_2a",
+          "kind": "choice",
+          "textKey": "inheritance.records_route_event_2a.text",
+          "choices": [
+            {
+              "id": "records_route_event_2a_proceed",
+              "goto": "records_route_3",
+              "labelKey": "inheritance.records_route_event_2a.proceed"
+            }
+          ]
+        },
+        "records_route_event_2b": {
+          "id": "records_route_event_2b",
+          "kind": "choice",
+          "textKey": "inheritance.records_route_event_2b.text",
+          "choices": [
+            {
+              "id": "records_route_event_2b_proceed",
+              "goto": "records_route_3",
+              "labelKey": "inheritance.records_route_event_2b.proceed"
+            }
+          ]
+        },
+        "records_route_3": {
+          "id": "records_route_3",
+          "kind": "choice",
+          "textKey": "inheritance.records_route_3.text",
+          "choices": [
+            {
+              "id": "records_route_steady",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "preparation",
+                  "by": 1
+                }
+              ],
+              "goto": "records_route_4",
+              "labelKey": "inheritance.records_route_3.steady"
+            },
+            {
+              "id": "records_route_call_in_favour",
+              "requirements": {
+                "field": "var.connections",
+                "operator": "greater_or_equal",
+                "value": 1
+              },
+              "effects": [
+                {
+                  "op": "decrement",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "records_route_4",
+              "labelKey": "inheritance.records_route_3.favour",
+              "requirementFailKey": "inheritance.records_route_3.favour_fail"
+            }
+          ]
+        },
+        "records_route_4": {
+          "id": "records_route_4",
+          "kind": "choice",
+          "textKey": "inheritance.records_route_4.text",
+          "choices": [
+            {
+              "id": "choose_court_victory",
+              "goto": "ending_court_victory",
+              "labelKey": "inheritance.records_route_4.ending_court_victory"
+            },
+            {
+              "id": "choose_family_peace",
+              "showWhen": {
+                "field": "var.remembered_records_route",
+                "operator": "equals",
+                "value": true
+              },
+              "goto": "ending_family_peace",
+              "labelKey": "inheritance.records_route_4.ending_family_peace"
+            }
+          ]
+        },
+        "ending_court_victory": {
+          "id": "ending_court_victory",
+          "kind": "ending",
+          "textKey": "inheritance.ending_court_victory.text",
+          "endingId": "court_victory",
+          "outcome": "win"
+        },
+        "ending_family_peace": {
+          "id": "ending_family_peace",
+          "kind": "ending",
+          "textKey": "inheritance.ending_family_peace.text",
+          "endingId": "family_peace",
+          "outcome": "win"
+        },
+        "neighbour_route_1": {
+          "id": "neighbour_route_1",
+          "kind": "choice",
+          "textKey": "inheritance.neighbour_route_1.text",
+          "choices": [
+            {
+              "id": "neighbour_route_listen",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "remembered_neighbour_route",
+                  "value": true
+                },
+                {
+                  "op": "increment",
+                  "var": "connections",
+                  "by": 1
+                }
+              ],
+              "goto": "neighbour_route_event_1",
+              "labelKey": "inheritance.neighbour_route_1.listen"
+            },
+            {
+              "id": "neighbour_route_push",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "remembered_neighbour_route",
+                  "value": true
+                },
+                {
+                  "op": "increment",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "neighbour_route_event_1",
+              "labelKey": "inheritance.neighbour_route_1.push"
+            }
+          ]
+        },
+        "neighbour_route_event_1": {
+          "id": "neighbour_route_event_1",
+          "kind": "random",
+          "textKey": "inheritance.neighbour_route_event_1.text",
+          "transitions": [
+            {
+              "weight": 1,
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "preparation",
+                  "by": 1
+                }
+              ],
+              "goto": "neighbour_route_event_1a"
+            },
+            {
+              "weight": 1,
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "neighbour_route_event_1b"
+            }
+          ]
+        },
+        "neighbour_route_event_1a": {
+          "id": "neighbour_route_event_1a",
+          "kind": "choice",
+          "textKey": "inheritance.neighbour_route_event_1a.text",
+          "choices": [
+            {
+              "id": "neighbour_route_event_1a_proceed",
+              "goto": "neighbour_route_2",
+              "labelKey": "inheritance.neighbour_route_event_1a.proceed"
+            }
+          ]
+        },
+        "neighbour_route_event_1b": {
+          "id": "neighbour_route_event_1b",
+          "kind": "choice",
+          "textKey": "inheritance.neighbour_route_event_1b.text",
+          "choices": [
+            {
+              "id": "neighbour_route_event_1b_proceed",
+              "goto": "neighbour_route_2",
+              "labelKey": "inheritance.neighbour_route_event_1b.proceed"
+            }
+          ]
+        },
+        "neighbour_route_2": {
+          "id": "neighbour_route_2",
+          "kind": "choice",
+          "textKey": "inheritance.neighbour_route_2.text",
+          "choices": [
+            {
+              "id": "neighbour_route_prepare",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "preparation",
+                  "by": 1
+                }
+              ],
+              "goto": "neighbour_route_event_2",
+              "labelKey": "inheritance.neighbour_route_2.prepare"
+            },
+            {
+              "id": "neighbour_route_improvise",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "neighbour_route_event_2",
+              "labelKey": "inheritance.neighbour_route_2.improvise"
+            }
+          ]
+        },
+        "neighbour_route_event_2": {
+          "id": "neighbour_route_event_2",
+          "kind": "random",
+          "textKey": "inheritance.neighbour_route_event_2.text",
+          "transitions": [
+            {
+              "weight": 1,
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "connections",
+                  "by": 1
+                }
+              ],
+              "goto": "neighbour_route_event_2a"
+            },
+            {
+              "weight": 1,
+              "goto": "neighbour_route_event_2b"
+            }
+          ]
+        },
+        "neighbour_route_event_2a": {
+          "id": "neighbour_route_event_2a",
+          "kind": "choice",
+          "textKey": "inheritance.neighbour_route_event_2a.text",
+          "choices": [
+            {
+              "id": "neighbour_route_event_2a_proceed",
+              "goto": "neighbour_route_3",
+              "labelKey": "inheritance.neighbour_route_event_2a.proceed"
+            }
+          ]
+        },
+        "neighbour_route_event_2b": {
+          "id": "neighbour_route_event_2b",
+          "kind": "choice",
+          "textKey": "inheritance.neighbour_route_event_2b.text",
+          "choices": [
+            {
+              "id": "neighbour_route_event_2b_proceed",
+              "goto": "neighbour_route_3",
+              "labelKey": "inheritance.neighbour_route_event_2b.proceed"
+            }
+          ]
+        },
+        "neighbour_route_3": {
+          "id": "neighbour_route_3",
+          "kind": "choice",
+          "textKey": "inheritance.neighbour_route_3.text",
+          "choices": [
+            {
+              "id": "neighbour_route_steady",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "preparation",
+                  "by": 1
+                }
+              ],
+              "goto": "neighbour_route_4",
+              "labelKey": "inheritance.neighbour_route_3.steady"
+            },
+            {
+              "id": "neighbour_route_call_in_favour",
+              "requirements": {
+                "field": "var.connections",
+                "operator": "greater_or_equal",
+                "value": 1
+              },
+              "effects": [
+                {
+                  "op": "decrement",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "neighbour_route_4",
+              "labelKey": "inheritance.neighbour_route_3.favour",
+              "requirementFailKey": "inheritance.neighbour_route_3.favour_fail"
+            }
+          ]
+        },
+        "neighbour_route_4": {
+          "id": "neighbour_route_4",
+          "kind": "choice",
+          "textKey": "inheritance.neighbour_route_4.text",
+          "choices": [
+            {
+              "id": "choose_settlement",
+              "showWhen": {
+                "field": "var.remembered_neighbour_route",
+                "operator": "equals",
+                "value": true
+              },
+              "goto": "ending_settlement",
+              "labelKey": "inheritance.neighbour_route_4.ending_settlement"
+            },
+            {
+              "id": "choose_buyout",
+              "goto": "ending_buyout",
+              "labelKey": "inheritance.neighbour_route_4.ending_buyout"
+            }
+          ]
+        },
+        "ending_settlement": {
+          "id": "ending_settlement",
+          "kind": "ending",
+          "textKey": "inheritance.ending_settlement.text",
+          "endingId": "settlement",
+          "outcome": "win"
+        },
+        "ending_buyout": {
+          "id": "ending_buyout",
+          "kind": "ending",
+          "textKey": "inheritance.ending_buyout.text",
+          "endingId": "buyout",
+          "outcome": "neutral"
+        },
+        "police_route_1": {
+          "id": "police_route_1",
+          "kind": "choice",
+          "textKey": "inheritance.police_route_1.text",
+          "choices": [
+            {
+              "id": "police_route_listen",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "remembered_police_route",
+                  "value": true
+                },
+                {
+                  "op": "increment",
+                  "var": "connections",
+                  "by": 1
+                }
+              ],
+              "goto": "police_route_event_1",
+              "labelKey": "inheritance.police_route_1.listen"
+            },
+            {
+              "id": "police_route_push",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "remembered_police_route",
+                  "value": true
+                },
+                {
+                  "op": "increment",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "police_route_event_1",
+              "labelKey": "inheritance.police_route_1.push"
+            }
+          ]
+        },
+        "police_route_event_1": {
+          "id": "police_route_event_1",
+          "kind": "random",
+          "textKey": "inheritance.police_route_event_1.text",
+          "transitions": [
+            {
+              "weight": 1,
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "preparation",
+                  "by": 1
+                }
+              ],
+              "goto": "police_route_event_1a"
+            },
+            {
+              "weight": 1,
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "police_route_event_1b"
+            }
+          ]
+        },
+        "police_route_event_1a": {
+          "id": "police_route_event_1a",
+          "kind": "choice",
+          "textKey": "inheritance.police_route_event_1a.text",
+          "choices": [
+            {
+              "id": "police_route_event_1a_proceed",
+              "goto": "police_route_2",
+              "labelKey": "inheritance.police_route_event_1a.proceed"
+            }
+          ]
+        },
+        "police_route_event_1b": {
+          "id": "police_route_event_1b",
+          "kind": "choice",
+          "textKey": "inheritance.police_route_event_1b.text",
+          "choices": [
+            {
+              "id": "police_route_event_1b_proceed",
+              "goto": "police_route_2",
+              "labelKey": "inheritance.police_route_event_1b.proceed"
+            }
+          ]
+        },
+        "police_route_2": {
+          "id": "police_route_2",
+          "kind": "choice",
+          "textKey": "inheritance.police_route_2.text",
+          "choices": [
+            {
+              "id": "police_route_prepare",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "preparation",
+                  "by": 1
+                }
+              ],
+              "goto": "police_route_event_2",
+              "labelKey": "inheritance.police_route_2.prepare"
+            },
+            {
+              "id": "police_route_improvise",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "police_route_event_2",
+              "labelKey": "inheritance.police_route_2.improvise"
+            }
+          ]
+        },
+        "police_route_event_2": {
+          "id": "police_route_event_2",
+          "kind": "random",
+          "textKey": "inheritance.police_route_event_2.text",
+          "transitions": [
+            {
+              "weight": 1,
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "connections",
+                  "by": 1
+                }
+              ],
+              "goto": "police_route_event_2a"
+            },
+            {
+              "weight": 1,
+              "goto": "police_route_event_2b"
+            }
+          ]
+        },
+        "police_route_event_2a": {
+          "id": "police_route_event_2a",
+          "kind": "choice",
+          "textKey": "inheritance.police_route_event_2a.text",
+          "choices": [
+            {
+              "id": "police_route_event_2a_proceed",
+              "goto": "police_route_3",
+              "labelKey": "inheritance.police_route_event_2a.proceed"
+            }
+          ]
+        },
+        "police_route_event_2b": {
+          "id": "police_route_event_2b",
+          "kind": "choice",
+          "textKey": "inheritance.police_route_event_2b.text",
+          "choices": [
+            {
+              "id": "police_route_event_2b_proceed",
+              "goto": "police_route_3",
+              "labelKey": "inheritance.police_route_event_2b.proceed"
+            }
+          ]
+        },
+        "police_route_3": {
+          "id": "police_route_3",
+          "kind": "choice",
+          "textKey": "inheritance.police_route_3.text",
+          "choices": [
+            {
+              "id": "police_route_steady",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "preparation",
+                  "by": 1
+                }
+              ],
+              "goto": "police_route_4",
+              "labelKey": "inheritance.police_route_3.steady"
+            },
+            {
+              "id": "police_route_call_in_favour",
+              "requirements": {
+                "field": "var.connections",
+                "operator": "greater_or_equal",
+                "value": 1
+              },
+              "effects": [
+                {
+                  "op": "decrement",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "police_route_4",
+              "labelKey": "inheritance.police_route_3.favour",
+              "requirementFailKey": "inheritance.police_route_3.favour_fail"
+            }
+          ]
+        },
+        "police_route_4": {
+          "id": "police_route_4",
+          "kind": "choice",
+          "textKey": "inheritance.police_route_4.text",
+          "choices": [
+            {
+              "id": "choose_abandonment",
+              "goto": "ending_abandonment",
+              "labelKey": "inheritance.police_route_4.ending_abandonment"
+            },
+            {
+              "id": "choose_family_war",
+              "showWhen": {
+                "field": "var.remembered_police_route",
+                "operator": "equals",
+                "value": true
+              },
+              "goto": "ending_family_war",
+              "labelKey": "inheritance.police_route_4.ending_family_war"
+            }
+          ]
+        },
+        "ending_abandonment": {
+          "id": "ending_abandonment",
+          "kind": "ending",
+          "textKey": "inheritance.ending_abandonment.text",
+          "endingId": "abandonment",
+          "outcome": "loss"
+        },
+        "ending_family_war": {
+          "id": "ending_family_war",
+          "kind": "ending",
+          "textKey": "inheritance.ending_family_war.text",
+          "endingId": "family_war",
+          "outcome": "loss"
+        }
+      },
+      "startNodeId": "property_inheritance",
+      "achievements": [
+        {
+          "id": "found_records_route_event_1a",
+          "hidden": true,
+          "condition": {
+            "field": "visited.records_route_event_1a",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "inheritance.achievement_records_route_event_1a.name",
+          "descriptionKey": "inheritance.achievement_records_route_event_1a.description"
+        },
+        {
+          "id": "found_records_route_event_1b",
+          "hidden": true,
+          "condition": {
+            "field": "visited.records_route_event_1b",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "inheritance.achievement_records_route_event_1b.name",
+          "descriptionKey": "inheritance.achievement_records_route_event_1b.description"
+        },
+        {
+          "id": "found_records_route_event_2a",
+          "hidden": true,
+          "condition": {
+            "field": "visited.records_route_event_2a",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "inheritance.achievement_records_route_event_2a.name",
+          "descriptionKey": "inheritance.achievement_records_route_event_2a.description"
+        },
+        {
+          "id": "found_records_route_event_2b",
+          "hidden": true,
+          "condition": {
+            "field": "visited.records_route_event_2b",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "inheritance.achievement_records_route_event_2b.name",
+          "descriptionKey": "inheritance.achievement_records_route_event_2b.description"
+        },
+        {
+          "id": "found_neighbour_route_event_1a",
+          "hidden": true,
+          "condition": {
+            "field": "visited.neighbour_route_event_1a",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "inheritance.achievement_neighbour_route_event_1a.name",
+          "descriptionKey": "inheritance.achievement_neighbour_route_event_1a.description"
+        },
+        {
+          "id": "found_neighbour_route_event_1b",
+          "hidden": true,
+          "condition": {
+            "field": "visited.neighbour_route_event_1b",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "inheritance.achievement_neighbour_route_event_1b.name",
+          "descriptionKey": "inheritance.achievement_neighbour_route_event_1b.description"
+        },
+        {
+          "id": "found_neighbour_route_event_2a",
+          "hidden": true,
+          "condition": {
+            "field": "visited.neighbour_route_event_2a",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "inheritance.achievement_neighbour_route_event_2a.name",
+          "descriptionKey": "inheritance.achievement_neighbour_route_event_2a.description"
+        },
+        {
+          "id": "found_neighbour_route_event_2b",
+          "hidden": true,
+          "condition": {
+            "field": "visited.neighbour_route_event_2b",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "inheritance.achievement_neighbour_route_event_2b.name",
+          "descriptionKey": "inheritance.achievement_neighbour_route_event_2b.description"
+        },
+        {
+          "id": "found_police_route_event_1a",
+          "hidden": true,
+          "condition": {
+            "field": "visited.police_route_event_1a",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "inheritance.achievement_police_route_event_1a.name",
+          "descriptionKey": "inheritance.achievement_police_route_event_1a.description"
+        },
+        {
+          "id": "found_police_route_event_1b",
+          "hidden": true,
+          "condition": {
+            "field": "visited.police_route_event_1b",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "inheritance.achievement_police_route_event_1b.name",
+          "descriptionKey": "inheritance.achievement_police_route_event_1b.description"
+        },
+        {
+          "id": "found_police_route_event_2a",
+          "hidden": true,
+          "condition": {
+            "field": "visited.police_route_event_2a",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "inheritance.achievement_police_route_event_2a.name",
+          "descriptionKey": "inheritance.achievement_police_route_event_2a.description"
+        },
+        {
+          "id": "found_police_route_event_2b",
+          "hidden": true,
+          "condition": {
+            "field": "visited.police_route_event_2b",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "inheritance.achievement_police_route_event_2b.name",
+          "descriptionKey": "inheritance.achievement_police_route_event_2b.description"
+        }
+      ]
+    }
+  },
+  "migration": {
+    "fromVersion": "1.0.0",
+    "nodeMap": {
+      "village_life": "neighbour_route_1",
+      "family_meeting": "neighbour_route_4",
+      "ending_avoided": "ending_abandonment",
+      "ending_unresolved": "ending_family_war",
+      "ending_resolved": "ending_settlement"
+    },
+    "endingMap": {
+      "avoided_the_inheritance": "abandonment",
+      "the_argument_continues": "family_war",
+      "the_documents_settle_it": "settlement"
+    }
+  },
+  "strings": {
+    "inheritance.achievement_neighbour_route_event_1a.description": "Discover an optional page on this route.",
+    "inheritance.achievement_neighbour_route_event_1a.name": "Found: the neighbour's testimony",
+    "inheritance.achievement_neighbour_route_event_1b.description": "Discover an optional page on this route.",
+    "inheritance.achievement_neighbour_route_event_1b.name": "Found: the neighbour's testimony",
+    "inheritance.achievement_neighbour_route_event_2a.description": "Discover an optional page on this route.",
+    "inheritance.achievement_neighbour_route_event_2a.name": "Found: the neighbour's testimony",
+    "inheritance.achievement_neighbour_route_event_2b.description": "Discover an optional page on this route.",
+    "inheritance.achievement_neighbour_route_event_2b.name": "Found: the neighbour's testimony",
+    "inheritance.achievement_police_route_event_1a.description": "Discover an optional page on this route.",
+    "inheritance.achievement_police_route_event_1a.name": "Found: the police report",
+    "inheritance.achievement_police_route_event_1b.description": "Discover an optional page on this route.",
+    "inheritance.achievement_police_route_event_1b.name": "Found: the police report",
+    "inheritance.achievement_police_route_event_2a.description": "Discover an optional page on this route.",
+    "inheritance.achievement_police_route_event_2a.name": "Found: the police report",
+    "inheritance.achievement_police_route_event_2b.description": "Discover an optional page on this route.",
+    "inheritance.achievement_police_route_event_2b.name": "Found: the police report",
+    "inheritance.achievement_records_route_event_1a.description": "Discover an optional page on this route.",
+    "inheritance.achievement_records_route_event_1a.name": "Found: the archivist's note",
+    "inheritance.achievement_records_route_event_1b.description": "Discover an optional page on this route.",
+    "inheritance.achievement_records_route_event_1b.name": "Found: the archivist's note",
+    "inheritance.achievement_records_route_event_2a.description": "Discover an optional page on this route.",
+    "inheritance.achievement_records_route_event_2a.name": "Found: the archivist's note",
+    "inheritance.achievement_records_route_event_2b.description": "Discover an optional page on this route.",
+    "inheritance.achievement_records_route_event_2b.name": "Found: the archivist's note",
+    "inheritance.campaign.description": "A village property dispute across evidence, neighbours, police, lawyers, court, settlement, and aftermath.",
+    "inheritance.campaign.title": "Inheritance",
+    "inheritance.ending_abandonment.text": "The House Without an Heir\n\nYou walk away. Grass crosses the disputed line before any relative does.",
+    "inheritance.ending_buyout.text": "One Owner, Five Receipts\n\nYou buy the remaining shares and inherit the roof, the tomatoes, and all future advice.",
+    "inheritance.ending_court_victory.text": "The Court Record\n\nThe judgment settles ownership in twelve pages. Nobody reads the same emotional result.",
+    "inheritance.ending_family_peace.text": "The Table After Court\n\nYou use the archivist's note to offer dignity with the facts. Lunch becomes possible again.",
+    "inheritance.ending_family_war.text": "The Inheritance War\n\nThe police report keeps the facts straight while the family perfects every other kind of damage.",
+    "inheritance.ending_settlement.text": "The Village Settlement\n\nThe signatures do not create affection, but they create a boundary everyone can live beside.",
+    "inheritance.neighbour_route_1.listen": "Write down the useful dates",
+    "inheritance.neighbour_route_1.push": "Let the 1994 story run its course",
+    "inheritance.neighbour_route_1.text": "Your mother supplies names, dates, and a detailed account of who failed to bring salad in 1994.",
+    "inheritance.neighbour_route_2.improvise": "Negotiate with the calmest branch first",
+    "inheritance.neighbour_route_2.prepare": "Invite every co-owner to mediation",
+    "inheritance.neighbour_route_2.text": "The oldest neighbour remembers the boundary before the fence and the agreement before the argument.",
+    "inheritance.neighbour_route_3.favour": "Call in the favour you earned",
+    "inheritance.neighbour_route_3.favour_fail": "No one owes you that favour yet.",
+    "inheritance.neighbour_route_3.steady": "Use what you prepared",
+    "inheritance.neighbour_route_3.text": "A village meeting turns testimony into negotiation while coffee keeps everyone technically seated.",
+    "inheritance.neighbour_route_4.ending_buyout": "One Owner, Five Receipts",
+    "inheritance.neighbour_route_4.ending_settlement": "The Village Settlement",
+    "inheritance.neighbour_route_4.text": "The family can now settle, trade shares, or preserve the dispute as its most durable tradition.",
+    "inheritance.neighbour_route_event_1.text": "The day contributes its own amendment.",
+    "inheritance.neighbour_route_event_1a.proceed": "Record the neighbour's boundary account",
+    "inheritance.neighbour_route_event_1a.text": "A forgotten photograph dates the old fence and includes everyone smiling beside it.",
+    "inheritance.neighbour_route_event_1b.proceed": "Measure the fence before listening",
+    "inheritance.neighbour_route_event_1b.text": "The story expands to include a christening and loses the parcel entirely.",
+    "inheritance.neighbour_route_event_2.text": "A seeded interruption arrives on schedule.",
+    "inheritance.neighbour_route_event_2a.proceed": "Draft a shared-use agreement",
+    "inheritance.neighbour_route_event_2a.text": "Two co-owners arrive ready to settle because the bus home leaves at four.",
+    "inheritance.neighbour_route_event_2b.proceed": "Offer to buy the smallest shares",
+    "inheritance.neighbour_route_event_2b.text": "A cousin arrives late with a secret agreement written on hotel stationery.",
+    "inheritance.police_route_1.listen": "Call police before entering",
+    "inheritance.police_route_1.push": "Enter and explain later",
+    "inheritance.police_route_1.text": "The new padlock yields immediately. The family WhatsApp group achieves operational readiness seconds later.",
+    "inheritance.police_route_2.improvise": "Start fixing the roof immediately",
+    "inheritance.police_route_2.prepare": "Document every repair and defect",
+    "inheritance.police_route_2.text": "Police record the fence, the lock, the missing deeds, and six mutually exclusive versions of a Tuesday.",
+    "inheritance.police_route_3.favour": "Call in the favour you earned",
+    "inheritance.police_route_3.favour_fail": "No one owes you that favour yet.",
+    "inheritance.police_route_3.steady": "Use what you prepared",
+    "inheritance.police_route_3.text": "Property condition becomes evidence: broken windows, repaired roof, cultivated tomatoes, and one room nobody claims.",
+    "inheritance.police_route_4.ending_abandonment": "The House Without an Heir",
+    "inheritance.police_route_4.ending_family_war": "The Inheritance War",
+    "inheritance.police_route_4.text": "The report prevents invention but not anger. You must choose whether the house is worth the war it now documents.",
+    "inheritance.police_route_event_1.text": "The day contributes its own amendment.",
+    "inheritance.police_route_event_1a.proceed": "Keep the report number",
+    "inheritance.police_route_event_1a.text": "The responding officer recognizes the parcel from an older boundary complaint and finds its diagram.",
+    "inheritance.police_route_event_1b.proceed": "Argue that family matters need no report",
+    "inheritance.police_route_event_1b.text": "A cousin removes the cut lock and replaces it with a larger one before sunset.",
+    "inheritance.police_route_event_2.text": "A seeded interruption arrives on schedule.",
+    "inheritance.police_route_event_2a.proceed": "Offer the property to the other branch",
+    "inheritance.police_route_event_2a.text": "The damp wall reveals an older doorway matching the deed plan.",
+    "inheritance.police_route_event_2b.proceed": "Prepare for a final confrontation",
+    "inheritance.police_route_event_2b.text": "A storm damages the roof and makes every negotiating position more expensive.",
+    "inheritance.property_inheritance.choice_accept_tomato_logic": "Hear the neighbours before challenging tomato law",
+    "inheritance.property_inheritance.choice_call_mother": "Ask family and neighbours what happened",
+    "inheritance.property_inheritance.choice_consult_lawyer": "Take the papers directly to a lawyer",
+    "inheritance.property_inheritance.choice_cut_padlock": "Cut the padlock and force the issue",
+    "inheritance.property_inheritance.choice_request_records": "Find the old documents",
+    "inheritance.property_inheritance.text": "Your aunt says she owns the entire property because she has maintained the tomatoes since 1998. The news arrives with one missing deed and five confident relatives.",
+    "inheritance.records_route_1.listen": "Let the archivist explain the annotations",
+    "inheritance.records_route_1.push": "Photograph everything before lunch",
+    "inheritance.records_route_1.text": "The cadastral archive holds three plans: old, older, and the one everyone cites but nobody can unfold.",
+    "inheritance.records_route_2.improvise": "Lead with the oldest deed",
+    "inheritance.records_route_2.prepare": "Build a dated evidence folder",
+    "inheritance.records_route_2.text": "A lost deed surfaces in a municipal index under your grandfather's second spelling.",
+    "inheritance.records_route_3.favour": "Call in the favour you earned",
+    "inheritance.records_route_3.favour_fail": "No one owes you that favour yet.",
+    "inheritance.records_route_3.steady": "Use what you prepared",
+    "inheritance.records_route_3.text": "The lawyer compares signatures while the family compares memories, neither exercise producing silence.",
+    "inheritance.records_route_4.ending_court_victory": "The Court Record",
+    "inheritance.records_route_4.ending_family_peace": "The Table After Court",
+    "inheritance.records_route_4.text": "In court, evidence and folklore finally occupy separate tables. You decide how hard a legal victory should land.",
+    "inheritance.records_route_event_1.text": "The day contributes its own amendment.",
+    "inheritance.records_route_event_1a.proceed": "Keep the index reference",
+    "inheritance.records_route_event_1a.text": "The archivist recognizes a notation that links the missing deed to the correct parcel.",
+    "inheritance.records_route_event_1b.proceed": "Commission a new survey immediately",
+    "inheritance.records_route_event_1b.text": "Your photographs include the wrong village's map, beautifully and uselessly.",
+    "inheritance.records_route_event_2.text": "A seeded interruption arrives on schedule.",
+    "inheritance.records_route_event_2a.proceed": "Ask the lawyer for settlement terms",
+    "inheritance.records_route_event_2a.text": "The surveyor finds the old boundary stone beneath a raspberry bush.",
+    "inheritance.records_route_event_2b.proceed": "Prepare every witness for court",
+    "inheritance.records_route_event_2b.text": "A witness cancels, then sends a voice message longer than the hearing.",
+    "inheritance.var_connections.label": "Family Support",
+    "inheritance.var_preparation.label": "Evidence",
+    "inheritance.var_pressure.label": "Family Tension"
+  }
+}

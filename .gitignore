@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+dist-ssr/
+*.tsbuildinfo
+
+# Written by a failing `toMatchScreenshot()` (actual/diff images for local
+# review). The committed baseline lives in __screenshots__/ instead.
+.vitest-attachments/
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+
+# The engine submodule builds its own dist/ under engine/src/engine/dist —
+# already covered by the bare dist/ pattern above, since git applies .gitignore
+# recursively. The engine repo's own .gitignore governs everything else inside
+# the submodule; this file only governs paths git tracks as part of this repo.
+
+# npm pack output
+*.tgz
+
+# Env / secrets
+.env
+.env.*
+*.local
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.log

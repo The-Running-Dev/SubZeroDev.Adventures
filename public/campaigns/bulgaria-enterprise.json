@@ -1,0 +1,1118 @@
+{
+  "formatVersion": 1,
+  "catalog": {
+    "title": "Enterprise",
+    "description": "Clients, tax, hiring, growth, cashflow, and the price of one more opportunity.",
+    "duration": "10–15 min per route",
+    "contentNotice": "Debt, bankruptcy, audits, job pressure, and business failure.",
+    "featured": false
+  },
+  "campaign": {
+    "id": "bulgaria-enterprise",
+    "kindId": "story-graph",
+    "version": "2.0.0",
+    "titleKey": "enterprise.campaign.title",
+    "content": {
+      "descriptionKey": "enterprise.campaign.description",
+      "variables": {
+        "route": {
+          "type": "enum",
+          "initial": "consultant_route",
+          "values": [
+            "consultant_route",
+            "company_route",
+            "pressure_route"
+          ]
+        },
+        "preparation": {
+          "type": "int",
+          "initial": 0,
+          "min": 0,
+          "max": 12,
+          "visible": true,
+          "labelKey": "enterprise.var_preparation.label"
+        },
+        "connections": {
+          "type": "int",
+          "initial": 0,
+          "min": 0,
+          "max": 12,
+          "visible": true,
+          "labelKey": "enterprise.var_connections.label"
+        },
+        "pressure": {
+          "type": "int",
+          "initial": 0,
+          "min": 0,
+          "max": 12,
+          "visible": true,
+          "labelKey": "enterprise.var_pressure.label"
+        },
+        "remembered_consultant_route": {
+          "type": "bool",
+          "initial": false
+        },
+        "remembered_company_route": {
+          "type": "bool",
+          "initial": false
+        },
+        "remembered_pressure_route": {
+          "type": "bool",
+          "initial": false
+        }
+      },
+      "nodes": {
+        "starting_a_business": {
+          "id": "starting_a_business",
+          "kind": "choice",
+          "textKey": "enterprise.starting_a_business.text",
+          "choices": [
+            {
+              "id": "offer_coffee",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "route",
+                  "value": "consultant_route"
+                }
+              ],
+              "goto": "consultant_route_1",
+              "labelKey": "enterprise.starting_a_business.choice_offer_coffee"
+            },
+            {
+              "id": "ask_who_invited_them",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "route",
+                  "value": "company_route"
+                }
+              ],
+              "goto": "company_route_1",
+              "labelKey": "enterprise.starting_a_business.choice_ask_who_invited_them"
+            },
+            {
+              "id": "hide",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "route",
+                  "value": "pressure_route"
+                }
+              ],
+              "goto": "pressure_route_1",
+              "labelKey": "enterprise.starting_a_business.choice_hide"
+            },
+            {
+              "id": "pretend_business_never_opened",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "route",
+                  "value": "pressure_route"
+                }
+              ],
+              "goto": "pressure_route_1",
+              "labelKey": "enterprise.starting_a_business.choice_pretend_business_never_opened"
+            }
+          ]
+        },
+        "consultant_route_1": {
+          "id": "consultant_route_1",
+          "kind": "choice",
+          "textKey": "enterprise.consultant_route_1.text",
+          "choices": [
+            {
+              "id": "consultant_route_listen",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "remembered_consultant_route",
+                  "value": true
+                },
+                {
+                  "op": "increment",
+                  "var": "connections",
+                  "by": 1
+                }
+              ],
+              "goto": "consultant_route_event_1",
+              "labelKey": "enterprise.consultant_route_1.listen"
+            },
+            {
+              "id": "consultant_route_push",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "remembered_consultant_route",
+                  "value": true
+                },
+                {
+                  "op": "increment",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "consultant_route_event_1",
+              "labelKey": "enterprise.consultant_route_1.push"
+            }
+          ]
+        },
+        "consultant_route_event_1": {
+          "id": "consultant_route_event_1",
+          "kind": "random",
+          "textKey": "enterprise.consultant_route_event_1.text",
+          "transitions": [
+            {
+              "weight": 1,
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "preparation",
+                  "by": 1
+                }
+              ],
+              "goto": "consultant_route_event_1a"
+            },
+            {
+              "weight": 1,
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "consultant_route_event_1b"
+            }
+          ]
+        },
+        "consultant_route_event_1a": {
+          "id": "consultant_route_event_1a",
+          "kind": "choice",
+          "textKey": "enterprise.consultant_route_event_1a.text",
+          "choices": [
+            {
+              "id": "consultant_route_event_1a_proceed",
+              "goto": "consultant_route_2",
+              "labelKey": "enterprise.consultant_route_event_1a.proceed"
+            }
+          ]
+        },
+        "consultant_route_event_1b": {
+          "id": "consultant_route_event_1b",
+          "kind": "choice",
+          "textKey": "enterprise.consultant_route_event_1b.text",
+          "choices": [
+            {
+              "id": "consultant_route_event_1b_proceed",
+              "goto": "consultant_route_2",
+              "labelKey": "enterprise.consultant_route_event_1b.proceed"
+            }
+          ]
+        },
+        "consultant_route_2": {
+          "id": "consultant_route_2",
+          "kind": "choice",
+          "textKey": "enterprise.consultant_route_2.text",
+          "choices": [
+            {
+              "id": "consultant_route_prepare",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "preparation",
+                  "by": 1
+                }
+              ],
+              "goto": "consultant_route_event_2",
+              "labelKey": "enterprise.consultant_route_2.prepare"
+            },
+            {
+              "id": "consultant_route_improvise",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "consultant_route_event_2",
+              "labelKey": "enterprise.consultant_route_2.improvise"
+            }
+          ]
+        },
+        "consultant_route_event_2": {
+          "id": "consultant_route_event_2",
+          "kind": "random",
+          "textKey": "enterprise.consultant_route_event_2.text",
+          "transitions": [
+            {
+              "weight": 1,
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "connections",
+                  "by": 1
+                }
+              ],
+              "goto": "consultant_route_event_2a"
+            },
+            {
+              "weight": 1,
+              "goto": "consultant_route_event_2b"
+            }
+          ]
+        },
+        "consultant_route_event_2a": {
+          "id": "consultant_route_event_2a",
+          "kind": "choice",
+          "textKey": "enterprise.consultant_route_event_2a.text",
+          "choices": [
+            {
+              "id": "consultant_route_event_2a_proceed",
+              "goto": "consultant_route_3",
+              "labelKey": "enterprise.consultant_route_event_2a.proceed"
+            }
+          ]
+        },
+        "consultant_route_event_2b": {
+          "id": "consultant_route_event_2b",
+          "kind": "choice",
+          "textKey": "enterprise.consultant_route_event_2b.text",
+          "choices": [
+            {
+              "id": "consultant_route_event_2b_proceed",
+              "goto": "consultant_route_3",
+              "labelKey": "enterprise.consultant_route_event_2b.proceed"
+            }
+          ]
+        },
+        "consultant_route_3": {
+          "id": "consultant_route_3",
+          "kind": "choice",
+          "textKey": "enterprise.consultant_route_3.text",
+          "choices": [
+            {
+              "id": "consultant_route_steady",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "preparation",
+                  "by": 1
+                }
+              ],
+              "goto": "consultant_route_4",
+              "labelKey": "enterprise.consultant_route_3.steady"
+            },
+            {
+              "id": "consultant_route_call_in_favour",
+              "requirements": {
+                "field": "var.connections",
+                "operator": "greater_or_equal",
+                "value": 1
+              },
+              "effects": [
+                {
+                  "op": "decrement",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "consultant_route_4",
+              "labelKey": "enterprise.consultant_route_3.favour",
+              "requirementFailKey": "enterprise.consultant_route_3.favour_fail"
+            }
+          ]
+        },
+        "consultant_route_4": {
+          "id": "consultant_route_4",
+          "kind": "choice",
+          "textKey": "enterprise.consultant_route_4.text",
+          "choices": [
+            {
+              "id": "choose_consultant",
+              "goto": "ending_consultant",
+              "labelKey": "enterprise.consultant_route_4.ending_consultant"
+            },
+            {
+              "id": "choose_agency",
+              "showWhen": {
+                "field": "var.remembered_consultant_route",
+                "operator": "equals",
+                "value": true
+              },
+              "goto": "ending_agency",
+              "labelKey": "enterprise.consultant_route_4.ending_agency"
+            }
+          ]
+        },
+        "ending_consultant": {
+          "id": "ending_consultant",
+          "kind": "ending",
+          "textKey": "enterprise.ending_consultant.text",
+          "endingId": "consultant",
+          "outcome": "win"
+        },
+        "ending_agency": {
+          "id": "ending_agency",
+          "kind": "ending",
+          "textKey": "enterprise.ending_agency.text",
+          "endingId": "agency",
+          "outcome": "win"
+        },
+        "company_route_1": {
+          "id": "company_route_1",
+          "kind": "choice",
+          "textKey": "enterprise.company_route_1.text",
+          "choices": [
+            {
+              "id": "company_route_listen",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "remembered_company_route",
+                  "value": true
+                },
+                {
+                  "op": "increment",
+                  "var": "connections",
+                  "by": 1
+                }
+              ],
+              "goto": "company_route_event_1",
+              "labelKey": "enterprise.company_route_1.listen"
+            },
+            {
+              "id": "company_route_push",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "remembered_company_route",
+                  "value": true
+                },
+                {
+                  "op": "increment",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "company_route_event_1",
+              "labelKey": "enterprise.company_route_1.push"
+            }
+          ]
+        },
+        "company_route_event_1": {
+          "id": "company_route_event_1",
+          "kind": "random",
+          "textKey": "enterprise.company_route_event_1.text",
+          "transitions": [
+            {
+              "weight": 1,
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "preparation",
+                  "by": 1
+                }
+              ],
+              "goto": "company_route_event_1a"
+            },
+            {
+              "weight": 1,
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "company_route_event_1b"
+            }
+          ]
+        },
+        "company_route_event_1a": {
+          "id": "company_route_event_1a",
+          "kind": "choice",
+          "textKey": "enterprise.company_route_event_1a.text",
+          "choices": [
+            {
+              "id": "company_route_event_1a_proceed",
+              "goto": "company_route_2",
+              "labelKey": "enterprise.company_route_event_1a.proceed"
+            }
+          ]
+        },
+        "company_route_event_1b": {
+          "id": "company_route_event_1b",
+          "kind": "choice",
+          "textKey": "enterprise.company_route_event_1b.text",
+          "choices": [
+            {
+              "id": "company_route_event_1b_proceed",
+              "goto": "company_route_2",
+              "labelKey": "enterprise.company_route_event_1b.proceed"
+            }
+          ]
+        },
+        "company_route_2": {
+          "id": "company_route_2",
+          "kind": "choice",
+          "textKey": "enterprise.company_route_2.text",
+          "choices": [
+            {
+              "id": "company_route_prepare",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "preparation",
+                  "by": 1
+                }
+              ],
+              "goto": "company_route_event_2",
+              "labelKey": "enterprise.company_route_2.prepare"
+            },
+            {
+              "id": "company_route_improvise",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "company_route_event_2",
+              "labelKey": "enterprise.company_route_2.improvise"
+            }
+          ]
+        },
+        "company_route_event_2": {
+          "id": "company_route_event_2",
+          "kind": "random",
+          "textKey": "enterprise.company_route_event_2.text",
+          "transitions": [
+            {
+              "weight": 1,
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "connections",
+                  "by": 1
+                }
+              ],
+              "goto": "company_route_event_2a"
+            },
+            {
+              "weight": 1,
+              "goto": "company_route_event_2b"
+            }
+          ]
+        },
+        "company_route_event_2a": {
+          "id": "company_route_event_2a",
+          "kind": "choice",
+          "textKey": "enterprise.company_route_event_2a.text",
+          "choices": [
+            {
+              "id": "company_route_event_2a_proceed",
+              "goto": "company_route_3",
+              "labelKey": "enterprise.company_route_event_2a.proceed"
+            }
+          ]
+        },
+        "company_route_event_2b": {
+          "id": "company_route_event_2b",
+          "kind": "choice",
+          "textKey": "enterprise.company_route_event_2b.text",
+          "choices": [
+            {
+              "id": "company_route_event_2b_proceed",
+              "goto": "company_route_3",
+              "labelKey": "enterprise.company_route_event_2b.proceed"
+            }
+          ]
+        },
+        "company_route_3": {
+          "id": "company_route_3",
+          "kind": "choice",
+          "textKey": "enterprise.company_route_3.text",
+          "choices": [
+            {
+              "id": "company_route_steady",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "preparation",
+                  "by": 1
+                }
+              ],
+              "goto": "company_route_4",
+              "labelKey": "enterprise.company_route_3.steady"
+            },
+            {
+              "id": "company_route_call_in_favour",
+              "requirements": {
+                "field": "var.connections",
+                "operator": "greater_or_equal",
+                "value": 1
+              },
+              "effects": [
+                {
+                  "op": "decrement",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "company_route_4",
+              "labelKey": "enterprise.company_route_3.favour",
+              "requirementFailKey": "enterprise.company_route_3.favour_fail"
+            }
+          ]
+        },
+        "company_route_4": {
+          "id": "company_route_4",
+          "kind": "choice",
+          "textKey": "enterprise.company_route_4.text",
+          "choices": [
+            {
+              "id": "choose_successful_company",
+              "showWhen": {
+                "field": "var.remembered_company_route",
+                "operator": "equals",
+                "value": true
+              },
+              "goto": "ending_successful_company",
+              "labelKey": "enterprise.company_route_4.ending_successful_company"
+            },
+            {
+              "id": "choose_platform_company",
+              "requirements": {
+                "field": "var.preparation",
+                "operator": "greater_or_equal",
+                "value": 2
+              },
+              "goto": "ending_platform_company",
+              "labelKey": "enterprise.company_route_4.ending_platform_company",
+              "requirementFailKey": "enterprise.company_route_4.ending_platform_company_fail"
+            }
+          ]
+        },
+        "ending_successful_company": {
+          "id": "ending_successful_company",
+          "kind": "ending",
+          "textKey": "enterprise.ending_successful_company.text",
+          "endingId": "successful_company",
+          "outcome": "win"
+        },
+        "ending_platform_company": {
+          "id": "ending_platform_company",
+          "kind": "ending",
+          "textKey": "enterprise.ending_platform_company.text",
+          "endingId": "platform_company",
+          "outcome": "win"
+        },
+        "pressure_route_1": {
+          "id": "pressure_route_1",
+          "kind": "choice",
+          "textKey": "enterprise.pressure_route_1.text",
+          "choices": [
+            {
+              "id": "pressure_route_listen",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "remembered_pressure_route",
+                  "value": true
+                },
+                {
+                  "op": "increment",
+                  "var": "connections",
+                  "by": 1
+                }
+              ],
+              "goto": "pressure_route_event_1",
+              "labelKey": "enterprise.pressure_route_1.listen"
+            },
+            {
+              "id": "pressure_route_push",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "remembered_pressure_route",
+                  "value": true
+                },
+                {
+                  "op": "increment",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "pressure_route_event_1",
+              "labelKey": "enterprise.pressure_route_1.push"
+            }
+          ]
+        },
+        "pressure_route_event_1": {
+          "id": "pressure_route_event_1",
+          "kind": "random",
+          "textKey": "enterprise.pressure_route_event_1.text",
+          "transitions": [
+            {
+              "weight": 1,
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "preparation",
+                  "by": 1
+                }
+              ],
+              "goto": "pressure_route_event_1a"
+            },
+            {
+              "weight": 1,
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "pressure_route_event_1b"
+            }
+          ]
+        },
+        "pressure_route_event_1a": {
+          "id": "pressure_route_event_1a",
+          "kind": "choice",
+          "textKey": "enterprise.pressure_route_event_1a.text",
+          "choices": [
+            {
+              "id": "pressure_route_event_1a_proceed",
+              "goto": "pressure_route_2",
+              "labelKey": "enterprise.pressure_route_event_1a.proceed"
+            }
+          ]
+        },
+        "pressure_route_event_1b": {
+          "id": "pressure_route_event_1b",
+          "kind": "choice",
+          "textKey": "enterprise.pressure_route_event_1b.text",
+          "choices": [
+            {
+              "id": "pressure_route_event_1b_proceed",
+              "goto": "pressure_route_2",
+              "labelKey": "enterprise.pressure_route_event_1b.proceed"
+            }
+          ]
+        },
+        "pressure_route_2": {
+          "id": "pressure_route_2",
+          "kind": "choice",
+          "textKey": "enterprise.pressure_route_2.text",
+          "choices": [
+            {
+              "id": "pressure_route_prepare",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "preparation",
+                  "by": 1
+                }
+              ],
+              "goto": "pressure_route_event_2",
+              "labelKey": "enterprise.pressure_route_2.prepare"
+            },
+            {
+              "id": "pressure_route_improvise",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "pressure_route_event_2",
+              "labelKey": "enterprise.pressure_route_2.improvise"
+            }
+          ]
+        },
+        "pressure_route_event_2": {
+          "id": "pressure_route_event_2",
+          "kind": "random",
+          "textKey": "enterprise.pressure_route_event_2.text",
+          "transitions": [
+            {
+              "weight": 1,
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "connections",
+                  "by": 1
+                }
+              ],
+              "goto": "pressure_route_event_2a"
+            },
+            {
+              "weight": 1,
+              "goto": "pressure_route_event_2b"
+            }
+          ]
+        },
+        "pressure_route_event_2a": {
+          "id": "pressure_route_event_2a",
+          "kind": "choice",
+          "textKey": "enterprise.pressure_route_event_2a.text",
+          "choices": [
+            {
+              "id": "pressure_route_event_2a_proceed",
+              "goto": "pressure_route_3",
+              "labelKey": "enterprise.pressure_route_event_2a.proceed"
+            }
+          ]
+        },
+        "pressure_route_event_2b": {
+          "id": "pressure_route_event_2b",
+          "kind": "choice",
+          "textKey": "enterprise.pressure_route_event_2b.text",
+          "choices": [
+            {
+              "id": "pressure_route_event_2b_proceed",
+              "goto": "pressure_route_3",
+              "labelKey": "enterprise.pressure_route_event_2b.proceed"
+            }
+          ]
+        },
+        "pressure_route_3": {
+          "id": "pressure_route_3",
+          "kind": "choice",
+          "textKey": "enterprise.pressure_route_3.text",
+          "choices": [
+            {
+              "id": "pressure_route_steady",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "preparation",
+                  "by": 1
+                }
+              ],
+              "goto": "pressure_route_4",
+              "labelKey": "enterprise.pressure_route_3.steady"
+            },
+            {
+              "id": "pressure_route_call_in_favour",
+              "requirements": {
+                "field": "var.connections",
+                "operator": "greater_or_equal",
+                "value": 1
+              },
+              "effects": [
+                {
+                  "op": "decrement",
+                  "var": "pressure",
+                  "by": 1
+                }
+              ],
+              "goto": "pressure_route_4",
+              "labelKey": "enterprise.pressure_route_3.favour",
+              "requirementFailKey": "enterprise.pressure_route_3.favour_fail"
+            }
+          ]
+        },
+        "pressure_route_4": {
+          "id": "pressure_route_4",
+          "kind": "choice",
+          "textKey": "enterprise.pressure_route_4.text",
+          "choices": [
+            {
+              "id": "choose_bankruptcy",
+              "goto": "ending_bankruptcy",
+              "labelKey": "enterprise.pressure_route_4.ending_bankruptcy"
+            },
+            {
+              "id": "choose_sale",
+              "showWhen": {
+                "field": "var.remembered_pressure_route",
+                "operator": "equals",
+                "value": true
+              },
+              "goto": "ending_sale",
+              "labelKey": "enterprise.pressure_route_4.ending_sale"
+            }
+          ]
+        },
+        "ending_bankruptcy": {
+          "id": "ending_bankruptcy",
+          "kind": "ending",
+          "textKey": "enterprise.ending_bankruptcy.text",
+          "endingId": "bankruptcy",
+          "outcome": "loss"
+        },
+        "ending_sale": {
+          "id": "ending_sale",
+          "kind": "ending",
+          "textKey": "enterprise.ending_sale.text",
+          "endingId": "sale",
+          "outcome": "neutral"
+        }
+      },
+      "startNodeId": "starting_a_business",
+      "achievements": [
+        {
+          "id": "found_consultant_route_event_1a",
+          "hidden": true,
+          "condition": {
+            "field": "visited.consultant_route_event_1a",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "enterprise.achievement_consultant_route_event_1a.name",
+          "descriptionKey": "enterprise.achievement_consultant_route_event_1a.description"
+        },
+        {
+          "id": "found_consultant_route_event_1b",
+          "hidden": true,
+          "condition": {
+            "field": "visited.consultant_route_event_1b",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "enterprise.achievement_consultant_route_event_1b.name",
+          "descriptionKey": "enterprise.achievement_consultant_route_event_1b.description"
+        },
+        {
+          "id": "found_consultant_route_event_2a",
+          "hidden": true,
+          "condition": {
+            "field": "visited.consultant_route_event_2a",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "enterprise.achievement_consultant_route_event_2a.name",
+          "descriptionKey": "enterprise.achievement_consultant_route_event_2a.description"
+        },
+        {
+          "id": "found_consultant_route_event_2b",
+          "hidden": true,
+          "condition": {
+            "field": "visited.consultant_route_event_2b",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "enterprise.achievement_consultant_route_event_2b.name",
+          "descriptionKey": "enterprise.achievement_consultant_route_event_2b.description"
+        },
+        {
+          "id": "found_company_route_event_1a",
+          "hidden": true,
+          "condition": {
+            "field": "visited.company_route_event_1a",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "enterprise.achievement_company_route_event_1a.name",
+          "descriptionKey": "enterprise.achievement_company_route_event_1a.description"
+        },
+        {
+          "id": "found_company_route_event_1b",
+          "hidden": true,
+          "condition": {
+            "field": "visited.company_route_event_1b",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "enterprise.achievement_company_route_event_1b.name",
+          "descriptionKey": "enterprise.achievement_company_route_event_1b.description"
+        },
+        {
+          "id": "found_company_route_event_2a",
+          "hidden": true,
+          "condition": {
+            "field": "visited.company_route_event_2a",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "enterprise.achievement_company_route_event_2a.name",
+          "descriptionKey": "enterprise.achievement_company_route_event_2a.description"
+        },
+        {
+          "id": "found_company_route_event_2b",
+          "hidden": true,
+          "condition": {
+            "field": "visited.company_route_event_2b",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "enterprise.achievement_company_route_event_2b.name",
+          "descriptionKey": "enterprise.achievement_company_route_event_2b.description"
+        },
+        {
+          "id": "found_pressure_route_event_1a",
+          "hidden": true,
+          "condition": {
+            "field": "visited.pressure_route_event_1a",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "enterprise.achievement_pressure_route_event_1a.name",
+          "descriptionKey": "enterprise.achievement_pressure_route_event_1a.description"
+        },
+        {
+          "id": "found_pressure_route_event_1b",
+          "hidden": true,
+          "condition": {
+            "field": "visited.pressure_route_event_1b",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "enterprise.achievement_pressure_route_event_1b.name",
+          "descriptionKey": "enterprise.achievement_pressure_route_event_1b.description"
+        },
+        {
+          "id": "found_pressure_route_event_2a",
+          "hidden": true,
+          "condition": {
+            "field": "visited.pressure_route_event_2a",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "enterprise.achievement_pressure_route_event_2a.name",
+          "descriptionKey": "enterprise.achievement_pressure_route_event_2a.description"
+        },
+        {
+          "id": "found_pressure_route_event_2b",
+          "hidden": true,
+          "condition": {
+            "field": "visited.pressure_route_event_2b",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "enterprise.achievement_pressure_route_event_2b.name",
+          "descriptionKey": "enterprise.achievement_pressure_route_event_2b.description"
+        }
+      ]
+    }
+  },
+  "migration": {
+    "fromVersion": "1.0.0",
+    "nodeMap": {
+      "entrepreneur": "consultant_route_2",
+      "ending": "ending_consultant"
+    },
+    "endingMap": {
+      "a_permanent_line_item": "bankruptcy"
+    }
+  },
+  "strings": {
+    "enterprise.achievement_company_route_event_1a.description": "Discover an optional page on this route.",
+    "enterprise.achievement_company_route_event_1a.name": "Found: the employee's loyalty",
+    "enterprise.achievement_company_route_event_1b.description": "Discover an optional page on this route.",
+    "enterprise.achievement_company_route_event_1b.name": "Found: the employee's loyalty",
+    "enterprise.achievement_company_route_event_2a.description": "Discover an optional page on this route.",
+    "enterprise.achievement_company_route_event_2a.name": "Found: the employee's loyalty",
+    "enterprise.achievement_company_route_event_2b.description": "Discover an optional page on this route.",
+    "enterprise.achievement_company_route_event_2b.name": "Found: the employee's loyalty",
+    "enterprise.achievement_consultant_route_event_1a.description": "Discover an optional page on this route.",
+    "enterprise.achievement_consultant_route_event_1a.name": "Found: the client's trust",
+    "enterprise.achievement_consultant_route_event_1b.description": "Discover an optional page on this route.",
+    "enterprise.achievement_consultant_route_event_1b.name": "Found: the client's trust",
+    "enterprise.achievement_consultant_route_event_2a.description": "Discover an optional page on this route.",
+    "enterprise.achievement_consultant_route_event_2a.name": "Found: the client's trust",
+    "enterprise.achievement_consultant_route_event_2b.description": "Discover an optional page on this route.",
+    "enterprise.achievement_consultant_route_event_2b.name": "Found: the client's trust",
+    "enterprise.achievement_pressure_route_event_1a.description": "Discover an optional page on this route.",
+    "enterprise.achievement_pressure_route_event_1a.name": "Found: the investor's warning",
+    "enterprise.achievement_pressure_route_event_1b.description": "Discover an optional page on this route.",
+    "enterprise.achievement_pressure_route_event_1b.name": "Found: the investor's warning",
+    "enterprise.achievement_pressure_route_event_2a.description": "Discover an optional page on this route.",
+    "enterprise.achievement_pressure_route_event_2a.name": "Found: the investor's warning",
+    "enterprise.achievement_pressure_route_event_2b.description": "Discover an optional page on this route.",
+    "enterprise.achievement_pressure_route_event_2b.name": "Found: the investor's warning",
+    "enterprise.campaign.description": "Registration, clients, tax, invoices, hiring, competition, government, growth, sale, and failure.",
+    "enterprise.campaign.title": "Enterprise",
+    "enterprise.company_route_1.listen": "Explain the runway and hire carefully",
+    "enterprise.company_route_1.push": "Hire three people for momentum",
+    "enterprise.company_route_1.text": "Hiring one person creates payroll, policy, equipment, and a government portal that prefers yesterday's browser.",
+    "enterprise.company_route_2.improvise": "Submit the boldest possible bid",
+    "enterprise.company_route_2.prepare": "Split the tender into a checklist",
+    "enterprise.company_route_2.text": "A competitor recruits your prospect while your team repairs the first client's server outage.",
+    "enterprise.company_route_3.favour": "Call in the favour you earned",
+    "enterprise.company_route_3.favour_fail": "No one owes you that favour yet.",
+    "enterprise.company_route_3.steady": "Use what you prepared",
+    "enterprise.company_route_3.text": "A government opportunity arrives with a short deadline and a folder of declarations about other declarations.",
+    "enterprise.company_route_4.ending_platform_company": "The Platform Bet",
+    "enterprise.company_route_4.ending_platform_company_fail": "This ending needs more preparation.",
+    "enterprise.company_route_4.ending_successful_company": "The Durable Company",
+    "enterprise.company_route_4.text": "Growth is now real enough to choose: disciplined company, platform bet, or a profitable sale before scale becomes weather.",
+    "enterprise.company_route_event_1.text": "The day contributes its own amendment.",
+    "enterprise.company_route_event_1a.proceed": "Save the outage postmortem",
+    "enterprise.company_route_event_1a.text": "The careful hire brings a client relationship stronger than the job board promised.",
+    "enterprise.company_route_event_1b.proceed": "Blame the hosting provider publicly",
+    "enterprise.company_route_event_1b.text": "The third hire asks when payroll runs; nobody has yet asked payroll.",
+    "enterprise.company_route_event_2.text": "A seeded interruption arrives on schedule.",
+    "enterprise.company_route_event_2a.proceed": "Promote the teammate who held the outage",
+    "enterprise.company_route_event_2a.text": "Your outage postmortem wins the government evaluator's technical confidence.",
+    "enterprise.company_route_event_2b.proceed": "Meet the interested buyer alone",
+    "enterprise.company_route_event_2b.text": "A server outage begins eleven minutes before submission and ends twelve minutes after.",
+    "enterprise.consultant_route_1.listen": "Ask what success means before pricing",
+    "enterprise.consultant_route_1.push": "Promise the full wishlist",
+    "enterprise.consultant_route_1.text": "Your first client wants a proposal by Friday, a discount by Thursday, and confidence immediately.",
+    "enterprise.consultant_route_2.improvise": "Reply from memory tonight",
+    "enterprise.consultant_route_2.prepare": "Call the accountant before replying",
+    "enterprise.consultant_route_2.text": "The invoice is accepted in seconds and scheduled for payment in sixty days.",
+    "enterprise.consultant_route_3.favour": "Call in the favour you earned",
+    "enterprise.consultant_route_3.favour_fail": "No one owes you that favour yet.",
+    "enterprise.consultant_route_3.steady": "Use what you prepared",
+    "enterprise.consultant_route_3.text": "A tax letter asks for clarification about income that has not yet become money.",
+    "enterprise.consultant_route_4.ending_agency": "The Careful Agency",
+    "enterprise.consultant_route_4.ending_consultant": "The Independent Consultant",
+    "enterprise.consultant_route_4.text": "The consultancy can remain deliberate, grow into an agency, or exhaust itself performing success.",
+    "enterprise.consultant_route_event_1.text": "The day contributes its own amendment.",
+    "enterprise.consultant_route_event_1a.proceed": "Keep the signed scope beside the invoice",
+    "enterprise.consultant_route_event_1a.text": "The client removes half the wishlist and trusts the smaller promise more.",
+    "enterprise.consultant_route_event_1b.proceed": "Assume goodwill will handle scope",
+    "enterprise.consultant_route_event_1b.text": "A competitor underbids by excluding the work from the price.",
+    "enterprise.consultant_route_event_2.text": "A seeded interruption arrives on schedule.",
+    "enterprise.consultant_route_event_2a.proceed": "Ask the client for a reference",
+    "enterprise.consultant_route_event_2a.text": "The tax letter is routine; the accountant identifies the correct checkbox in under an hour.",
+    "enterprise.consultant_route_event_2b.proceed": "Take the next project quietly",
+    "enterprise.consultant_route_event_2b.text": "A bad review appears for a company with the same name and a different comma.",
+    "enterprise.ending_agency.text": "The Careful Agency\n\nThe first client's trust becomes a referral, then a team, then a business that can survive your day off.",
+    "enterprise.ending_bankruptcy.text": "The Permanent Line Item\n\nDebt becomes the only reliable customer. You close the company and keep the lessons that cannot be invoiced.",
+    "enterprise.ending_consultant.text": "The Independent Consultant\n\nThe calendar fills, the invoices clear, and the company stays small enough to recognize itself.",
+    "enterprise.ending_platform_company.text": "The Platform Bet\n\nYou turn repeated client work into a product. The roadmap becomes longer and the margins become possible.",
+    "enterprise.ending_sale.text": "The Timely Sale\n\nThe warning helps you recognize a fair offer before desperation sets the price. You sign and pay everyone.",
+    "enterprise.ending_successful_company.text": "The Durable Company\n\nRevenue, process, and people finally reinforce each other. Growth stops feeling like falling upward.",
+    "enterprise.pressure_route_1.listen": "Tell the supplier exactly when payment lands",
+    "enterprise.pressure_route_1.push": "Borrow silently and keep moving",
+    "enterprise.pressure_route_1.text": "A late payment forces a choice between supplier trust, payroll, and pretending the bank balance is a design problem.",
+    "enterprise.pressure_route_2.improvise": "Sign before the client cools",
+    "enterprise.pressure_route_2.prepare": "Model the exclusivity cost",
+    "enterprise.pressure_route_2.text": "An audit notice arrives on the same morning as a lucky client with an implausibly large opportunity.",
+    "enterprise.pressure_route_3.favour": "Call in the favour you earned",
+    "enterprise.pressure_route_3.favour_fail": "No one owes you that favour yet.",
+    "enterprise.pressure_route_3.steady": "Use what you prepared",
+    "enterprise.pressure_route_3.text": "The lucky client requests exclusivity while an investor offers rescue on terms written in unusually friendly language.",
+    "enterprise.pressure_route_4.ending_bankruptcy": "The Permanent Line Item",
+    "enterprise.pressure_route_4.ending_sale": "The Timely Sale",
+    "enterprise.pressure_route_4.text": "Cashflow has become a verdict. You may sell, close cleanly, or keep borrowing until optimism becomes an accounting category.",
+    "enterprise.pressure_route_event_1.text": "The day contributes its own amendment.",
+    "enterprise.pressure_route_event_1a.proceed": "Keep the investor's warning email",
+    "enterprise.pressure_route_event_1a.text": "The supplier grants two weeks because honesty turns out to have credit value.",
+    "enterprise.pressure_route_event_1b.proceed": "Spend the lucky deposit immediately",
+    "enterprise.pressure_route_event_1b.text": "The bridge loan clears hours before payroll and starts charging interest immediately.",
+    "enterprise.pressure_route_event_2.text": "A seeded interruption arrives on schedule.",
+    "enterprise.pressure_route_event_2a.proceed": "Invite acquisition offers",
+    "enterprise.pressure_route_event_2a.text": "The audit finds a filing error, not fraud, and the warning email proves when you corrected it.",
+    "enterprise.pressure_route_event_2b.proceed": "Take one final emergency loan",
+    "enterprise.pressure_route_event_2b.text": "The lucky client pauses the project after the deposit has already funded three hires.",
+    "enterprise.starting_a_business.choice_ask_who_invited_them": "Build a company before the inspectors return",
+    "enterprise.starting_a_business.choice_hide": "Hide from the inspectors and chase cash",
+    "enterprise.starting_a_business.choice_offer_coffee": "Stay small and win the first client",
+    "enterprise.starting_a_business.choice_pretend_business_never_opened": "Avoid the inspectors and focus on cash",
+    "enterprise.starting_a_business.text": "Your company is officially registered. Its first visitors are the Tax Agency, Labour Inspectorate, and Health Inspectorate. None of them are customers.",
+    "enterprise.var_connections.label": "Reputation",
+    "enterprise.var_preparation.label": "Runway",
+    "enterprise.var_pressure.label": "Cashflow Pressure"
+  }
+}

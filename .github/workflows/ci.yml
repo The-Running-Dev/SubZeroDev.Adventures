@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# No `paths` filter -- this workflow's single job is a required status check on `main`
+# (branch protection expects it to report on every PR), the same reasoning the engine
+# repo's own `ci.yml` documents for its `engine` job.
+jobs:
+  ci:
+    name: ci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (with submodules)
+        uses: actions/checkout@v5
+        with:
+          submodules: true
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      - name: Build engine submodule
+        run: npm run setup
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Check (format, lint, typecheck, unit + browser tests, build)
+        run: npm run check
+
+      - name: Verify campaign content is not stale
+        run: |
+          npm run sync:campaigns
+          git diff --exit-code -- public/campaigns

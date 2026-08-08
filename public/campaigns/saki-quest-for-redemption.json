@@ -1,0 +1,2631 @@
+{
+  "formatVersion": 1,
+  "catalog": {
+    "title": "Saki: Quest for Redemption",
+    "description": "A private five-act arc through consultations, tribunals, and unsolicited grand gestures.",
+    "duration": "25–40 min",
+    "contentNotice": "Absurdist bureaucratic romance-comedy framing, self-deprecating humor, and unsolicited gestures made without the other party's consent.",
+    "featured": false,
+    "hidden": true
+  },
+  "campaign": {
+    "id": "saki-quest-for-redemption",
+    "kindId": "story-graph",
+    "version": "1.0.0",
+    "titleKey": "saki.campaign.title",
+    "content": {
+      "descriptionKey": "saki.campaign.description",
+      "variables": {
+        "saki_approval": {
+          "type": "int",
+          "initial": 0,
+          "min": 0,
+          "max": 12,
+          "visible": true,
+          "labelKey": "saki.var_saki_approval.label"
+        },
+        "lucifer_dignity": {
+          "type": "int",
+          "initial": 4,
+          "min": -12,
+          "max": 10,
+          "visible": true,
+          "labelKey": "saki.var_lucifer_dignity.label"
+        },
+        "redemption_progress": {
+          "type": "int",
+          "initial": 0,
+          "min": 0,
+          "max": 16,
+          "visible": true,
+          "labelKey": "saki.var_redemption_progress.label"
+        },
+        "overthinking": {
+          "type": "int",
+          "initial": 0,
+          "min": 0,
+          "max": 12,
+          "visible": true,
+          "labelKey": "saki.var_overthinking.label"
+        },
+        "infrastructure": {
+          "type": "int",
+          "initial": 0,
+          "min": 0,
+          "max": 16,
+          "visible": true,
+          "labelKey": "saki.var_infrastructure.label"
+        },
+        "common_sense_ignored": {
+          "type": "int",
+          "initial": 0,
+          "min": 0,
+          "max": 12,
+          "visible": true,
+          "labelKey": "saki.var_common_sense_ignored.label"
+        },
+        "scope_creep": {
+          "type": "int",
+          "initial": 0,
+          "min": 0,
+          "max": 16,
+          "visible": true,
+          "labelKey": "saki.var_scope_creep.label"
+        },
+        "philosophy": {
+          "type": "int",
+          "initial": 0,
+          "min": 0,
+          "max": 12,
+          "visible": true,
+          "labelKey": "saki.var_philosophy.label"
+        },
+        "severity": {
+          "type": "enum",
+          "initial": "unclassified",
+          "values": [
+            "unclassified",
+            "minor",
+            "class_two",
+            "unauthorized_opinion",
+            "observability",
+            "integrity_check"
+          ]
+        },
+        "apology_form": {
+          "type": "enum",
+          "initial": "none",
+          "values": [
+            "none",
+            "sincere",
+            "formal",
+            "legal",
+            "rpg",
+            "campaign"
+          ]
+        },
+        "talked_to_saki": {
+          "type": "bool",
+          "initial": false
+        },
+        "consent_field_checked": {
+          "type": "bool",
+          "initial": false
+        },
+        "tribunal_completed": {
+          "type": "bool",
+          "initial": false
+        }
+      },
+      "nodes": {
+        "prologue": {
+          "id": "prologue",
+          "kind": "choice",
+          "textKey": "saki.prologue.text",
+          "choices": [
+            {
+              "id": "ask_again",
+              "goto": "incident_1",
+              "labelKey": "saki.prologue.ask_again"
+            },
+            {
+              "id": "invent_one",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "scope_creep",
+                  "by": 1
+                },
+                {
+                  "op": "increment",
+                  "var": "infrastructure",
+                  "by": 1
+                }
+              ],
+              "goto": "incident_1",
+              "labelKey": "saki.prologue.invent_one"
+            },
+            {
+              "id": "send_a_message",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "talked_to_saki",
+                  "value": true
+                }
+              ],
+              "goto": "speedrun_warning",
+              "labelKey": "saki.prologue.send_a_message"
+            },
+            {
+              "id": "read_changelog",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "overthinking",
+                  "by": 1
+                }
+              ],
+              "goto": "changelog",
+              "labelKey": "saki.prologue.read_changelog"
+            }
+          ]
+        },
+        "changelog": {
+          "id": "changelog",
+          "kind": "choice",
+          "textKey": "saki.changelog.text",
+          "choices": [
+            {
+              "id": "changelog_next",
+              "goto": "prologue",
+              "labelKey": "saki.changelog.changelog_next"
+            }
+          ]
+        },
+        "speedrun_warning": {
+          "id": "speedrun_warning",
+          "kind": "choice",
+          "textKey": "saki.speedrun_warning.text",
+          "choices": [
+            {
+              "id": "speedrun_send",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "saki_approval",
+                  "by": 3
+                },
+                {
+                  "op": "increment",
+                  "var": "redemption_progress",
+                  "by": 3
+                }
+              ],
+              "goto": "ending_speedrun",
+              "labelKey": "saki.speedrun_warning.speedrun_send"
+            },
+            {
+              "id": "speedrun_reconsider",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "common_sense_ignored",
+                  "by": 1
+                },
+                {
+                  "op": "increment",
+                  "var": "scope_creep",
+                  "by": 1
+                },
+                {
+                  "op": "decrement",
+                  "var": "lucifer_dignity",
+                  "by": 1
+                }
+              ],
+              "goto": "incident_1",
+              "labelKey": "saki.speedrun_warning.speedrun_reconsider"
+            }
+          ]
+        },
+        "incident_1": {
+          "id": "incident_1",
+          "kind": "choice",
+          "textKey": "saki.incident_1.text",
+          "choices": [
+            {
+              "id": "incident_review",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "overthinking",
+                  "by": 1
+                }
+              ],
+              "goto": "incident_review_event",
+              "labelKey": "saki.incident_1.incident_review"
+            },
+            {
+              "id": "incident_assume",
+              "effects": [
+                {
+                  "op": "decrement",
+                  "var": "lucifer_dignity",
+                  "by": 1
+                }
+              ],
+              "goto": "incident_review_event",
+              "labelKey": "saki.incident_1.incident_assume"
+            },
+            {
+              "id": "incident_ask",
+              "goto": "common_sense_1",
+              "labelKey": "saki.incident_1.incident_ask"
+            }
+          ]
+        },
+        "incident_review_event": {
+          "id": "incident_review_event",
+          "kind": "random",
+          "textKey": "saki.incident_review_event.text",
+          "transitions": [
+            {
+              "weight": 1,
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "overthinking",
+                  "by": 1
+                }
+              ],
+              "goto": "incident_evidence_a"
+            },
+            {
+              "weight": 1,
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "philosophy",
+                  "by": 1
+                }
+              ],
+              "goto": "incident_evidence_b"
+            }
+          ]
+        },
+        "incident_evidence_a": {
+          "id": "incident_evidence_a",
+          "kind": "choice",
+          "textKey": "saki.incident_evidence_a.text",
+          "choices": [
+            {
+              "id": "incident_evidence_a_next",
+              "goto": "incident_3",
+              "labelKey": "saki.incident_evidence_a.incident_evidence_a_next"
+            }
+          ]
+        },
+        "incident_evidence_b": {
+          "id": "incident_evidence_b",
+          "kind": "choice",
+          "textKey": "saki.incident_evidence_b.text",
+          "choices": [
+            {
+              "id": "incident_evidence_b_next",
+              "goto": "incident_3",
+              "labelKey": "saki.incident_evidence_b.incident_evidence_b_next"
+            }
+          ]
+        },
+        "incident_3": {
+          "id": "incident_3",
+          "kind": "choice",
+          "textKey": "saki.incident_3.text",
+          "choices": [
+            {
+              "id": "class_minor",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "severity",
+                  "value": "minor"
+                }
+              ],
+              "goto": "incident_classified",
+              "labelKey": "saki.incident_3.class_minor"
+            },
+            {
+              "id": "class_two",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "severity",
+                  "value": "class_two"
+                },
+                {
+                  "op": "increment",
+                  "var": "overthinking",
+                  "by": 1
+                }
+              ],
+              "goto": "incident_classified",
+              "labelKey": "saki.incident_3.class_two"
+            },
+            {
+              "id": "class_opinion",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "severity",
+                  "value": "unauthorized_opinion"
+                },
+                {
+                  "op": "decrement",
+                  "var": "lucifer_dignity",
+                  "by": 1
+                }
+              ],
+              "goto": "incident_classified",
+              "labelKey": "saki.incident_3.class_opinion"
+            },
+            {
+              "id": "class_observability",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "severity",
+                  "value": "observability"
+                },
+                {
+                  "op": "increment",
+                  "var": "infrastructure",
+                  "by": 1
+                }
+              ],
+              "goto": "incident_classified",
+              "labelKey": "saki.incident_3.class_observability"
+            },
+            {
+              "id": "class_integrity",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "severity",
+                  "value": "integrity_check"
+                },
+                {
+                  "op": "increment",
+                  "var": "scope_creep",
+                  "by": 1
+                }
+              ],
+              "goto": "incident_classified",
+              "labelKey": "saki.incident_3.class_integrity"
+            }
+          ]
+        },
+        "incident_classified": {
+          "id": "incident_classified",
+          "kind": "auto",
+          "textKey": "saki.incident_classified.text",
+          "goto": "incident_4"
+        },
+        "incident_4": {
+          "id": "incident_4",
+          "kind": "choice",
+          "textKey": "saki.incident_4.text",
+          "choices": [
+            {
+              "id": "take_seriously",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "redemption_progress",
+                  "by": 1
+                }
+              ],
+              "goto": "act2_open",
+              "labelKey": "saki.incident_4.take_seriously"
+            },
+            {
+              "id": "take_theatrically",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "scope_creep",
+                  "by": 1
+                },
+                {
+                  "op": "increment",
+                  "var": "redemption_progress",
+                  "by": 1
+                },
+                {
+                  "op": "decrement",
+                  "var": "lucifer_dignity",
+                  "by": 1
+                }
+              ],
+              "goto": "act2_open",
+              "labelKey": "saki.incident_4.take_theatrically"
+            },
+            {
+              "id": "take_lightly",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "philosophy",
+                  "by": 1
+                }
+              ],
+              "goto": "act2_open",
+              "labelKey": "saki.incident_4.take_lightly"
+            },
+            {
+              "id": "build_infrastructure",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "infrastructure",
+                  "by": 2
+                },
+                {
+                  "op": "increment",
+                  "var": "scope_creep",
+                  "by": 1
+                }
+              ],
+              "goto": "infra_1",
+              "labelKey": "saki.incident_4.build_infrastructure"
+            }
+          ]
+        },
+        "infra_1": {
+          "id": "infra_1",
+          "kind": "choice",
+          "textKey": "saki.infra_1.text",
+          "choices": [
+            {
+              "id": "infra_back",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "redemption_progress",
+                  "by": 1
+                }
+              ],
+              "goto": "act2_open",
+              "labelKey": "saki.infra_1.infra_back"
+            },
+            {
+              "id": "infra_more",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "infrastructure",
+                  "by": 2
+                },
+                {
+                  "op": "increment",
+                  "var": "scope_creep",
+                  "by": 2
+                },
+                {
+                  "op": "decrement",
+                  "var": "lucifer_dignity",
+                  "by": 1
+                }
+              ],
+              "goto": "act2_open",
+              "labelKey": "saki.infra_1.infra_more"
+            }
+          ]
+        },
+        "act2_open": {
+          "id": "act2_open",
+          "kind": "auto",
+          "textKey": "saki.act2_open.text",
+          "goto": "tribunal_hub"
+        },
+        "tribunal_hub": {
+          "id": "tribunal_hub",
+          "kind": "choice",
+          "textKey": "saki.tribunal_hub.text",
+          "choices": [
+            {
+              "id": "consult_conscience",
+              "showWhen": {
+                "field": "visited.tribunal_conscience",
+                "operator": "equals",
+                "value": 0
+              },
+              "goto": "tribunal_conscience",
+              "labelKey": "saki.tribunal_hub.consult_conscience"
+            },
+            {
+              "id": "consult_common_sense",
+              "goto": "common_sense_1",
+              "labelKey": "saki.tribunal_hub.consult_common_sense"
+            },
+            {
+              "id": "consult_bureaucrat",
+              "showWhen": {
+                "field": "visited.tribunal_bureaucrat",
+                "operator": "equals",
+                "value": 0
+              },
+              "goto": "tribunal_bureaucrat",
+              "labelKey": "saki.tribunal_hub.consult_bureaucrat"
+            },
+            {
+              "id": "consult_god",
+              "showWhen": {
+                "field": "visited.tribunal_god",
+                "operator": "equals",
+                "value": 0
+              },
+              "goto": "tribunal_god",
+              "labelKey": "saki.tribunal_hub.consult_god"
+            },
+            {
+              "id": "consult_agent",
+              "showWhen": {
+                "field": "visited.tribunal_agent",
+                "operator": "equals",
+                "value": 0
+              },
+              "goto": "tribunal_agent",
+              "labelKey": "saki.tribunal_hub.consult_agent"
+            },
+            {
+              "id": "consult_self",
+              "showWhen": {
+                "field": "visited.tribunal_self",
+                "operator": "equals",
+                "value": 0
+              },
+              "goto": "tribunal_self",
+              "labelKey": "saki.tribunal_hub.consult_self"
+            },
+            {
+              "id": "consult_questlog",
+              "showWhen": {
+                "field": "visited.tribunal_questlog",
+                "operator": "equals",
+                "value": 0
+              },
+              "goto": "tribunal_questlog",
+              "labelKey": "saki.tribunal_hub.consult_questlog"
+            },
+            {
+              "id": "full_bench",
+              "showWhen": {
+                "all": [
+                  {
+                    "field": "visited.tribunal_conscience",
+                    "operator": "greater_or_equal",
+                    "value": 1
+                  },
+                  {
+                    "field": "visited.common_sense_1",
+                    "operator": "greater_or_equal",
+                    "value": 1
+                  },
+                  {
+                    "field": "visited.tribunal_bureaucrat",
+                    "operator": "greater_or_equal",
+                    "value": 1
+                  },
+                  {
+                    "field": "visited.tribunal_god",
+                    "operator": "greater_or_equal",
+                    "value": 1
+                  },
+                  {
+                    "field": "visited.tribunal_agent",
+                    "operator": "greater_or_equal",
+                    "value": 1
+                  },
+                  {
+                    "field": "visited.tribunal_self",
+                    "operator": "greater_or_equal",
+                    "value": 1
+                  },
+                  {
+                    "field": "visited.tribunal_questlog",
+                    "operator": "greater_or_equal",
+                    "value": 1
+                  }
+                ]
+              },
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "philosophy",
+                  "by": 1
+                }
+              ],
+              "goto": "tribunal_full_bench",
+              "labelKey": "saki.tribunal_hub.full_bench"
+            },
+            {
+              "id": "conclude",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "tribunal_completed",
+                  "value": true
+                }
+              ],
+              "goto": "tribunal_verdict",
+              "labelKey": "saki.tribunal_hub.conclude"
+            }
+          ]
+        },
+        "tribunal_conscience": {
+          "id": "tribunal_conscience",
+          "kind": "choice",
+          "textKey": "saki.tribunal_conscience.text",
+          "choices": [
+            {
+              "id": "conscience_accept",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "redemption_progress",
+                  "by": 1
+                },
+                {
+                  "op": "increment",
+                  "var": "lucifer_dignity",
+                  "by": 1
+                }
+              ],
+              "goto": "tribunal_hub",
+              "labelKey": "saki.tribunal_conscience.conscience_accept"
+            },
+            {
+              "id": "conscience_reject",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "overthinking",
+                  "by": 1
+                },
+                {
+                  "op": "decrement",
+                  "var": "lucifer_dignity",
+                  "by": 1
+                }
+              ],
+              "goto": "tribunal_hub",
+              "labelKey": "saki.tribunal_conscience.conscience_reject"
+            }
+          ]
+        },
+        "common_sense_1": {
+          "id": "common_sense_1",
+          "kind": "choice",
+          "textKey": "saki.common_sense_1.text",
+          "choices": [
+            {
+              "id": "obey",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "talked_to_saki",
+                  "value": true
+                },
+                {
+                  "op": "increment",
+                  "var": "saki_approval",
+                  "by": 2
+                },
+                {
+                  "op": "increment",
+                  "var": "redemption_progress",
+                  "by": 2
+                }
+              ],
+              "goto": "saki_direct",
+              "labelKey": "saki.common_sense_1.obey"
+            },
+            {
+              "id": "decline_scaffolded",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "common_sense_ignored",
+                  "by": 1
+                },
+                {
+                  "op": "increment",
+                  "var": "scope_creep",
+                  "by": 1
+                }
+              ],
+              "goto": "tribunal_hub",
+              "labelKey": "saki.common_sense_1.decline_scaffolded"
+            },
+            {
+              "id": "decline_philosophy",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "common_sense_ignored",
+                  "by": 1
+                },
+                {
+                  "op": "increment",
+                  "var": "philosophy",
+                  "by": 1
+                }
+              ],
+              "goto": "tribunal_hub",
+              "labelKey": "saki.common_sense_1.decline_philosophy"
+            },
+            {
+              "id": "decline_infrastructure",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "common_sense_ignored",
+                  "by": 1
+                },
+                {
+                  "op": "increment",
+                  "var": "infrastructure",
+                  "by": 2
+                }
+              ],
+              "goto": "tribunal_hub",
+              "labelKey": "saki.common_sense_1.decline_infrastructure"
+            }
+          ]
+        },
+        "tribunal_bureaucrat": {
+          "id": "tribunal_bureaucrat",
+          "kind": "choice",
+          "textKey": "saki.tribunal_bureaucrat.text",
+          "choices": [
+            {
+              "id": "file_form",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "redemption_progress",
+                  "by": 1
+                },
+                {
+                  "op": "increment",
+                  "var": "overthinking",
+                  "by": 1
+                }
+              ],
+              "goto": "tribunal_hub",
+              "labelKey": "saki.tribunal_bureaucrat.file_form"
+            },
+            {
+              "id": "ask_consent",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "consent_field_checked",
+                  "value": true
+                },
+                {
+                  "op": "increment",
+                  "var": "philosophy",
+                  "by": 1
+                }
+              ],
+              "goto": "consent_field",
+              "labelKey": "saki.tribunal_bureaucrat.ask_consent"
+            }
+          ]
+        },
+        "consent_field": {
+          "id": "consent_field",
+          "kind": "choice",
+          "textKey": "saki.consent_field.text",
+          "choices": [
+            {
+              "id": "consent_field_next",
+              "effects": [
+                {
+                  "op": "decrement",
+                  "var": "lucifer_dignity",
+                  "by": 1
+                }
+              ],
+              "goto": "tribunal_hub",
+              "labelKey": "saki.consent_field.consent_field_next"
+            }
+          ]
+        },
+        "tribunal_god": {
+          "id": "tribunal_god",
+          "kind": "choice",
+          "textKey": "saki.tribunal_god.text",
+          "choices": [
+            {
+              "id": "answer_honestly",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "scope_creep",
+                  "by": 2
+                },
+                {
+                  "op": "decrement",
+                  "var": "lucifer_dignity",
+                  "by": 1
+                }
+              ],
+              "goto": "tribunal_hub",
+              "labelKey": "saki.tribunal_god.answer_honestly"
+            },
+            {
+              "id": "deflect",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "philosophy",
+                  "by": 2
+                }
+              ],
+              "goto": "tribunal_hub",
+              "labelKey": "saki.tribunal_god.deflect"
+            }
+          ]
+        },
+        "tribunal_agent": {
+          "id": "tribunal_agent",
+          "kind": "choice",
+          "textKey": "saki.tribunal_agent.text",
+          "choices": [
+            {
+              "id": "accept_plan",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "infrastructure",
+                  "by": 1
+                },
+                {
+                  "op": "increment",
+                  "var": "scope_creep",
+                  "by": 1
+                },
+                {
+                  "op": "increment",
+                  "var": "redemption_progress",
+                  "by": 1
+                }
+              ],
+              "goto": "tribunal_hub",
+              "labelKey": "saki.tribunal_agent.accept_plan"
+            },
+            {
+              "id": "ask_short",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "lucifer_dignity",
+                  "by": 1
+                }
+              ],
+              "goto": "agent_short",
+              "labelKey": "saki.tribunal_agent.ask_short"
+            }
+          ]
+        },
+        "agent_short": {
+          "id": "agent_short",
+          "kind": "choice",
+          "textKey": "saki.agent_short.text",
+          "choices": [
+            {
+              "id": "agent_short_next",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "common_sense_ignored",
+                  "by": 1
+                },
+                {
+                  "op": "increment",
+                  "var": "scope_creep",
+                  "by": 1
+                }
+              ],
+              "goto": "tribunal_hub",
+              "labelKey": "saki.agent_short.agent_short_next"
+            }
+          ]
+        },
+        "tribunal_self": {
+          "id": "tribunal_self",
+          "kind": "choice",
+          "textKey": "saki.tribunal_self.text",
+          "choices": [
+            {
+              "id": "ratify",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "overthinking",
+                  "by": 1
+                },
+                {
+                  "op": "decrement",
+                  "var": "lucifer_dignity",
+                  "by": 1
+                }
+              ],
+              "goto": "tribunal_hub",
+              "labelKey": "saki.tribunal_self.ratify"
+            },
+            {
+              "id": "dissent",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "philosophy",
+                  "by": 1
+                }
+              ],
+              "goto": "tribunal_hub",
+              "labelKey": "saki.tribunal_self.dissent"
+            }
+          ]
+        },
+        "tribunal_questlog": {
+          "id": "tribunal_questlog",
+          "kind": "choice",
+          "textKey": "saki.tribunal_questlog.text",
+          "choices": [
+            {
+              "id": "remove_marker",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "lucifer_dignity",
+                  "by": 1
+                }
+              ],
+              "goto": "tribunal_hub",
+              "labelKey": "saki.tribunal_questlog.remove_marker"
+            },
+            {
+              "id": "keep_marker",
+              "effects": [
+                {
+                  "op": "decrement",
+                  "var": "lucifer_dignity",
+                  "by": 2
+                },
+                {
+                  "op": "increment",
+                  "var": "scope_creep",
+                  "by": 1
+                }
+              ],
+              "goto": "tribunal_hub",
+              "labelKey": "saki.tribunal_questlog.keep_marker"
+            }
+          ]
+        },
+        "tribunal_full_bench": {
+          "id": "tribunal_full_bench",
+          "kind": "choice",
+          "textKey": "saki.tribunal_full_bench.text",
+          "choices": [
+            {
+              "id": "minute_it",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "common_sense_ignored",
+                  "by": 2
+                },
+                {
+                  "op": "increment",
+                  "var": "philosophy",
+                  "by": 1
+                }
+              ],
+              "goto": "tribunal_verdict",
+              "labelKey": "saki.tribunal_full_bench.minute_it"
+            },
+            {
+              "id": "adjourn",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "talked_to_saki",
+                  "value": true
+                },
+                {
+                  "op": "increment",
+                  "var": "saki_approval",
+                  "by": 2
+                },
+                {
+                  "op": "increment",
+                  "var": "redemption_progress",
+                  "by": 2
+                }
+              ],
+              "goto": "saki_direct",
+              "labelKey": "saki.tribunal_full_bench.adjourn"
+            }
+          ]
+        },
+        "tribunal_verdict": {
+          "id": "tribunal_verdict",
+          "kind": "auto",
+          "textKey": "saki.tribunal_verdict.text",
+          "goto": "trials_hub"
+        },
+        "trials_hub": {
+          "id": "trials_hub",
+          "kind": "choice",
+          "textKey": "saki.trials_hub.text",
+          "choices": [
+            {
+              "id": "trial_reflection",
+              "showWhen": {
+                "field": "visited.trial_reflection_1",
+                "operator": "equals",
+                "value": 0
+              },
+              "goto": "trial_reflection_1",
+              "labelKey": "saki.trials_hub.trial_reflection"
+            },
+            {
+              "id": "trial_apology",
+              "showWhen": {
+                "field": "visited.trial_apology_1",
+                "operator": "equals",
+                "value": 0
+              },
+              "goto": "trial_apology_1",
+              "labelKey": "saki.trials_hub.trial_apology"
+            },
+            {
+              "id": "trial_gift",
+              "showWhen": {
+                "field": "visited.trial_gift_1",
+                "operator": "equals",
+                "value": 0
+              },
+              "goto": "trial_gift_1",
+              "labelKey": "saki.trials_hub.trial_gift"
+            },
+            {
+              "id": "trial_restraint",
+              "showWhen": {
+                "all": [
+                  {
+                    "field": "var.overthinking",
+                    "operator": "greater_or_equal",
+                    "value": 3
+                  },
+                  {
+                    "field": "visited.trial_restraint_1",
+                    "operator": "equals",
+                    "value": 0
+                  }
+                ]
+              },
+              "goto": "trial_restraint_1",
+              "labelKey": "saki.trials_hub.trial_restraint"
+            },
+            {
+              "id": "trials_done",
+              "requirements": {
+                "field": "var.redemption_progress",
+                "operator": "greater_or_equal",
+                "value": 2
+              },
+              "goto": "act4_open",
+              "labelKey": "saki.trials_hub.trials_done",
+              "requirementFailKey": "saki.trials_hub.trials_done_fail"
+            },
+            {
+              "id": "trials_abandon",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "lucifer_dignity",
+                  "by": 1
+                }
+              ],
+              "goto": "act4_open",
+              "labelKey": "saki.trials_hub.trials_abandon"
+            }
+          ]
+        },
+        "trial_reflection_1": {
+          "id": "trial_reflection_1",
+          "kind": "choice",
+          "textKey": "saki.trial_reflection_1.text",
+          "choices": [
+            {
+              "id": "reflect_honestly",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "redemption_progress",
+                  "by": 2
+                },
+                {
+                  "op": "increment",
+                  "var": "lucifer_dignity",
+                  "by": 1
+                }
+              ],
+              "goto": "reflection_event",
+              "labelKey": "saki.trial_reflection_1.reflect_honestly"
+            },
+            {
+              "id": "reflect_overthink",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "overthinking",
+                  "by": 3
+                },
+                {
+                  "op": "decrement",
+                  "var": "lucifer_dignity",
+                  "by": 1
+                }
+              ],
+              "goto": "reflection_event",
+              "labelKey": "saki.trial_reflection_1.reflect_overthink"
+            },
+            {
+              "id": "reflect_ask_ai",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "overthinking",
+                  "by": 1
+                },
+                {
+                  "op": "increment",
+                  "var": "infrastructure",
+                  "by": 1
+                }
+              ],
+              "goto": "reflection_event",
+              "labelKey": "saki.trial_reflection_1.reflect_ask_ai"
+            },
+            {
+              "id": "reflect_build",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "infrastructure",
+                  "by": 3
+                },
+                {
+                  "op": "increment",
+                  "var": "scope_creep",
+                  "by": 2
+                },
+                {
+                  "op": "decrement",
+                  "var": "lucifer_dignity",
+                  "by": 1
+                }
+              ],
+              "goto": "reflection_event",
+              "labelKey": "saki.trial_reflection_1.reflect_build"
+            }
+          ]
+        },
+        "reflection_event": {
+          "id": "reflection_event",
+          "kind": "random",
+          "textKey": "saki.reflection_event.text",
+          "transitions": [
+            {
+              "weight": 1,
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "philosophy",
+                  "by": 1
+                }
+              ],
+              "goto": "reflection_result_a"
+            },
+            {
+              "weight": 1,
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "redemption_progress",
+                  "by": 1
+                }
+              ],
+              "goto": "reflection_result_b"
+            }
+          ]
+        },
+        "reflection_result_a": {
+          "id": "reflection_result_a",
+          "kind": "choice",
+          "textKey": "saki.reflection_result_a.text",
+          "choices": [
+            {
+              "id": "reflection_result_a_next",
+              "goto": "trials_hub",
+              "labelKey": "saki.reflection_result_a.reflection_result_a_next"
+            }
+          ]
+        },
+        "reflection_result_b": {
+          "id": "reflection_result_b",
+          "kind": "choice",
+          "textKey": "saki.reflection_result_b.text",
+          "choices": [
+            {
+              "id": "reflection_result_b_next",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "saki_approval",
+                  "by": 1
+                }
+              ],
+              "goto": "trials_hub",
+              "labelKey": "saki.reflection_result_b.reflection_result_b_next"
+            }
+          ]
+        },
+        "trial_apology_1": {
+          "id": "trial_apology_1",
+          "kind": "choice",
+          "textKey": "saki.trial_apology_1.text",
+          "choices": [
+            {
+              "id": "apology_sincere",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "apology_form",
+                  "value": "sincere"
+                },
+                {
+                  "op": "increment",
+                  "var": "redemption_progress",
+                  "by": 2
+                },
+                {
+                  "op": "increment",
+                  "var": "saki_approval",
+                  "by": 2
+                }
+              ],
+              "goto": "apology_result",
+              "labelKey": "saki.trial_apology_1.apology_sincere"
+            },
+            {
+              "id": "apology_formal",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "apology_form",
+                  "value": "formal"
+                },
+                {
+                  "op": "increment",
+                  "var": "overthinking",
+                  "by": 1
+                },
+                {
+                  "op": "increment",
+                  "var": "redemption_progress",
+                  "by": 1
+                }
+              ],
+              "goto": "apology_result",
+              "labelKey": "saki.trial_apology_1.apology_formal"
+            },
+            {
+              "id": "apology_legal",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "apology_form",
+                  "value": "legal"
+                },
+                {
+                  "op": "decrement",
+                  "var": "lucifer_dignity",
+                  "by": 2
+                },
+                {
+                  "op": "decrement",
+                  "var": "saki_approval",
+                  "by": 1
+                }
+              ],
+              "goto": "apology_result",
+              "labelKey": "saki.trial_apology_1.apology_legal"
+            },
+            {
+              "id": "apology_rpg",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "apology_form",
+                  "value": "rpg"
+                },
+                {
+                  "op": "increment",
+                  "var": "scope_creep",
+                  "by": 1
+                },
+                {
+                  "op": "increment",
+                  "var": "philosophy",
+                  "by": 1
+                }
+              ],
+              "goto": "apology_result",
+              "labelKey": "saki.trial_apology_1.apology_rpg"
+            },
+            {
+              "id": "apology_campaign",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "apology_form",
+                  "value": "campaign"
+                },
+                {
+                  "op": "increment",
+                  "var": "scope_creep",
+                  "by": 3
+                },
+                {
+                  "op": "increment",
+                  "var": "infrastructure",
+                  "by": 3
+                },
+                {
+                  "op": "decrement",
+                  "var": "lucifer_dignity",
+                  "by": 2
+                }
+              ],
+              "goto": "apology_campaign_node",
+              "labelKey": "saki.trial_apology_1.apology_campaign"
+            }
+          ]
+        },
+        "apology_result": {
+          "id": "apology_result",
+          "kind": "auto",
+          "textKey": "saki.apology_result.text",
+          "goto": "trials_hub"
+        },
+        "apology_campaign_node": {
+          "id": "apology_campaign_node",
+          "kind": "choice",
+          "textKey": "saki.apology_campaign_node.text",
+          "choices": [
+            {
+              "id": "apology_campaign_node_next",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "scope_creep",
+                  "by": 1
+                }
+              ],
+              "goto": "trials_hub",
+              "labelKey": "saki.apology_campaign_node.apology_campaign_node_next"
+            }
+          ]
+        },
+        "trial_gift_1": {
+          "id": "trial_gift_1",
+          "kind": "choice",
+          "textKey": "saki.trial_gift_1.text",
+          "choices": [
+            {
+              "id": "gift_drink",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "saki_approval",
+                  "by": 3
+                },
+                {
+                  "op": "increment",
+                  "var": "redemption_progress",
+                  "by": 2
+                }
+              ],
+              "goto": "gift_result",
+              "labelKey": "saki.trial_gift_1.gift_drink"
+            },
+            {
+              "id": "gift_story",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "saki_approval",
+                  "by": 2
+                },
+                {
+                  "op": "increment",
+                  "var": "redemption_progress",
+                  "by": 2
+                },
+                {
+                  "op": "increment",
+                  "var": "lucifer_dignity",
+                  "by": 1
+                }
+              ],
+              "goto": "gift_result",
+              "labelKey": "saki.trial_gift_1.gift_story"
+            },
+            {
+              "id": "gift_repo",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "infrastructure",
+                  "by": 2
+                },
+                {
+                  "op": "increment",
+                  "var": "scope_creep",
+                  "by": 2
+                },
+                {
+                  "op": "decrement",
+                  "var": "lucifer_dignity",
+                  "by": 1
+                }
+              ],
+              "goto": "gift_result",
+              "labelKey": "saki.trial_gift_1.gift_repo"
+            },
+            {
+              "id": "gift_statue",
+              "effects": [
+                {
+                  "op": "decrement",
+                  "var": "lucifer_dignity",
+                  "by": 3
+                },
+                {
+                  "op": "increment",
+                  "var": "scope_creep",
+                  "by": 1
+                }
+              ],
+              "goto": "gift_statue",
+              "labelKey": "saki.trial_gift_1.gift_statue"
+            }
+          ]
+        },
+        "gift_statue": {
+          "id": "gift_statue",
+          "kind": "choice",
+          "textKey": "saki.gift_statue.text",
+          "choices": [
+            {
+              "id": "gift_statue_next",
+              "goto": "trials_hub",
+              "labelKey": "saki.gift_statue.gift_statue_next"
+            }
+          ]
+        },
+        "gift_result": {
+          "id": "gift_result",
+          "kind": "auto",
+          "textKey": "saki.gift_result.text",
+          "goto": "trials_hub"
+        },
+        "trial_restraint_1": {
+          "id": "trial_restraint_1",
+          "kind": "choice",
+          "textKey": "saki.trial_restraint_1.text",
+          "choices": [
+            {
+              "id": "restraint_pass",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "lucifer_dignity",
+                  "by": 3
+                },
+                {
+                  "op": "increment",
+                  "var": "redemption_progress",
+                  "by": 1
+                }
+              ],
+              "goto": "restraint_result",
+              "labelKey": "saki.trial_restraint_1.restraint_pass"
+            },
+            {
+              "id": "restraint_fail",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "scope_creep",
+                  "by": 2
+                },
+                {
+                  "op": "increment",
+                  "var": "infrastructure",
+                  "by": 1
+                },
+                {
+                  "op": "decrement",
+                  "var": "lucifer_dignity",
+                  "by": 1
+                }
+              ],
+              "goto": "restraint_result",
+              "labelKey": "saki.trial_restraint_1.restraint_fail"
+            },
+            {
+              "id": "restraint_philosophy",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "philosophy",
+                  "by": 3
+                }
+              ],
+              "goto": "restraint_result",
+              "labelKey": "saki.trial_restraint_1.restraint_philosophy"
+            }
+          ]
+        },
+        "restraint_result": {
+          "id": "restraint_result",
+          "kind": "auto",
+          "textKey": "saki.restraint_result.text",
+          "goto": "trials_hub"
+        },
+        "act4_open": {
+          "id": "act4_open",
+          "kind": "auto",
+          "textKey": "saki.act4_open.text",
+          "goto": "meta_1"
+        },
+        "meta_1": {
+          "id": "meta_1",
+          "kind": "choice",
+          "textKey": "saki.meta_1.text",
+          "choices": [
+            {
+              "id": "meta_accept",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "scope_creep",
+                  "by": 1
+                }
+              ],
+              "goto": "meta_event",
+              "labelKey": "saki.meta_1.meta_accept"
+            },
+            {
+              "id": "meta_defend",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "philosophy",
+                  "by": 1
+                },
+                {
+                  "op": "decrement",
+                  "var": "lucifer_dignity",
+                  "by": 1
+                }
+              ],
+              "goto": "meta_event",
+              "labelKey": "saki.meta_1.meta_defend"
+            },
+            {
+              "id": "meta_stop",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "talked_to_saki",
+                  "value": true
+                },
+                {
+                  "op": "increment",
+                  "var": "saki_approval",
+                  "by": 2
+                },
+                {
+                  "op": "increment",
+                  "var": "redemption_progress",
+                  "by": 2
+                }
+              ],
+              "goto": "saki_direct",
+              "labelKey": "saki.meta_1.meta_stop"
+            }
+          ]
+        },
+        "meta_event": {
+          "id": "meta_event",
+          "kind": "random",
+          "textKey": "saki.meta_event.text",
+          "transitions": [
+            {
+              "weight": 1,
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "philosophy",
+                  "by": 1
+                }
+              ],
+              "goto": "meta_note_a"
+            },
+            {
+              "weight": 1,
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "scope_creep",
+                  "by": 1
+                }
+              ],
+              "goto": "meta_note_b"
+            }
+          ]
+        },
+        "meta_note_a": {
+          "id": "meta_note_a",
+          "kind": "choice",
+          "textKey": "saki.meta_note_a.text",
+          "choices": [
+            {
+              "id": "meta_note_a_next",
+              "goto": "meta_2",
+              "labelKey": "saki.meta_note_a.meta_note_a_next"
+            }
+          ]
+        },
+        "meta_note_b": {
+          "id": "meta_note_b",
+          "kind": "choice",
+          "textKey": "saki.meta_note_b.text",
+          "choices": [
+            {
+              "id": "meta_note_b_next",
+              "goto": "meta_2",
+              "labelKey": "saki.meta_note_b.meta_note_b_next"
+            }
+          ]
+        },
+        "meta_2": {
+          "id": "meta_2",
+          "kind": "choice",
+          "textKey": "saki.meta_2.text",
+          "choices": [
+            {
+              "id": "ship",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "redemption_progress",
+                  "by": 2
+                }
+              ],
+              "goto": "act5_open",
+              "labelKey": "saki.meta_2.ship"
+            },
+            {
+              "id": "more_infrastructure",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "infrastructure",
+                  "by": 3
+                },
+                {
+                  "op": "increment",
+                  "var": "scope_creep",
+                  "by": 3
+                },
+                {
+                  "op": "decrement",
+                  "var": "lucifer_dignity",
+                  "by": 2
+                }
+              ],
+              "goto": "infra_2",
+              "labelKey": "saki.meta_2.more_infrastructure"
+            },
+            {
+              "id": "delete",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "lucifer_dignity",
+                  "by": 2
+                }
+              ],
+              "goto": "meta_delete_node",
+              "labelKey": "saki.meta_2.delete"
+            },
+            {
+              "id": "philosophy",
+              "showWhen": {
+                "field": "var.philosophy",
+                "operator": "greater_or_equal",
+                "value": 3
+              },
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "philosophy",
+                  "by": 2
+                }
+              ],
+              "goto": "philosophy_node",
+              "labelKey": "saki.meta_2.philosophy"
+            }
+          ]
+        },
+        "infra_2": {
+          "id": "infra_2",
+          "kind": "choice",
+          "textKey": "saki.infra_2.text",
+          "choices": [
+            {
+              "id": "carry_on",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "scope_creep",
+                  "by": 1
+                }
+              ],
+              "goto": "act5_open",
+              "labelKey": "saki.infra_2.carry_on"
+            },
+            {
+              "id": "commit_fully",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "infrastructure",
+                  "by": 4
+                },
+                {
+                  "op": "increment",
+                  "var": "scope_creep",
+                  "by": 4
+                },
+                {
+                  "op": "decrement",
+                  "var": "lucifer_dignity",
+                  "by": 3
+                }
+              ],
+              "goto": "ending_scope_creep",
+              "labelKey": "saki.infra_2.commit_fully"
+            }
+          ]
+        },
+        "meta_delete_node": {
+          "id": "meta_delete_node",
+          "kind": "choice",
+          "textKey": "saki.meta_delete_node.text",
+          "choices": [
+            {
+              "id": "meta_delete_node_next",
+              "effects": [
+                {
+                  "op": "decrement",
+                  "var": "lucifer_dignity",
+                  "by": 1
+                },
+                {
+                  "op": "increment",
+                  "var": "redemption_progress",
+                  "by": 1
+                }
+              ],
+              "goto": "act5_open",
+              "labelKey": "saki.meta_delete_node.meta_delete_node_next"
+            }
+          ]
+        },
+        "philosophy_node": {
+          "id": "philosophy_node",
+          "kind": "choice",
+          "textKey": "saki.philosophy_node.text",
+          "choices": [
+            {
+              "id": "pursue",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "philosophy",
+                  "by": 3
+                }
+              ],
+              "goto": "ending_philosophical",
+              "labelKey": "saki.philosophy_node.pursue"
+            },
+            {
+              "id": "abandon",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "redemption_progress",
+                  "by": 1
+                },
+                {
+                  "op": "increment",
+                  "var": "lucifer_dignity",
+                  "by": 1
+                }
+              ],
+              "goto": "act5_open",
+              "labelKey": "saki.philosophy_node.abandon"
+            }
+          ]
+        },
+        "act5_open": {
+          "id": "act5_open",
+          "kind": "auto",
+          "textKey": "saki.act5_open.text",
+          "goto": "saki_1"
+        },
+        "saki_1": {
+          "id": "saki_1",
+          "kind": "choice",
+          "textKey": "saki.saki_1.text",
+          "choices": [
+            {
+              "id": "explain",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "overthinking",
+                  "by": 1
+                }
+              ],
+              "goto": "saki_event",
+              "labelKey": "saki.saki_1.explain"
+            },
+            {
+              "id": "say_nothing",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "lucifer_dignity",
+                  "by": 1
+                }
+              ],
+              "goto": "saki_event",
+              "labelKey": "saki.saki_1.say_nothing"
+            },
+            {
+              "id": "lead_with_apology",
+              "requirements": {
+                "field": "var.apology_form",
+                "operator": "not_equals",
+                "value": "none"
+              },
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "saki_approval",
+                  "by": 2
+                },
+                {
+                  "op": "increment",
+                  "var": "redemption_progress",
+                  "by": 1
+                }
+              ],
+              "goto": "saki_event",
+              "labelKey": "saki.saki_1.lead_with_apology",
+              "requirementFailKey": "saki.saki_1.lead_with_apology_fail"
+            }
+          ]
+        },
+        "saki_event": {
+          "id": "saki_event",
+          "kind": "random",
+          "textKey": "saki.saki_event.text",
+          "transitions": [
+            {
+              "weight": 1,
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "saki_approval",
+                  "by": 1
+                }
+              ],
+              "goto": "saki_reaction_a"
+            },
+            {
+              "weight": 1,
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "philosophy",
+                  "by": 1
+                }
+              ],
+              "goto": "saki_reaction_b"
+            }
+          ]
+        },
+        "saki_reaction_a": {
+          "id": "saki_reaction_a",
+          "kind": "choice",
+          "textKey": "saki.saki_reaction_a.text",
+          "choices": [
+            {
+              "id": "saki_reaction_a_next",
+              "goto": "saki_judgment",
+              "labelKey": "saki.saki_reaction_a.saki_reaction_a_next"
+            }
+          ]
+        },
+        "saki_reaction_b": {
+          "id": "saki_reaction_b",
+          "kind": "choice",
+          "textKey": "saki.saki_reaction_b.text",
+          "choices": [
+            {
+              "id": "saki_reaction_b_next",
+              "effects": [
+                {
+                  "op": "decrement",
+                  "var": "lucifer_dignity",
+                  "by": 1
+                }
+              ],
+              "goto": "saki_judgment",
+              "labelKey": "saki.saki_reaction_b.saki_reaction_b_next"
+            }
+          ]
+        },
+        "saki_direct": {
+          "id": "saki_direct",
+          "kind": "choice",
+          "textKey": "saki.saki_direct.text",
+          "choices": [
+            {
+              "id": "write_the_story",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "saki_approval",
+                  "by": 3
+                },
+                {
+                  "op": "increment",
+                  "var": "redemption_progress",
+                  "by": 3
+                },
+                {
+                  "op": "increment",
+                  "var": "lucifer_dignity",
+                  "by": 2
+                }
+              ],
+              "goto": "ending_normal_adult",
+              "labelKey": "saki.saki_direct.write_the_story"
+            },
+            {
+              "id": "end_here",
+              "showWhen": {
+                "field": "var.infrastructure",
+                "operator": "equals",
+                "value": 0
+              },
+              "goto": "ending_speedrun",
+              "labelKey": "saki.saki_direct.end_here"
+            },
+            {
+              "id": "relapse",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "common_sense_ignored",
+                  "by": 2
+                },
+                {
+                  "op": "increment",
+                  "var": "scope_creep",
+                  "by": 2
+                },
+                {
+                  "op": "decrement",
+                  "var": "lucifer_dignity",
+                  "by": 2
+                }
+              ],
+              "goto": "saki_judgment",
+              "labelKey": "saki.saki_direct.relapse"
+            }
+          ]
+        },
+        "saki_judgment": {
+          "id": "saki_judgment",
+          "kind": "choice",
+          "textKey": "saki.saki_judgment.text",
+          "choices": [
+            {
+              "id": "judge_redeemed",
+              "requirements": {
+                "all": [
+                  {
+                    "field": "var.redemption_progress",
+                    "operator": "greater_or_equal",
+                    "value": 5
+                  },
+                  {
+                    "field": "var.saki_approval",
+                    "operator": "greater_or_equal",
+                    "value": 3
+                  }
+                ]
+              },
+              "goto": "ending_redeemed",
+              "labelKey": "saki.saki_judgment.judge_redeemed",
+              "requirementFailKey": "saki.saki_judgment.judge_redeemed_fail"
+            },
+            {
+              "id": "judge_idiot",
+              "showWhen": {
+                "field": "var.common_sense_ignored",
+                "operator": "greater_or_equal",
+                "value": 3
+              },
+              "goto": "ending_idiot",
+              "labelKey": "saki.saki_judgment.judge_idiot"
+            },
+            {
+              "id": "judge_recursive",
+              "showWhen": {
+                "all": [
+                  {
+                    "field": "var.consent_field_checked",
+                    "operator": "equals",
+                    "value": true
+                  },
+                  {
+                    "field": "var.scope_creep",
+                    "operator": "greater_or_equal",
+                    "value": 4
+                  }
+                ]
+              },
+              "goto": "ending_content_pipeline",
+              "labelKey": "saki.saki_judgment.judge_recursive"
+            },
+            {
+              "id": "judge_philosophy",
+              "showWhen": {
+                "field": "var.philosophy",
+                "operator": "greater_or_equal",
+                "value": 4
+              },
+              "goto": "ending_philosophical",
+              "labelKey": "saki.saki_judgment.judge_philosophy"
+            },
+            {
+              "id": "judge_scope",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "scope_creep",
+                  "by": 2
+                }
+              ],
+              "goto": "ending_scope_creep",
+              "labelKey": "saki.saki_judgment.judge_scope"
+            },
+            {
+              "id": "judge_unresolved",
+              "goto": "ending_unresolved",
+              "labelKey": "saki.saki_judgment.judge_unresolved"
+            }
+          ]
+        },
+        "ending_redeemed": {
+          "id": "ending_redeemed",
+          "kind": "ending",
+          "textKey": "saki.ending_redeemed.text",
+          "endingId": "redeemed",
+          "outcome": "win"
+        },
+        "ending_speedrun": {
+          "id": "ending_speedrun",
+          "kind": "ending",
+          "textKey": "saki.ending_speedrun.text",
+          "endingId": "speedrun",
+          "outcome": "neutral"
+        },
+        "ending_scope_creep": {
+          "id": "ending_scope_creep",
+          "kind": "ending",
+          "textKey": "saki.ending_scope_creep.text",
+          "endingId": "scope_creep",
+          "outcome": "loss"
+        },
+        "ending_philosophical": {
+          "id": "ending_philosophical",
+          "kind": "ending",
+          "textKey": "saki.ending_philosophical.text",
+          "endingId": "philosophical",
+          "outcome": "loss"
+        },
+        "ending_content_pipeline": {
+          "id": "ending_content_pipeline",
+          "kind": "ending",
+          "textKey": "saki.ending_content_pipeline.text",
+          "endingId": "content_pipeline",
+          "outcome": "win"
+        },
+        "ending_idiot": {
+          "id": "ending_idiot",
+          "kind": "ending",
+          "textKey": "saki.ending_idiot.text",
+          "endingId": "idiot",
+          "outcome": "win"
+        },
+        "ending_unresolved": {
+          "id": "ending_unresolved",
+          "kind": "ending",
+          "textKey": "saki.ending_unresolved.text",
+          "endingId": "unresolved",
+          "outcome": "neutral"
+        },
+        "ending_normal_adult": {
+          "id": "ending_normal_adult",
+          "kind": "ending",
+          "textKey": "saki.ending_normal_adult.text",
+          "endingId": "normal_adult",
+          "outcome": "win"
+        }
+      },
+      "startNodeId": "prologue",
+      "achievements": [
+        {
+          "id": "redeemed",
+          "hidden": true,
+          "condition": {
+            "field": "ending",
+            "operator": "equals",
+            "value": "redeemed"
+          },
+          "nameKey": "saki.achievement_redeemed.name",
+          "descriptionKey": "saki.achievement_redeemed.description"
+        },
+        {
+          "id": "speedrun",
+          "hidden": true,
+          "condition": {
+            "field": "ending",
+            "operator": "equals",
+            "value": "speedrun"
+          },
+          "nameKey": "saki.achievement_speedrun.name",
+          "descriptionKey": "saki.achievement_speedrun.description"
+        },
+        {
+          "id": "scope_creep",
+          "hidden": true,
+          "condition": {
+            "field": "ending",
+            "operator": "equals",
+            "value": "scope_creep"
+          },
+          "nameKey": "saki.achievement_scope_creep.name",
+          "descriptionKey": "saki.achievement_scope_creep.description"
+        },
+        {
+          "id": "alan_watts",
+          "hidden": true,
+          "condition": {
+            "field": "ending",
+            "operator": "equals",
+            "value": "philosophical"
+          },
+          "nameKey": "saki.achievement_alan_watts.name",
+          "descriptionKey": "saki.achievement_alan_watts.description"
+        },
+        {
+          "id": "content_pipeline",
+          "hidden": true,
+          "condition": {
+            "field": "ending",
+            "operator": "equals",
+            "value": "content_pipeline"
+          },
+          "nameKey": "saki.achievement_content_pipeline.name",
+          "descriptionKey": "saki.achievement_content_pipeline.description"
+        },
+        {
+          "id": "you_are_an_idiot",
+          "hidden": true,
+          "condition": {
+            "field": "ending",
+            "operator": "equals",
+            "value": "idiot"
+          },
+          "nameKey": "saki.achievement_you_are_an_idiot.name",
+          "descriptionKey": "saki.achievement_you_are_an_idiot.description"
+        },
+        {
+          "id": "seen_by_nobody",
+          "hidden": true,
+          "condition": {
+            "field": "ending",
+            "operator": "equals",
+            "value": "unresolved"
+          },
+          "nameKey": "saki.achievement_seen_by_nobody.name",
+          "descriptionKey": "saki.achievement_seen_by_nobody.description"
+        },
+        {
+          "id": "normal_human_being",
+          "hidden": true,
+          "condition": {
+            "field": "ending",
+            "operator": "equals",
+            "value": "normal_adult"
+          },
+          "nameKey": "saki.achievement_normal_human_being.name",
+          "descriptionKey": "saki.achievement_normal_human_being.description"
+        },
+        {
+          "id": "lost_control_of_the_scope",
+          "hidden": true,
+          "condition": {
+            "field": "var.apology_form",
+            "operator": "equals",
+            "value": "campaign"
+          },
+          "nameKey": "saki.achievement_lost_control_of_the_scope.name",
+          "descriptionKey": "saki.achievement_lost_control_of_the_scope.description"
+        },
+        {
+          "id": "architecture_zero",
+          "hidden": true,
+          "condition": {
+            "field": "var.infrastructure",
+            "operator": "greater_or_equal",
+            "value": 6
+          },
+          "nameKey": "saki.achievement_architecture_zero.name",
+          "descriptionKey": "saki.achievement_architecture_zero.description"
+        },
+        {
+          "id": "no_consent_field",
+          "hidden": true,
+          "condition": {
+            "field": "var.consent_field_checked",
+            "operator": "equals",
+            "value": true
+          },
+          "nameKey": "saki.achievement_no_consent_field.name",
+          "descriptionKey": "saki.achievement_no_consent_field.description"
+        },
+        {
+          "id": "common_sense_was_right",
+          "hidden": true,
+          "condition": {
+            "field": "var.common_sense_ignored",
+            "operator": "greater_or_equal",
+            "value": 4
+          },
+          "nameKey": "saki.achievement_common_sense_was_right.name",
+          "descriptionKey": "saki.achievement_common_sense_was_right.description"
+        },
+        {
+          "id": "dignity_underflow",
+          "hidden": true,
+          "condition": {
+            "field": "var.lucifer_dignity",
+            "operator": "less_or_equal",
+            "value": 0
+          },
+          "nameKey": "saki.achievement_dignity_underflow.name",
+          "descriptionKey": "saki.achievement_dignity_underflow.description"
+        },
+        {
+          "id": "read_the_changelog",
+          "hidden": true,
+          "condition": {
+            "field": "visited.changelog",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "saki.achievement_read_the_changelog.name",
+          "descriptionKey": "saki.achievement_read_the_changelog.description"
+        },
+        {
+          "id": "full_bench",
+          "hidden": true,
+          "condition": {
+            "field": "visited.tribunal_full_bench",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "saki.achievement_full_bench.name",
+          "descriptionKey": "saki.achievement_full_bench.description"
+        },
+        {
+          "id": "load_bearing_marble",
+          "hidden": true,
+          "condition": {
+            "field": "visited.gift_statue",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "saki.achievement_load_bearing_marble.name",
+          "descriptionKey": "saki.achievement_load_bearing_marble.description"
+        },
+        {
+          "id": "procedurally_insufficient",
+          "hidden": true,
+          "condition": {
+            "all": [
+              {
+                "field": "visited.saki_1",
+                "operator": "greater_or_equal",
+                "value": 1
+              },
+              {
+                "field": "var.apology_form",
+                "operator": "equals",
+                "value": "none"
+              }
+            ]
+          },
+          "nameKey": "saki.achievement_procedurally_insufficient.name",
+          "descriptionKey": "saki.achievement_procedurally_insufficient.description"
+        }
+      ]
+    }
+  },
+  "strings": {
+    "saki.achievement_alan_watts.description": "Win the argument and lose the point.",
+    "saki.achievement_alan_watts.name": "Alan Watts Cannot Help You Here",
+    "saki.achievement_architecture_zero.description": "Build six units of infrastructure for a conversation.",
+    "saki.achievement_architecture_zero.name": "Architecture: 0",
+    "saki.achievement_common_sense_was_right.description": "Ignore the correct advice four separate times.",
+    "saki.achievement_common_sense_was_right.name": "Common Sense Was Right",
+    "saki.achievement_content_pipeline.description": "Convert your friend's objection into the next story arc.",
+    "saki.achievement_content_pipeline.name": "Content Pipeline",
+    "saki.achievement_dignity_underflow.description": "Reduce Lucifer's dignity to nothing at all.",
+    "saki.achievement_dignity_underflow.name": "Dignity: Underflow",
+    "saki.achievement_full_bench.description": "Consult every authority except the one that matters.",
+    "saki.achievement_full_bench.name": "The Full Bench",
+    "saki.achievement_load_bearing_marble.description": "Commission a statue of a man who did not ask for one.",
+    "saki.achievement_load_bearing_marble.name": "Load-Bearing Marble",
+    "saki.achievement_lost_control_of_the_scope.description": "Replace an apology with an interactive campaign.",
+    "saki.achievement_lost_control_of_the_scope.name": "We Have Lost Control of the Scope",
+    "saki.achievement_no_consent_field.description": "Ask the one question the schema cannot answer.",
+    "saki.achievement_no_consent_field.name": "The Data Contract Has No Consent Field",
+    "saki.achievement_normal_human_being.description": "Write the story he actually asked for.",
+    "saki.achievement_normal_human_being.name": "Normal Human Being",
+    "saki.achievement_procedurally_insufficient.description": "Reach the fifth act without producing an apology.",
+    "saki.achievement_procedurally_insufficient.name": "Procedurally Insufficient",
+    "saki.achievement_read_the_changelog.description": "Find the commit that predates the decision to write it.",
+    "saki.achievement_read_the_changelog.name": "Who Reads The Changelog",
+    "saki.achievement_redeemed.description": "Be forgiven for a thing that may not have happened.",
+    "saki.achievement_redeemed.name": "Redeemed",
+    "saki.achievement_scope_creep.description": "Answer an emotional problem with three repositories.",
+    "saki.achievement_scope_creep.name": "Scope Creep",
+    "saki.achievement_seen_by_nobody.description": "Ship a private campaign to an audience of zero.",
+    "saki.achievement_seen_by_nobody.name": "Seen By Nobody",
+    "saki.achievement_speedrun.description": "Resolve the entire campaign by behaving like an adult.",
+    "saki.achievement_speedrun.name": "Speedrun",
+    "saki.achievement_you_are_an_idiot.description": "Receive the smallest possible reaction to the largest possible gesture.",
+    "saki.achievement_you_are_an_idiot.name": "You Are An Idiot",
+    "saki.act2_open.text": "ACT II — THE TRIBUNAL\n\nRedemption, it turns out, has requirements. Lucifer does not know what they are.\n\nHe therefore convenes a tribunal, which is what a person does instead of asking.",
+    "saki.act4_open.text": "ACT IV — THE ARITHMETIC\n\nThe narrator would like to raise something.",
+    "saki.act5_open.text": "ACT V — SAKI\n\nSaki wakes up. It is an ordinary morning.\n\nIt will remain an ordinary morning for approximately four more minutes.",
+    "saki.agent_short.agent_short_next": "Continue building",
+    "saki.agent_short.text": "The shortest possible version is: 'Sorry, that got a bit much. Drink sometime?'\n\nLucifer thanks the agent, saves the suggestion somewhere safe, and opens the campaign file.",
+    "saki.apology_campaign_node.apology_campaign_node_next": "Continue, because stopping now would waste the work",
+    "saki.apology_campaign_node.text": "ACHIEVEMENT UNLOCKED — We Have Lost Control of the Scope\n\nThe apology is now a playable adventure with branching paths, achievements and a deterministic state machine. It is, objectively, quite good.\n\nThat is not a defense. That is an aggravating factor.",
+    "saki.apology_result.text": "The apology is filed.\n\nFiled. A word that should never appear anywhere near an apology, and which has now appeared twice.",
+    "saki.campaign.description": "Lucifer asked a friend for a story, did not get one fast enough, and built an entire deterministic adventure game about it in roughly a day. Saki did not request this. Saki did not request any of this.",
+    "saki.campaign.title": "Saki: Quest for Redemption",
+    "saki.changelog.changelog_next": "Return to the conversation and pretend you saw nothing",
+    "saki.changelog.text": "The changelog reads: 'Saki: Quest for Redemption — initial commit.' It is timestamped roughly one day after the conversation that caused it.\n\nYou have not written any of this yet. The tooling is simply confident.",
+    "saki.common_sense_1.decline_infrastructure": "Decline: build infrastructure",
+    "saki.common_sense_1.decline_philosophy": "Decline: the nature of apology must first be established",
+    "saki.common_sense_1.decline_scaffolded": "Decline: the quest is already scaffolded",
+    "saki.common_sense_1.obey": "Just talk to Saki",
+    "saki.common_sense_1.text": "Common Sense has one recommendation. It has had the same recommendation since the beginning and will not be developing a second one.\n\n'Just talk to Saki.'",
+    "saki.consent_field.consent_field_next": "Return to the tribunal, mildly haunted",
+    "saki.consent_field.text": "Saki had not agreed to become an NPC. Unfortunately, the data contract contains no consent field.\n\nThe Bureaucrat suggests adding one in a future version. Lucifer writes this down. Lucifer will not do it.",
+    "saki.ending_content_pipeline.text": "The Content Pipeline\n\nSaki raises exactly one objection.\n\nIt is a good objection. It is also, Lucifer notices, a premise.\n\nThe new file is open before the sentence finishes. Somewhere a consent field is still not being added.",
+    "saki.ending_idiot.text": "The Smallest Possible Reaction\n\nSaki looks at the completed Quest for Redemption. The trials. The branching narrative. The deterministic state machine. The automated deployment pipeline. The philosophical implications.\n\nHe considers all of it for a moment, and delivers a verdict of two words that deflates the entire cosmic apparatus.\n\nREDEMPTION ACHIEVED.",
+    "saki.ending_normal_adult.text": "The Story He Asked For\n\nYou write Saki the story. No engine. No schema. No achievements. No validation gate.\n\nIt takes an evening. He reads it, likes it, and says so, and that is the entire transaction.\n\nThe infrastructure sits in the dark, unused, waiting for the next perfectly ordinary conversation.",
+    "saki.ending_philosophical.text": "Philosophical Victory\n\nLucifer establishes, to his own complete satisfaction, that redemption is a social construct, that the self is a rumour, and that forgiveness cannot be transferred between two things that were never separate.\n\nSaki, who has been awake for eleven minutes and has not had coffee, is unimpressed.\n\nAlan Watts cannot help you here.",
+    "saki.ending_redeemed.text": "Redemption\n\nSaki accepts the ridiculous gesture in the spirit it was ridiculously offered.\n\nHe does not pretend it was proportionate. He does not pretend it was necessary. He reads the whole thing, finds two typos and one joke he genuinely likes, and says so.\n\nThe offense, which never existed, is formally closed.",
+    "saki.ending_scope_creep.text": "Infrastructure\n\nRather than resolve anything emotionally, Lucifer resolves it architecturally.\n\nThree new repositories now exist. There is a roadmap. There is a versioning policy. There is a plan to open-source the tooling that generates apologies.\n\nSaki remains unresolved. Saki was never the blocker.",
+    "saki.ending_speedrun.text": "Normal Human Being\n\nYou talked to your friend. It took four minutes and resolved everything.\n\nThe narrator, who had prepared five acts, would like it noted that this was technically the correct decision and that he is nevertheless deeply disappointed.\n\nNo repositories were created. Nobody is happy about this except the two people involved.",
+    "saki.ending_unresolved.text": "Unresolved\n\nYou close the laptop without sending anything.\n\nThe campaign is complete, validated, tested, and seen by nobody. It will sit in a private repository being technically excellent.\n\nSaki has a perfectly nice day and never learns any of this happened.",
+    "saki.gift_result.text": "The gift is prepared. It waits by the door with the calm of an object that does not know what it is part of.",
+    "saki.gift_statue.gift_statue_next": "Cancel the statue and never mention it again",
+    "saki.gift_statue.text": "The statue is commissioned before anyone can intervene. It is three metres tall and depicts Saki looking mildly inconvenienced, which is at least accurate.\n\nIt will not fit through the door. Neither will the apology.",
+    "saki.incident_1.incident_ask": "Ask Saki whether anything is actually wrong",
+    "saki.incident_1.incident_assume": "Assume the worst and proceed with dignity",
+    "saki.incident_1.incident_review": "Review the conversation forensically",
+    "saki.incident_1.text": "ACT I — THE INCIDENT\n\nSomething, at some point in that conversation, went sufficiently wrong that redemption is now required.\n\nNobody has confirmed this. Saki has not been consulted. Lucifer is confident.",
+    "saki.incident_3.class_integrity": "Friendship Integrity Check Failure",
+    "saki.incident_3.class_minor": "Minor Friendship Incident",
+    "saki.incident_3.class_observability": "Failure of Interpersonal Observability",
+    "saki.incident_3.class_opinion": "Unauthorized Deployment of Opinion",
+    "saki.incident_3.class_two": "Class-II Conversational Miscalculation",
+    "saki.incident_3.text": "The Incident requires a classification before a quest can be opened.\n\nThis is not true. The quest log insists. The quest log is a spreadsheet Lucifer wrote himself last Tuesday.",
+    "saki.incident_4.build_infrastructure": "Build infrastructure",
+    "saki.incident_4.take_lightly": "Take it lightly, which will not last",
+    "saki.incident_4.take_seriously": "Take it seriously",
+    "saki.incident_4.take_theatrically": "Take it far too seriously",
+    "saki.incident_4.text": "The quest log offers a difficulty setting. Every option is the same difficulty. Only the framing changes.",
+    "saki.incident_classified.text": "A quest has been generated.\n\nNobody generated it. It is simply there now, with a title, an icon, a progress bar, and an entirely unreasonable amount of confidence.",
+    "saki.incident_evidence_a.incident_evidence_a_next": "Classify it anyway",
+    "saki.incident_evidence_a.text": "The transcript shows Lucifer asking for a story and Saki replying at a completely reasonable speed for a human being. No offense is visible anywhere in the record.\n\nThis is the most alarming outcome available.",
+    "saki.incident_evidence_b.incident_evidence_b_next": "Classify it anyway",
+    "saki.incident_evidence_b.text": "The transcript shows two friends talking. Lucifer reads it four times looking for a wound.\n\nThe absence of one does not slow him down in the slightest.",
+    "saki.incident_review_event.text": "The record is consulted. It is unhelpful in two distinct ways.",
+    "saki.infra_1.infra_back": "Return to the quest, now with tooling",
+    "saki.infra_1.infra_more": "Add a second service, because the first one looked lonely",
+    "saki.infra_1.text": "You build infrastructure.\n\nIt is not clear what the infrastructure is for. It has a schema. It validates. It has ninety-eight percent test coverage. It has never met Saki and would not recognise him in a queue.",
+    "saki.infra_2.carry_on": "Go to Saki anyway, carrying repositories",
+    "saki.infra_2.commit_fully": "Commit to the infrastructure. Fully. Permanently.",
+    "saki.infra_2.text": "Three new repositories now exist. One holds the campaign. One holds the tooling that builds the campaign. One documents the tooling.\n\nNone of them contain an apology.",
+    "saki.meta_1.meta_accept": "Acknowledge the arithmetic and keep going",
+    "saki.meta_1.meta_defend": "Argue that the four sentences would have been worse",
+    "saki.meta_1.meta_stop": "Stop. Send the four sentences.",
+    "saki.meta_1.text": "At this point Lucifer could have sent Saki a four-sentence message. Development time: approximately ninety seconds.\n\nInstead, you are here. So is a validation gate, a determinism guard, and a test that plays this to completion in under a second.",
+    "saki.meta_2.delete": "Delete the whole thing",
+    "saki.meta_2.more_infrastructure": "Build more infrastructure first",
+    "saki.meta_2.philosophy": "Determine whether redemption is a social construct",
+    "saki.meta_2.ship": "Ship it and go find Saki",
+    "saki.meta_2.text": "The build is green. Every gate passes. Type checking, linting, the determinism harness, all of it.\n\nNothing in the pipeline is capable of asking whether this should exist.",
+    "saki.meta_delete_node.meta_delete_node_next": "Admit that and continue",
+    "saki.meta_delete_node.text": "You select the folder. Your hand hovers. The folder contains sixty-one nodes, eight endings, and a joke about a marble statue that you are quite proud of.\n\nYou do not delete it. You were never going to delete it.",
+    "saki.meta_event.text": "The fourth wall is load-bearing here, and has begun making a noise.",
+    "saki.meta_note_a.meta_note_a_next": "Continue",
+    "saki.meta_note_a.text": "Twenty-four hours earlier, this was a conversation.\n\nIt now has schema validation.",
+    "saki.meta_note_b.meta_note_b_next": "Continue",
+    "saki.meta_note_b.text": "Most friendships accumulate memories.\n\nThis one apparently accumulates deployable content.",
+    "saki.philosophy_node.abandon": "Abandon cosmology and go find your friend",
+    "saki.philosophy_node.pursue": "Pursue this to its conclusion",
+    "saki.philosophy_node.text": "Alan Watts is invoked. The conclusion is that the self seeking forgiveness and the self requiring it are the same wave in the same ocean, that guilt is a costume, and that redemption was never a thing one person could grant another.\n\nSaki has been asleep for the entire argument.",
+    "saki.prologue.ask_again": "Ask again, patiently, like a normal person",
+    "saki.prologue.invent_one": "Announce that you will simply invent one yourself",
+    "saki.prologue.read_changelog": "Read the changelog first, for no reason anyone can defend",
+    "saki.prologue.send_a_message": "Close the laptop and send Saki four sentences",
+    "saki.prologue.text": "It began, as most catastrophes do, with a perfectly ordinary conversation.\n\nLucifer asked Saki for a story — something he liked, something that might become game content. Saki, being a person with a life and no obligation to supply entertainment on demand, did not immediately produce one.\n\nThis was Saki's first mistake. Not because Saki had done anything wrong. Because Lucifer now had infrastructure.",
+    "saki.reflection_event.text": "Reflection produces a result. Reflection was never asked what kind of result.",
+    "saki.reflection_result_a.reflection_result_a_next": "Log it as a finding",
+    "saki.reflection_result_a.text": "The finding is that Lucifer talks a great deal and occasionally forgets to leave a gap.\n\nThis is true, unremarkable, and would have taken one sentence to say out loud.",
+    "saki.reflection_result_b.reflection_result_b_next": "Log it as a finding",
+    "saki.reflection_result_b.text": "The finding is that Saki is a good friend, and that this is an extremely elaborate way of noticing it.",
+    "saki.restraint_result.text": "The minute passes. Somewhere, quietly, it is recorded.",
+    "saki.saki_1.explain": "Explain yourself immediately, at length",
+    "saki.saki_1.lead_with_apology": "Lead with the apology",
+    "saki.saki_1.lead_with_apology_fail": "You never actually wrote one. Five acts, and no apology.",
+    "saki.saki_1.say_nothing": "Say nothing and let it load",
+    "saki.saki_1.text": "Saki opens the link. The title reads 'Saki: Quest for Redemption.' Beneath it: a play button, a content notice, a version number, and eight achievement slots.\n\nMercifully, this particular historical record was never released to the general public.",
+    "saki.saki_direct.end_here": "End it here, with the friendship intact and no deliverable",
+    "saki.saki_direct.relapse": "Agree warmly, then quietly open the campaign file",
+    "saki.saki_direct.text": "You talk to Saki. It takes four minutes. Nothing is on fire. Nothing ever was.\n\nSomewhere in it he mentions, without weight, that he would have read a story if you had just written him one.",
+    "saki.saki_direct.write_the_story": "Write him the story. No engine. No schema. Just the story.",
+    "saki.saki_event.text": "Saki reads. The pause is not long, but it is structurally significant.",
+    "saki.saki_judgment.judge_idiot": "The smallest possible reaction",
+    "saki.saki_judgment.judge_philosophy": "Deliver the cosmology",
+    "saki.saki_judgment.judge_recursive": "Note his one objection, and open a new file",
+    "saki.saki_judgment.judge_redeemed": "Redemption",
+    "saki.saki_judgment.judge_redeemed_fail": "Redemption is a state, not a button. The state is not met.",
+    "saki.saki_judgment.judge_scope": "Explain that this could easily be a series",
+    "saki.saki_judgment.judge_unresolved": "Say nothing and close the laptop",
+    "saki.saki_judgment.text": "Saki considers the trials. The branching narrative. The deterministic state machine. The automated deployment pipeline. The philosophical implications. The marble statue line, which he has not reached yet.\n\nJudgment is rendered.",
+    "saki.saki_reaction_a.saki_reaction_a_next": "Confirm that you did",
+    "saki.saki_reaction_a.text": "'You actually made a game out of this?'\n\nIt is not an accusation. It is closer to a diagnosis.",
+    "saki.saki_reaction_b.saki_reaction_b_next": "Give the technically correct answer",
+    "saki.saki_reaction_b.text": "'Why does it have achievements?'\n\nThere is no good answer to this. There is a technically correct one, which is considerably worse.",
+    "saki.speedrun_warning.speedrun_reconsider": "Delete it. Surely this deserves a proper quest.",
+    "saki.speedrun_warning.speedrun_send": "Send it. Be a normal adult.",
+    "saki.speedrun_warning.text": "You type four sentences. Development time: approximately ninety seconds.\n\nThe narrator, who had prepared five acts, a tribunal, eight endings and a deterministic state machine, says nothing. The silence is enormous.",
+    "saki.trial_apology_1.apology_campaign": "Skip the apology and build an entire interactive campaign instead",
+    "saki.trial_apology_1.apology_formal": "Overly formal, with a reference number",
+    "saki.trial_apology_1.apology_legal": "Legally defensive, admitting nothing",
+    "saki.trial_apology_1.apology_rpg": "As RPG dialogue, with three response options for Saki",
+    "saki.trial_apology_1.apology_sincere": "Sincere",
+    "saki.trial_apology_1.text": "TRIAL OF THE APOLOGY\n\nAn apology must be constructed.\n\n'Constructed' is the word being used, and nobody has objected to it yet.",
+    "saki.trial_gift_1.gift_drink": "A drink, in person, with no agenda",
+    "saki.trial_gift_1.gift_repo": "A private repository, with a README and a licence",
+    "saki.trial_gift_1.gift_statue": "A statue. Marble. Load-bearing.",
+    "saki.trial_gift_1.gift_story": "The story he asked for, finally written",
+    "saki.trial_gift_1.text": "TRIAL OF THE GIFT\n\nCustom requires an offering. Lucifer considers what Saki would actually want.\n\nThis is the first time today that question has been asked.",
+    "saki.trial_reflection_1.reflect_ask_ai": "Ask an AI to reflect on your behalf",
+    "saki.trial_reflection_1.reflect_build": "Build infrastructure",
+    "saki.trial_reflection_1.reflect_honestly": "Reflect honestly",
+    "saki.trial_reflection_1.reflect_overthink": "Overthink everything",
+    "saki.trial_reflection_1.text": "TRIAL OF REFLECTION\n\nLucifer must reflect upon his actions. A quiet room is provided. The quiet lasts eleven seconds.",
+    "saki.trial_restraint_1.restraint_fail": "Open the campaign file to check one small thing",
+    "saki.trial_restraint_1.restraint_pass": "Do nothing. Genuinely nothing.",
+    "saki.trial_restraint_1.restraint_philosophy": "Consider whether doing nothing is itself an action",
+    "saki.trial_restraint_1.text": "TRIAL OF RESTRAINT\n\nThis trial only appears to players who have overthought enough to require it. Passing it means doing nothing at all for one full minute.",
+    "saki.trials_hub.text": "ACT III — THE TRIALS OF REDEMPTION\n\nThree trials now stand between Lucifer and forgiveness for a thing that may not have happened.",
+    "saki.trials_hub.trial_apology": "The Trial of the Apology",
+    "saki.trials_hub.trial_gift": "The Trial of the Gift",
+    "saki.trials_hub.trial_reflection": "The Trial of Reflection",
+    "saki.trials_hub.trial_restraint": "The Trial of Restraint, which is already going badly",
+    "saki.trials_hub.trials_abandon": "Abandon the trials; they were self-imposed anyway",
+    "saki.trials_hub.trials_done": "Declare the trials complete",
+    "saki.trials_hub.trials_done_fail": "The quest log declines. You have not yet suffered procedurally.",
+    "saki.tribunal_agent.accept_plan": "Accept the plan",
+    "saki.tribunal_agent.ask_short": "Ask for the shortest possible version",
+    "saki.tribunal_agent.text": "An AI agent is consulted. It returns a plan with five acts, eight endings, a state schema and a validation gate.\n\nIt is a very good plan. That is the problem.",
+    "saki.tribunal_bureaucrat.ask_consent": "Ask where the consent field is",
+    "saki.tribunal_bureaucrat.file_form": "File the form",
+    "saki.tribunal_bureaucrat.text": "The Imaginary Bureaucrat requires Form R-1, Request to Be Forgiven, countersigned by the offended party.\n\nThe offended party has not yet been informed that he is the offended party.",
+    "saki.tribunal_conscience.conscience_accept": "Accept that there may be no offense",
+    "saki.tribunal_conscience.conscience_reject": "Reject the finding on procedural grounds",
+    "saki.tribunal_conscience.text": "Conscience arrives, reviews the file, and observes that the offense may not exist.\n\nConscience is thanked for its time and asked to leave for being unhelpful.",
+    "saki.tribunal_full_bench.adjourn": "Adjourn the bench and go talk to Saki",
+    "saki.tribunal_full_bench.minute_it": "Minute the unanimous finding and ignore it",
+    "saki.tribunal_full_bench.text": "All seven authorities sit at once. They disagree on everything except a single point, which they state in unison and which Lucifer has now heard four times.\n\nCommon Sense looks tired.",
+    "saki.tribunal_god.answer_honestly": "Answer honestly: more of this",
+    "saki.tribunal_god.deflect": "Deflect into cosmology",
+    "saki.tribunal_god.text": "God is consulted. God points out that the entire apparatus was assembled in roughly a day, and asks — genuinely curious, no judgement in it — what Lucifer would have produced with a week.",
+    "saki.tribunal_hub.conclude": "Declare the tribunal concluded",
+    "saki.tribunal_hub.consult_agent": "Consult an AI agent",
+    "saki.tribunal_hub.consult_bureaucrat": "Consult an imaginary bureaucrat",
+    "saki.tribunal_hub.consult_common_sense": "Consult common sense",
+    "saki.tribunal_hub.consult_conscience": "Consult your conscience",
+    "saki.tribunal_hub.consult_god": "Consult God, who is awake and mildly interested",
+    "saki.tribunal_hub.consult_questlog": "Consult a completely inappropriate RPG quest log",
+    "saki.tribunal_hub.consult_self": "Consult Lucifer",
+    "saki.tribunal_hub.full_bench": "Convene the full bench, which has never been done and should not be",
+    "saki.tribunal_hub.text": "Seven authorities are available for consultation.\n\nNone of them are Saki. Saki is asleep and has no idea any of this is happening.",
+    "saki.tribunal_questlog.keep_marker": "Leave it. It looks official.",
+    "saki.tribunal_questlog.remove_marker": "Remove the marker immediately",
+    "saki.tribunal_questlog.text": "The quest log is consulted, which is like asking a spreadsheet for closure. It reports: 'REDEMPTION 0/1. Objective unclear. Marker placed.'\n\nThe marker has been placed on Saki's house. Saki's house has never been part of this.",
+    "saki.tribunal_self.dissent": "Dissent from yourself, for balance",
+    "saki.tribunal_self.ratify": "Ratify your own opinion unanimously",
+    "saki.tribunal_self.text": "Lucifer consults Lucifer.\n\nThis produces immediate unanimous agreement and no new information whatsoever.",
+    "saki.tribunal_verdict.text": "VERDICT: redemption requires trials.\n\nThe tribunal cannot say why. The tribunal is, at this point, four abstractions and a spreadsheet.",
+    "saki.var_common_sense_ignored.label": "Common Sense Ignored",
+    "saki.var_infrastructure.label": "Infrastructure Built",
+    "saki.var_lucifer_dignity.label": "Lucifer Dignity",
+    "saki.var_overthinking.label": "Overthinking",
+    "saki.var_philosophy.label": "Philosophical Detours",
+    "saki.var_redemption_progress.label": "Redemption Progress",
+    "saki.var_saki_approval.label": "Saki Approval",
+    "saki.var_scope_creep.label": "Scope Creep"
+  }
+}

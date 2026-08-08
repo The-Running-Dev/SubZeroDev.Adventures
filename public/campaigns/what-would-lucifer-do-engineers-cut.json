@@ -1,0 +1,2463 @@
+{
+  "formatVersion": 1,
+  "catalog": {
+    "title": "What Would Lucifer Do? — Engineer's Cut",
+    "description": "The sixteen predictions What Would Lucifer Do? relocated for a general audience — thirteen technical, three software-career — told here in their original wording: the real rubric, the real pipelines, the real policy.",
+    "duration": "25–35 min",
+    "contentNotice": "Strong language, religious satire, recognizable parody, and technical jargon used completely unironically.",
+    "featured": false,
+    "hidden": true
+  },
+  "campaign": {
+    "id": "what-would-lucifer-do-engineers-cut",
+    "kindId": "story-graph",
+    "version": "1.0.0",
+    "titleKey": "wwldx.campaign.title",
+    "content": {
+      "descriptionKey": "wwldx.campaign.description",
+      "variables": {
+        "predictions_correct": {
+          "type": "int",
+          "initial": 0,
+          "min": 0,
+          "max": 16,
+          "visible": true,
+          "labelKey": "wwldx.var_predictions_correct.label"
+        },
+        "no_fucking_way": {
+          "type": "int",
+          "initial": 0,
+          "min": 0,
+          "max": 3,
+          "visible": true,
+          "labelKey": "wwldx.var_no_fucking_way.label"
+        },
+        "bureaucratic_escalation": {
+          "type": "int",
+          "initial": 0,
+          "min": 0,
+          "max": 2,
+          "visible": true,
+          "labelKey": "wwldx.var_bureaucratic_escalation.label"
+        },
+        "unnecessary_escalation": {
+          "type": "int",
+          "initial": 0,
+          "min": 0,
+          "max": 3,
+          "visible": true,
+          "labelKey": "wwldx.var_unnecessary_escalation.label"
+        },
+        "surprisingly_reasonable": {
+          "type": "int",
+          "initial": 0,
+          "min": 0,
+          "max": 2,
+          "visible": true,
+          "labelKey": "wwldx.var_surprisingly_reasonable.label"
+        },
+        "philosophical_detours": {
+          "type": "int",
+          "initial": 0,
+          "min": 0,
+          "max": 1,
+          "visible": true,
+          "labelKey": "wwldx.var_philosophical_detours.label"
+        },
+        "ridiculous_engineering": {
+          "type": "int",
+          "initial": 0,
+          "min": 0,
+          "max": 5,
+          "visible": true,
+          "labelKey": "wwldx.var_ridiculous_engineering.label"
+        },
+        "reasonable_assumption": {
+          "type": "int",
+          "initial": 0,
+          "min": 0,
+          "max": 16,
+          "visible": true,
+          "labelKey": "wwldx.var_reasonable_assumption.label"
+        },
+        "streak": {
+          "type": "int",
+          "initial": 0,
+          "min": 0,
+          "max": 16
+        },
+        "named_the_ai": {
+          "type": "bool",
+          "initial": false
+        },
+        "declined_the_money": {
+          "type": "bool",
+          "initial": false
+        },
+        "applied_after_decline": {
+          "type": "bool",
+          "initial": false
+        },
+        "guessed_close_but_wrong": {
+          "type": "bool",
+          "initial": false
+        }
+      },
+      "nodes": {
+        "prologue": {
+          "id": "prologue",
+          "kind": "auto",
+          "textKey": "wwldx.prologue.text",
+          "goto": "ch3_p1"
+        },
+        "ch3_p1": {
+          "id": "ch3_p1",
+          "kind": "choice",
+          "textKey": "wwldx.ch3_p1.text",
+          "choices": [
+            {
+              "id": "ch3_p1_correct",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "predictions_correct",
+                  "by": 1
+                },
+                {
+                  "op": "increment",
+                  "var": "streak",
+                  "by": 1
+                },
+                {
+                  "op": "increment",
+                  "var": "bureaucratic_escalation",
+                  "by": 1
+                }
+              ],
+              "goto": "ch3_p1_hit",
+              "labelKey": "wwldx.ch3_p1.ch3_p1_correct"
+            },
+            {
+              "id": "ch3_p1_perfect",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "streak",
+                  "value": 0
+                },
+                {
+                  "op": "increment",
+                  "var": "reasonable_assumption",
+                  "by": 1
+                }
+              ],
+              "goto": "ch3_p1_miss",
+              "labelKey": "wwldx.ch3_p1.ch3_p1_perfect"
+            },
+            {
+              "id": "ch3_p1_fail",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "streak",
+                  "value": 0
+                }
+              ],
+              "goto": "ch3_p1_miss",
+              "labelKey": "wwldx.ch3_p1.ch3_p1_fail"
+            },
+            {
+              "id": "ch3_p1_ignored",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "streak",
+                  "value": 0
+                }
+              ],
+              "goto": "ch3_p1_miss",
+              "labelKey": "wwldx.ch3_p1.ch3_p1_ignored"
+            },
+            {
+              "id": "leave",
+              "goto": "ending_walk_away",
+              "labelKey": "wwldx.ch3_p1.leave"
+            }
+          ]
+        },
+        "ch3_p1_hit": {
+          "id": "ch3_p1_hit",
+          "kind": "choice",
+          "textKey": "wwldx.ch3_p1_hit.text",
+          "choices": [
+            {
+              "id": "ch3_p1_hit_next",
+              "goto": "ch3_p2",
+              "labelKey": "wwldx.ch3_p1_hit.ch3_p1_hit_next"
+            }
+          ]
+        },
+        "ch3_p1_miss": {
+          "id": "ch3_p1_miss",
+          "kind": "choice",
+          "textKey": "wwldx.ch3_p1_miss.text",
+          "choices": [
+            {
+              "id": "ch3_p1_miss_next",
+              "goto": "ch3_p2",
+              "labelKey": "wwldx.ch3_p1_miss.ch3_p1_miss_next"
+            }
+          ]
+        },
+        "ch3_p2": {
+          "id": "ch3_p2",
+          "kind": "choice",
+          "textKey": "wwldx.ch3_p2.text",
+          "choices": [
+            {
+              "id": "ch3_p2_correct",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "predictions_correct",
+                  "by": 1
+                },
+                {
+                  "op": "increment",
+                  "var": "streak",
+                  "by": 1
+                },
+                {
+                  "op": "increment",
+                  "var": "bureaucratic_escalation",
+                  "by": 1
+                }
+              ],
+              "goto": "ch3_p2_hit",
+              "labelKey": "wwldx.ch3_p2.ch3_p2_correct"
+            },
+            {
+              "id": "ch3_p2_thanks",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "streak",
+                  "value": 0
+                }
+              ],
+              "goto": "ch3_p2_miss",
+              "labelKey": "wwldx.ch3_p2.ch3_p2_thanks"
+            },
+            {
+              "id": "ch3_p2_quiet",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "streak",
+                  "value": 0
+                },
+                {
+                  "op": "increment",
+                  "var": "reasonable_assumption",
+                  "by": 1
+                }
+              ],
+              "goto": "ch3_p2_miss",
+              "labelKey": "wwldx.ch3_p2.ch3_p2_quiet"
+            },
+            {
+              "id": "ch3_p2_fired",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "streak",
+                  "value": 0
+                }
+              ],
+              "goto": "ch3_p2_miss",
+              "labelKey": "wwldx.ch3_p2.ch3_p2_fired"
+            }
+          ]
+        },
+        "ch3_p2_hit": {
+          "id": "ch3_p2_hit",
+          "kind": "choice",
+          "textKey": "wwldx.ch3_p2_hit.text",
+          "choices": [
+            {
+              "id": "ch3_p2_hit_next",
+              "goto": "ch3_p2_fork",
+              "labelKey": "wwldx.ch3_p2_hit.ch3_p2_hit_next"
+            }
+          ]
+        },
+        "ch3_p2_miss": {
+          "id": "ch3_p2_miss",
+          "kind": "choice",
+          "textKey": "wwldx.ch3_p2_miss.text",
+          "choices": [
+            {
+              "id": "ch3_p2_miss_next",
+              "goto": "ch3_p2_fork",
+              "labelKey": "wwldx.ch3_p2_miss.ch3_p2_miss_next"
+            }
+          ]
+        },
+        "ch3_p2_fork": {
+          "id": "ch3_p2_fork",
+          "kind": "random",
+          "textKey": "wwldx.ch3_p2_fork.text",
+          "transitions": [
+            {
+              "weight": 1,
+              "goto": "ch3_p2_fork_a"
+            },
+            {
+              "weight": 1,
+              "goto": "ch3_p2_fork_b"
+            }
+          ]
+        },
+        "ch3_p2_fork_a": {
+          "id": "ch3_p2_fork_a",
+          "kind": "choice",
+          "textKey": "wwldx.ch3_p2_fork_a.text",
+          "choices": [
+            {
+              "id": "ch3_p2_fork_a_next",
+              "goto": "ch3_p3",
+              "labelKey": "wwldx.ch3_p2_fork_a.ch3_p2_fork_a_next"
+            }
+          ]
+        },
+        "ch3_p2_fork_b": {
+          "id": "ch3_p2_fork_b",
+          "kind": "choice",
+          "textKey": "wwldx.ch3_p2_fork_b.text",
+          "choices": [
+            {
+              "id": "ch3_p2_fork_b_next",
+              "goto": "ch3_p3",
+              "labelKey": "wwldx.ch3_p2_fork_b.ch3_p2_fork_b_next"
+            }
+          ]
+        },
+        "ch3_p3": {
+          "id": "ch3_p3",
+          "kind": "choice",
+          "textKey": "wwldx.ch3_p3.text",
+          "choices": [
+            {
+              "id": "ch3_p3_correct",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "predictions_correct",
+                  "by": 1
+                },
+                {
+                  "op": "increment",
+                  "var": "streak",
+                  "by": 1
+                },
+                {
+                  "op": "increment",
+                  "var": "surprisingly_reasonable",
+                  "by": 1
+                }
+              ],
+              "goto": "ch3_p3_hit",
+              "labelKey": "wwldx.ch3_p3.ch3_p3_correct"
+            },
+            {
+              "id": "ch3_p3_argue",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "streak",
+                  "value": 0
+                }
+              ],
+              "goto": "ch3_p3_miss",
+              "labelKey": "wwldx.ch3_p3.ch3_p3_argue"
+            },
+            {
+              "id": "ch3_p3_shrink",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "streak",
+                  "value": 0
+                },
+                {
+                  "op": "increment",
+                  "var": "reasonable_assumption",
+                  "by": 1
+                }
+              ],
+              "goto": "ch3_p3_miss",
+              "labelKey": "wwldx.ch3_p3.ch3_p3_shrink"
+            }
+          ]
+        },
+        "ch3_p3_hit": {
+          "id": "ch3_p3_hit",
+          "kind": "choice",
+          "textKey": "wwldx.ch3_p3_hit.text",
+          "choices": [
+            {
+              "id": "ch3_p3_hit_next",
+              "goto": "disc_hub_ch3",
+              "labelKey": "wwldx.ch3_p3_hit.ch3_p3_hit_next"
+            }
+          ]
+        },
+        "ch3_p3_miss": {
+          "id": "ch3_p3_miss",
+          "kind": "choice",
+          "textKey": "wwldx.ch3_p3_miss.text",
+          "choices": [
+            {
+              "id": "ch3_p3_miss_next",
+              "goto": "disc_hub_ch3",
+              "labelKey": "wwldx.ch3_p3_miss.ch3_p3_miss_next"
+            }
+          ]
+        },
+        "disc_hub_ch3": {
+          "id": "disc_hub_ch3",
+          "kind": "choice",
+          "textKey": "wwldx.disc_hub_ch3.text",
+          "choices": [
+            {
+              "id": "website",
+              "showWhen": {
+                "field": "visited.disc_website",
+                "operator": "equals",
+                "value": 0
+              },
+              "goto": "disc_website",
+              "labelKey": "wwldx.disc_hub_ch3.website"
+            },
+            {
+              "id": "wizard",
+              "showWhen": {
+                "field": "visited.disc_wizard",
+                "operator": "equals",
+                "value": 0
+              },
+              "goto": "disc_wizard",
+              "labelKey": "wwldx.disc_hub_ch3.wizard"
+            },
+            {
+              "id": "statemachine",
+              "showWhen": {
+                "field": "visited.disc_statemachine",
+                "operator": "equals",
+                "value": 0
+              },
+              "goto": "disc_statemachine",
+              "labelKey": "wwldx.disc_hub_ch3.statemachine"
+            },
+            {
+              "id": "webapi",
+              "showWhen": {
+                "field": "visited.disc_webapi",
+                "operator": "equals",
+                "value": 0
+              },
+              "goto": "disc_webapi",
+              "labelKey": "wwldx.disc_hub_ch3.webapi"
+            },
+            {
+              "id": "move_on",
+              "goto": "ch4_p1",
+              "labelKey": "wwldx.disc_hub_ch3.move_on"
+            }
+          ]
+        },
+        "disc_website": {
+          "id": "disc_website",
+          "kind": "choice",
+          "textKey": "wwldx.disc_website.text",
+          "choices": [
+            {
+              "id": "disc_website_next",
+              "goto": "disc_hub_ch3",
+              "labelKey": "wwldx.disc_website.disc_website_next"
+            }
+          ]
+        },
+        "disc_wizard": {
+          "id": "disc_wizard",
+          "kind": "choice",
+          "textKey": "wwldx.disc_wizard.text",
+          "choices": [
+            {
+              "id": "disc_wizard_next",
+              "goto": "disc_hub_ch3",
+              "labelKey": "wwldx.disc_wizard.disc_wizard_next"
+            }
+          ]
+        },
+        "disc_statemachine": {
+          "id": "disc_statemachine",
+          "kind": "choice",
+          "textKey": "wwldx.disc_statemachine.text",
+          "choices": [
+            {
+              "id": "disc_statemachine_next",
+              "goto": "disc_hub_ch3",
+              "labelKey": "wwldx.disc_statemachine.disc_statemachine_next"
+            }
+          ]
+        },
+        "disc_webapi": {
+          "id": "disc_webapi",
+          "kind": "choice",
+          "textKey": "wwldx.disc_webapi.text",
+          "choices": [
+            {
+              "id": "disc_webapi_next",
+              "goto": "disc_hub_ch3",
+              "labelKey": "wwldx.disc_webapi.disc_webapi_next"
+            }
+          ]
+        },
+        "ch4_p1": {
+          "id": "ch4_p1",
+          "kind": "choice",
+          "textKey": "wwldx.ch4_p1.text",
+          "choices": [
+            {
+              "id": "ch4_p1_correct",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "predictions_correct",
+                  "by": 1
+                },
+                {
+                  "op": "increment",
+                  "var": "streak",
+                  "by": 1
+                },
+                {
+                  "op": "increment",
+                  "var": "ridiculous_engineering",
+                  "by": 1
+                }
+              ],
+              "goto": "ch4_p1_hit",
+              "labelKey": "wwldx.ch4_p1.ch4_p1_correct"
+            },
+            {
+              "id": "ch4_p1_apply",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "streak",
+                  "value": 0
+                },
+                {
+                  "op": "increment",
+                  "var": "reasonable_assumption",
+                  "by": 1
+                }
+              ],
+              "goto": "ch4_p1_miss",
+              "labelKey": "wwldx.ch4_p1.ch4_p1_apply"
+            },
+            {
+              "id": "ch4_p1_email",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "streak",
+                  "value": 0
+                }
+              ],
+              "goto": "ch4_p1_miss",
+              "labelKey": "wwldx.ch4_p1.ch4_p1_email"
+            }
+          ]
+        },
+        "ch4_p1_hit": {
+          "id": "ch4_p1_hit",
+          "kind": "choice",
+          "textKey": "wwldx.ch4_p1_hit.text",
+          "choices": [
+            {
+              "id": "ch4_p1_hit_next",
+              "goto": "ch4_p2",
+              "labelKey": "wwldx.ch4_p1_hit.ch4_p1_hit_next"
+            }
+          ]
+        },
+        "ch4_p1_miss": {
+          "id": "ch4_p1_miss",
+          "kind": "choice",
+          "textKey": "wwldx.ch4_p1_miss.text",
+          "choices": [
+            {
+              "id": "ch4_p1_miss_next",
+              "goto": "ch4_p2",
+              "labelKey": "wwldx.ch4_p1_miss.ch4_p1_miss_next"
+            }
+          ]
+        },
+        "ch4_p2": {
+          "id": "ch4_p2",
+          "kind": "choice",
+          "textKey": "wwldx.ch4_p2.text",
+          "choices": [
+            {
+              "id": "ch4_p2_correct",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "predictions_correct",
+                  "by": 1
+                },
+                {
+                  "op": "increment",
+                  "var": "streak",
+                  "by": 1
+                },
+                {
+                  "op": "increment",
+                  "var": "no_fucking_way",
+                  "by": 1
+                },
+                {
+                  "op": "set",
+                  "var": "declined_the_money",
+                  "value": true
+                }
+              ],
+              "goto": "ch4_p2_hit",
+              "labelKey": "wwldx.ch4_p2.ch4_p2_correct"
+            },
+            {
+              "id": "ch4_p2_accept",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "streak",
+                  "value": 0
+                },
+                {
+                  "op": "increment",
+                  "var": "reasonable_assumption",
+                  "by": 1
+                }
+              ],
+              "goto": "ch4_p2_decline_flag",
+              "labelKey": "wwldx.ch4_p2.ch4_p2_accept"
+            },
+            {
+              "id": "ch4_p2_negotiate",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "streak",
+                  "value": 0
+                }
+              ],
+              "goto": "ch4_p2_miss",
+              "labelKey": "wwldx.ch4_p2.ch4_p2_negotiate"
+            }
+          ]
+        },
+        "ch4_p2_hit": {
+          "id": "ch4_p2_hit",
+          "kind": "choice",
+          "textKey": "wwldx.ch4_p2_hit.text",
+          "choices": [
+            {
+              "id": "ch4_p2_hit_next",
+              "goto": "ch4_p3",
+              "labelKey": "wwldx.ch4_p2_hit.ch4_p2_hit_next"
+            }
+          ]
+        },
+        "ch4_p2_miss": {
+          "id": "ch4_p2_miss",
+          "kind": "choice",
+          "textKey": "wwldx.ch4_p2_miss.text",
+          "choices": [
+            {
+              "id": "ch4_p2_miss_next",
+              "goto": "ch4_p3",
+              "labelKey": "wwldx.ch4_p2_miss.ch4_p2_miss_next"
+            }
+          ]
+        },
+        "ch4_p2_decline_flag": {
+          "id": "ch4_p2_decline_flag",
+          "kind": "choice",
+          "textKey": "wwldx.ch4_p2_decline_flag.text",
+          "choices": [
+            {
+              "id": "ch4_p2_decline_flag_next",
+              "goto": "ch4_p3",
+              "labelKey": "wwldx.ch4_p2_decline_flag.ch4_p2_decline_flag_next"
+            }
+          ]
+        },
+        "ch4_p3": {
+          "id": "ch4_p3",
+          "kind": "choice",
+          "textKey": "wwldx.ch4_p3.text",
+          "choices": [
+            {
+              "id": "ch4_p3_correct",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "predictions_correct",
+                  "by": 1
+                },
+                {
+                  "op": "increment",
+                  "var": "streak",
+                  "by": 1
+                },
+                {
+                  "op": "increment",
+                  "var": "ridiculous_engineering",
+                  "by": 1
+                },
+                {
+                  "op": "set",
+                  "var": "applied_after_decline",
+                  "value": true
+                }
+              ],
+              "goto": "ch4_p3_hit",
+              "labelKey": "wwldx.ch4_p3.ch4_p3_correct"
+            },
+            {
+              "id": "ch4_p3_ignore",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "streak",
+                  "value": 0
+                },
+                {
+                  "op": "increment",
+                  "var": "reasonable_assumption",
+                  "by": 1
+                }
+              ],
+              "goto": "ch4_p3_miss",
+              "labelKey": "wwldx.ch4_p3.ch4_p3_ignore"
+            },
+            {
+              "id": "ch4_p3_screenshot",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "streak",
+                  "value": 0
+                }
+              ],
+              "goto": "ch4_p3_miss",
+              "labelKey": "wwldx.ch4_p3.ch4_p3_screenshot"
+            }
+          ]
+        },
+        "ch4_p3_hit": {
+          "id": "ch4_p3_hit",
+          "kind": "choice",
+          "textKey": "wwldx.ch4_p3_hit.text",
+          "choices": [
+            {
+              "id": "ch4_p3_hit_next",
+              "goto": "ch5_p1",
+              "labelKey": "wwldx.ch4_p3_hit.ch4_p3_hit_next"
+            }
+          ]
+        },
+        "ch4_p3_miss": {
+          "id": "ch4_p3_miss",
+          "kind": "choice",
+          "textKey": "wwldx.ch4_p3_miss.text",
+          "choices": [
+            {
+              "id": "ch4_p3_miss_next",
+              "goto": "ch5_p1",
+              "labelKey": "wwldx.ch4_p3_miss.ch4_p3_miss_next"
+            }
+          ]
+        },
+        "ch5_p1": {
+          "id": "ch5_p1",
+          "kind": "choice",
+          "textKey": "wwldx.ch5_p1.text",
+          "choices": [
+            {
+              "id": "ch5_p1_correct",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "predictions_correct",
+                  "by": 1
+                },
+                {
+                  "op": "increment",
+                  "var": "streak",
+                  "by": 1
+                },
+                {
+                  "op": "increment",
+                  "var": "no_fucking_way",
+                  "by": 1
+                },
+                {
+                  "op": "set",
+                  "var": "named_the_ai",
+                  "value": true
+                }
+              ],
+              "goto": "ch5_p1_hit",
+              "labelKey": "wwldx.ch5_p1.ch5_p1_correct"
+            },
+            {
+              "id": "ch5_p1_unplug",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "streak",
+                  "value": 0
+                },
+                {
+                  "op": "increment",
+                  "var": "reasonable_assumption",
+                  "by": 1
+                }
+              ],
+              "goto": "ch5_p1_miss",
+              "labelKey": "wwldx.ch5_p1.ch5_p1_unplug"
+            },
+            {
+              "id": "ch5_p1_complain",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "streak",
+                  "value": 0
+                }
+              ],
+              "goto": "ch5_p1_miss",
+              "labelKey": "wwldx.ch5_p1.ch5_p1_complain"
+            }
+          ]
+        },
+        "ch5_p1_hit": {
+          "id": "ch5_p1_hit",
+          "kind": "choice",
+          "textKey": "wwldx.ch5_p1_hit.text",
+          "choices": [
+            {
+              "id": "ch5_p1_hit_next",
+              "goto": "ch5_p1_fork",
+              "labelKey": "wwldx.ch5_p1_hit.ch5_p1_hit_next"
+            }
+          ]
+        },
+        "ch5_p1_miss": {
+          "id": "ch5_p1_miss",
+          "kind": "choice",
+          "textKey": "wwldx.ch5_p1_miss.text",
+          "choices": [
+            {
+              "id": "ch5_p1_miss_next",
+              "goto": "ch5_p1_fork",
+              "labelKey": "wwldx.ch5_p1_miss.ch5_p1_miss_next"
+            }
+          ]
+        },
+        "ch5_p1_fork": {
+          "id": "ch5_p1_fork",
+          "kind": "random",
+          "textKey": "wwldx.ch5_p1_fork.text",
+          "transitions": [
+            {
+              "weight": 1,
+              "goto": "ch5_p1_fork_a"
+            },
+            {
+              "weight": 1,
+              "goto": "ch5_p1_fork_b"
+            }
+          ]
+        },
+        "ch5_p1_fork_a": {
+          "id": "ch5_p1_fork_a",
+          "kind": "choice",
+          "textKey": "wwldx.ch5_p1_fork_a.text",
+          "choices": [
+            {
+              "id": "ch5_p1_fork_a_next",
+              "goto": "ch5_p2",
+              "labelKey": "wwldx.ch5_p1_fork_a.ch5_p1_fork_a_next"
+            }
+          ]
+        },
+        "ch5_p1_fork_b": {
+          "id": "ch5_p1_fork_b",
+          "kind": "choice",
+          "textKey": "wwldx.ch5_p1_fork_b.text",
+          "choices": [
+            {
+              "id": "ch5_p1_fork_b_next",
+              "goto": "ch5_p2",
+              "labelKey": "wwldx.ch5_p1_fork_b.ch5_p1_fork_b_next"
+            }
+          ]
+        },
+        "ch5_p2": {
+          "id": "ch5_p2",
+          "kind": "choice",
+          "textKey": "wwldx.ch5_p2.text",
+          "choices": [
+            {
+              "id": "ch5_p2_correct",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "predictions_correct",
+                  "by": 1
+                },
+                {
+                  "op": "increment",
+                  "var": "streak",
+                  "by": 1
+                },
+                {
+                  "op": "increment",
+                  "var": "surprisingly_reasonable",
+                  "by": 1
+                }
+              ],
+              "goto": "ch5_p2_hit",
+              "labelKey": "wwldx.ch5_p2.ch5_p2_correct"
+            },
+            {
+              "id": "ch5_p2_rewrite",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "streak",
+                  "value": 0
+                }
+              ],
+              "goto": "ch5_p2_miss",
+              "labelKey": "wwldx.ch5_p2.ch5_p2_rewrite"
+            },
+            {
+              "id": "ch5_p2_human",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "streak",
+                  "value": 0
+                },
+                {
+                  "op": "increment",
+                  "var": "reasonable_assumption",
+                  "by": 1
+                }
+              ],
+              "goto": "ch5_p2_miss",
+              "labelKey": "wwldx.ch5_p2.ch5_p2_human"
+            },
+            {
+              "id": "ch5_p2_rust",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "streak",
+                  "value": 0
+                }
+              ],
+              "goto": "ch5_p2_miss",
+              "labelKey": "wwldx.ch5_p2.ch5_p2_rust"
+            }
+          ]
+        },
+        "ch5_p2_hit": {
+          "id": "ch5_p2_hit",
+          "kind": "choice",
+          "textKey": "wwldx.ch5_p2_hit.text",
+          "choices": [
+            {
+              "id": "ch5_p2_hit_next",
+              "goto": "ch5_p3",
+              "labelKey": "wwldx.ch5_p2_hit.ch5_p2_hit_next"
+            }
+          ]
+        },
+        "ch5_p2_miss": {
+          "id": "ch5_p2_miss",
+          "kind": "choice",
+          "textKey": "wwldx.ch5_p2_miss.text",
+          "choices": [
+            {
+              "id": "ch5_p2_miss_next",
+              "goto": "ch5_p3",
+              "labelKey": "wwldx.ch5_p2_miss.ch5_p2_miss_next"
+            }
+          ]
+        },
+        "ch5_p3": {
+          "id": "ch5_p3",
+          "kind": "choice",
+          "textKey": "wwldx.ch5_p3.text",
+          "choices": [
+            {
+              "id": "ch5_p3_correct",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "predictions_correct",
+                  "by": 1
+                },
+                {
+                  "op": "increment",
+                  "var": "streak",
+                  "by": 1
+                },
+                {
+                  "op": "increment",
+                  "var": "unnecessary_escalation",
+                  "by": 1
+                }
+              ],
+              "goto": "ch5_p3_hit",
+              "labelKey": "wwldx.ch5_p3.ch5_p3_correct"
+            },
+            {
+              "id": "ch5_p3_optimistic",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "streak",
+                  "value": 0
+                },
+                {
+                  "op": "increment",
+                  "var": "reasonable_assumption",
+                  "by": 1
+                }
+              ],
+              "goto": "ch5_p3_miss",
+              "labelKey": "wwldx.ch5_p3.ch5_p3_optimistic"
+            },
+            {
+              "id": "ch5_p3_give_up",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "streak",
+                  "value": 0
+                }
+              ],
+              "goto": "ch5_p3_miss",
+              "labelKey": "wwldx.ch5_p3.ch5_p3_give_up"
+            },
+            {
+              "id": "read_policy",
+              "showWhen": {
+                "field": "visited.disc_model_policy",
+                "operator": "equals",
+                "value": 0
+              },
+              "goto": "disc_model_policy",
+              "labelKey": "wwldx.ch5_p3.read_policy"
+            }
+          ]
+        },
+        "ch5_p3_hit": {
+          "id": "ch5_p3_hit",
+          "kind": "choice",
+          "textKey": "wwldx.ch5_p3_hit.text",
+          "choices": [
+            {
+              "id": "ch5_p3_hit_next",
+              "goto": "ch6_p1",
+              "labelKey": "wwldx.ch5_p3_hit.ch5_p3_hit_next"
+            }
+          ]
+        },
+        "ch5_p3_miss": {
+          "id": "ch5_p3_miss",
+          "kind": "choice",
+          "textKey": "wwldx.ch5_p3_miss.text",
+          "choices": [
+            {
+              "id": "ch5_p3_miss_next",
+              "goto": "ch6_p1",
+              "labelKey": "wwldx.ch5_p3_miss.ch5_p3_miss_next"
+            }
+          ]
+        },
+        "disc_model_policy": {
+          "id": "disc_model_policy",
+          "kind": "choice",
+          "textKey": "wwldx.disc_model_policy.text",
+          "choices": [
+            {
+              "id": "disc_model_policy_next",
+              "goto": "ch5_p3",
+              "labelKey": "wwldx.disc_model_policy.disc_model_policy_next"
+            }
+          ]
+        },
+        "ch6_p1": {
+          "id": "ch6_p1",
+          "kind": "choice",
+          "textKey": "wwldx.ch6_p1.text",
+          "choices": [
+            {
+              "id": "ch6_p1_correct",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "predictions_correct",
+                  "by": 1
+                },
+                {
+                  "op": "increment",
+                  "var": "streak",
+                  "by": 1
+                },
+                {
+                  "op": "increment",
+                  "var": "ridiculous_engineering",
+                  "by": 1
+                }
+              ],
+              "goto": "ch6_p1_hit",
+              "labelKey": "wwldx.ch6_p1.ch6_p1_correct"
+            },
+            {
+              "id": "ch6_p1_tolerate",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "streak",
+                  "value": 0
+                },
+                {
+                  "op": "increment",
+                  "var": "reasonable_assumption",
+                  "by": 1
+                }
+              ],
+              "goto": "ch6_p1_miss",
+              "labelKey": "wwldx.ch6_p1.ch6_p1_tolerate"
+            },
+            {
+              "id": "ch6_p1_script",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "streak",
+                  "value": 0
+                }
+              ],
+              "goto": "ch6_p1_miss",
+              "labelKey": "wwldx.ch6_p1.ch6_p1_script"
+            }
+          ]
+        },
+        "ch6_p1_hit": {
+          "id": "ch6_p1_hit",
+          "kind": "choice",
+          "textKey": "wwldx.ch6_p1_hit.text",
+          "choices": [
+            {
+              "id": "ch6_p1_hit_next",
+              "goto": "ch6_p2",
+              "labelKey": "wwldx.ch6_p1_hit.ch6_p1_hit_next"
+            }
+          ]
+        },
+        "ch6_p1_miss": {
+          "id": "ch6_p1_miss",
+          "kind": "choice",
+          "textKey": "wwldx.ch6_p1_miss.text",
+          "choices": [
+            {
+              "id": "ch6_p1_miss_next",
+              "goto": "ch6_p2",
+              "labelKey": "wwldx.ch6_p1_miss.ch6_p1_miss_next"
+            }
+          ]
+        },
+        "ch6_p2": {
+          "id": "ch6_p2",
+          "kind": "choice",
+          "textKey": "wwldx.ch6_p2.text",
+          "choices": [
+            {
+              "id": "ch6_p2_correct",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "predictions_correct",
+                  "by": 1
+                },
+                {
+                  "op": "increment",
+                  "var": "streak",
+                  "by": 1
+                },
+                {
+                  "op": "increment",
+                  "var": "unnecessary_escalation",
+                  "by": 1
+                }
+              ],
+              "goto": "ch6_p2_hit",
+              "labelKey": "wwldx.ch6_p2.ch6_p2_correct"
+            },
+            {
+              "id": "ch6_p2_stop",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "streak",
+                  "value": 0
+                },
+                {
+                  "op": "increment",
+                  "var": "reasonable_assumption",
+                  "by": 1
+                }
+              ],
+              "goto": "ch6_p2_miss",
+              "labelKey": "wwldx.ch6_p2.ch6_p2_stop"
+            },
+            {
+              "id": "ch6_p2_sell",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "streak",
+                  "value": 0
+                }
+              ],
+              "goto": "ch6_p2_miss",
+              "labelKey": "wwldx.ch6_p2.ch6_p2_sell"
+            }
+          ]
+        },
+        "ch6_p2_hit": {
+          "id": "ch6_p2_hit",
+          "kind": "choice",
+          "textKey": "wwldx.ch6_p2_hit.text",
+          "choices": [
+            {
+              "id": "ch6_p2_hit_next",
+              "goto": "ch6_p3",
+              "labelKey": "wwldx.ch6_p2_hit.ch6_p2_hit_next"
+            }
+          ]
+        },
+        "ch6_p2_miss": {
+          "id": "ch6_p2_miss",
+          "kind": "choice",
+          "textKey": "wwldx.ch6_p2_miss.text",
+          "choices": [
+            {
+              "id": "ch6_p2_miss_next",
+              "goto": "ch6_p3",
+              "labelKey": "wwldx.ch6_p2_miss.ch6_p2_miss_next"
+            }
+          ]
+        },
+        "ch6_p3": {
+          "id": "ch6_p3",
+          "kind": "choice",
+          "textKey": "wwldx.ch6_p3.text",
+          "choices": [
+            {
+              "id": "ch6_p3_correct",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "predictions_correct",
+                  "by": 1
+                },
+                {
+                  "op": "increment",
+                  "var": "streak",
+                  "by": 1
+                },
+                {
+                  "op": "increment",
+                  "var": "philosophical_detours",
+                  "by": 1
+                }
+              ],
+              "goto": "ch6_p3_hit",
+              "labelKey": "wwldx.ch6_p3.ch6_p3_correct"
+            },
+            {
+              "id": "ch6_p3_loop",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "streak",
+                  "value": 0
+                }
+              ],
+              "goto": "ch6_p3_miss",
+              "labelKey": "wwldx.ch6_p3.ch6_p3_loop"
+            },
+            {
+              "id": "ch6_p3_nothing",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "streak",
+                  "value": 0
+                },
+                {
+                  "op": "increment",
+                  "var": "reasonable_assumption",
+                  "by": 1
+                }
+              ],
+              "goto": "ch6_p3_miss",
+              "labelKey": "wwldx.ch6_p3.ch6_p3_nothing"
+            },
+            {
+              "id": "read_pipeline",
+              "showWhen": {
+                "field": "visited.disc_pipeline",
+                "operator": "equals",
+                "value": 0
+              },
+              "goto": "disc_pipeline",
+              "labelKey": "wwldx.ch6_p3.read_pipeline"
+            }
+          ]
+        },
+        "ch6_p3_hit": {
+          "id": "ch6_p3_hit",
+          "kind": "choice",
+          "textKey": "wwldx.ch6_p3_hit.text",
+          "choices": [
+            {
+              "id": "ch6_p3_hit_next",
+              "goto": "ch6_to_ch8",
+              "labelKey": "wwldx.ch6_p3_hit.ch6_p3_hit_next"
+            }
+          ]
+        },
+        "ch6_p3_miss": {
+          "id": "ch6_p3_miss",
+          "kind": "choice",
+          "textKey": "wwldx.ch6_p3_miss.text",
+          "choices": [
+            {
+              "id": "ch6_p3_miss_next",
+              "goto": "ch6_to_ch8",
+              "labelKey": "wwldx.ch6_p3_miss.ch6_p3_miss_next"
+            }
+          ]
+        },
+        "disc_pipeline": {
+          "id": "disc_pipeline",
+          "kind": "choice",
+          "textKey": "wwldx.disc_pipeline.text",
+          "choices": [
+            {
+              "id": "disc_pipeline_next",
+              "goto": "ch6_p3",
+              "labelKey": "wwldx.disc_pipeline.disc_pipeline_next"
+            }
+          ]
+        },
+        "ch6_to_ch8": {
+          "id": "ch6_to_ch8",
+          "kind": "auto",
+          "textKey": "wwldx.ch6_to_ch8.text",
+          "goto": "ch8_p2"
+        },
+        "ch8_p2": {
+          "id": "ch8_p2",
+          "kind": "choice",
+          "textKey": "wwldx.ch8_p2.text",
+          "choices": [
+            {
+              "id": "ch8_p2_correct",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "predictions_correct",
+                  "by": 1
+                },
+                {
+                  "op": "increment",
+                  "var": "streak",
+                  "by": 1
+                },
+                {
+                  "op": "increment",
+                  "var": "ridiculous_engineering",
+                  "by": 1
+                }
+              ],
+              "goto": "ch8_p2_hit",
+              "labelKey": "wwldx.ch8_p2.ch8_p2_correct"
+            },
+            {
+              "id": "ch8_p2_close",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "streak",
+                  "value": 0
+                },
+                {
+                  "op": "increment",
+                  "var": "reasonable_assumption",
+                  "by": 1
+                }
+              ],
+              "goto": "ch8_p2_miss",
+              "labelKey": "wwldx.ch8_p2.ch8_p2_close"
+            },
+            {
+              "id": "ch8_p2_playnormal",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "streak",
+                  "value": 0
+                }
+              ],
+              "goto": "ch8_p2_miss",
+              "labelKey": "wwldx.ch8_p2.ch8_p2_playnormal"
+            },
+            {
+              "id": "read_episode",
+              "showWhen": {
+                "field": "visited.disc_episode_one",
+                "operator": "equals",
+                "value": 0
+              },
+              "goto": "disc_episode_one",
+              "labelKey": "wwldx.ch8_p2.read_episode"
+            }
+          ]
+        },
+        "ch8_p2_hit": {
+          "id": "ch8_p2_hit",
+          "kind": "choice",
+          "textKey": "wwldx.ch8_p2_hit.text",
+          "choices": [
+            {
+              "id": "ch8_p2_hit_next",
+              "goto": "ch8_p3",
+              "labelKey": "wwldx.ch8_p2_hit.ch8_p2_hit_next"
+            }
+          ]
+        },
+        "ch8_p2_miss": {
+          "id": "ch8_p2_miss",
+          "kind": "choice",
+          "textKey": "wwldx.ch8_p2_miss.text",
+          "choices": [
+            {
+              "id": "ch8_p2_miss_next",
+              "goto": "ch8_p3",
+              "labelKey": "wwldx.ch8_p2_miss.ch8_p2_miss_next"
+            }
+          ]
+        },
+        "disc_episode_one": {
+          "id": "disc_episode_one",
+          "kind": "choice",
+          "textKey": "wwldx.disc_episode_one.text",
+          "choices": [
+            {
+              "id": "disc_episode_one_next",
+              "goto": "ch8_p2",
+              "labelKey": "wwldx.disc_episode_one.disc_episode_one_next"
+            }
+          ]
+        },
+        "ch8_p3": {
+          "id": "ch8_p3",
+          "kind": "choice",
+          "textKey": "wwldx.ch8_p3.text",
+          "choices": [
+            {
+              "id": "ch8_p3_correct",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "predictions_correct",
+                  "by": 1
+                },
+                {
+                  "op": "increment",
+                  "var": "streak",
+                  "by": 1
+                },
+                {
+                  "op": "increment",
+                  "var": "ridiculous_engineering",
+                  "by": 1
+                }
+              ],
+              "goto": "ch8_p3_hit",
+              "labelKey": "wwldx.ch8_p3.ch8_p3_correct"
+            },
+            {
+              "id": "ch8_p3_prototype",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "streak",
+                  "value": 0
+                },
+                {
+                  "op": "increment",
+                  "var": "reasonable_assumption",
+                  "by": 1
+                }
+              ],
+              "goto": "ch8_p3_miss",
+              "labelKey": "wwldx.ch8_p3.ch8_p3_prototype"
+            },
+            {
+              "id": "ch8_p3_abandoned",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "streak",
+                  "value": 0
+                }
+              ],
+              "goto": "ch8_p3_miss",
+              "labelKey": "wwldx.ch8_p3.ch8_p3_abandoned"
+            },
+            {
+              "id": "ch8_p3_sentient",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "streak",
+                  "value": 0
+                },
+                {
+                  "op": "set",
+                  "var": "guessed_close_but_wrong",
+                  "value": true
+                }
+              ],
+              "goto": "ch8_p3_close",
+              "labelKey": "wwldx.ch8_p3.ch8_p3_sentient"
+            }
+          ]
+        },
+        "ch8_p3_hit": {
+          "id": "ch8_p3_hit",
+          "kind": "choice",
+          "textKey": "wwldx.ch8_p3_hit.text",
+          "choices": [
+            {
+              "id": "ch8_p3_hit_next",
+              "goto": "ch8_p4",
+              "labelKey": "wwldx.ch8_p3_hit.ch8_p3_hit_next"
+            }
+          ]
+        },
+        "ch8_p3_miss": {
+          "id": "ch8_p3_miss",
+          "kind": "choice",
+          "textKey": "wwldx.ch8_p3_miss.text",
+          "choices": [
+            {
+              "id": "ch8_p3_miss_next",
+              "goto": "ch8_p4",
+              "labelKey": "wwldx.ch8_p3_miss.ch8_p3_miss_next"
+            }
+          ]
+        },
+        "ch8_p3_close": {
+          "id": "ch8_p3_close",
+          "kind": "choice",
+          "textKey": "wwldx.ch8_p3_close.text",
+          "choices": [
+            {
+              "id": "ch8_p3_close_next",
+              "goto": "ch8_p4",
+              "labelKey": "wwldx.ch8_p3_close.ch8_p3_close_next"
+            }
+          ]
+        },
+        "ch8_p4": {
+          "id": "ch8_p4",
+          "kind": "choice",
+          "textKey": "wwldx.ch8_p4.text",
+          "choices": [
+            {
+              "id": "ch8_p4_correct",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "predictions_correct",
+                  "by": 1
+                },
+                {
+                  "op": "increment",
+                  "var": "streak",
+                  "by": 1
+                },
+                {
+                  "op": "increment",
+                  "var": "unnecessary_escalation",
+                  "by": 1
+                }
+              ],
+              "goto": "ch8_p4_hit",
+              "labelKey": "wwldx.ch8_p4.ch8_p4_correct"
+            },
+            {
+              "id": "ch8_p4_console",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "streak",
+                  "value": 0
+                }
+              ],
+              "goto": "ch8_p4_miss",
+              "labelKey": "wwldx.ch8_p4.ch8_p4_console"
+            },
+            {
+              "id": "ch8_p4_nothing",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "streak",
+                  "value": 0
+                },
+                {
+                  "op": "increment",
+                  "var": "reasonable_assumption",
+                  "by": 1
+                }
+              ],
+              "goto": "ch8_p4_miss",
+              "labelKey": "wwldx.ch8_p4.ch8_p4_nothing"
+            },
+            {
+              "id": "read_roadmap",
+              "showWhen": {
+                "field": "visited.disc_roadmap",
+                "operator": "equals",
+                "value": 0
+              },
+              "goto": "disc_roadmap",
+              "labelKey": "wwldx.ch8_p4.read_roadmap"
+            }
+          ]
+        },
+        "ch8_p4_hit": {
+          "id": "ch8_p4_hit",
+          "kind": "choice",
+          "textKey": "wwldx.ch8_p4_hit.text",
+          "choices": [
+            {
+              "id": "ch8_p4_hit_next",
+              "goto": "ch8_p8",
+              "labelKey": "wwldx.ch8_p4_hit.ch8_p4_hit_next"
+            }
+          ]
+        },
+        "ch8_p4_miss": {
+          "id": "ch8_p4_miss",
+          "kind": "choice",
+          "textKey": "wwldx.ch8_p4_miss.text",
+          "choices": [
+            {
+              "id": "ch8_p4_miss_next",
+              "goto": "ch8_p8",
+              "labelKey": "wwldx.ch8_p4_miss.ch8_p4_miss_next"
+            }
+          ]
+        },
+        "disc_roadmap": {
+          "id": "disc_roadmap",
+          "kind": "choice",
+          "textKey": "wwldx.disc_roadmap.text",
+          "choices": [
+            {
+              "id": "disc_roadmap_next",
+              "goto": "ch8_p4",
+              "labelKey": "wwldx.disc_roadmap.disc_roadmap_next"
+            }
+          ]
+        },
+        "ch8_p8": {
+          "id": "ch8_p8",
+          "kind": "choice",
+          "textKey": "wwldx.ch8_p8.text",
+          "choices": [
+            {
+              "id": "ch8_p8_correct",
+              "effects": [
+                {
+                  "op": "increment",
+                  "var": "predictions_correct",
+                  "by": 1
+                },
+                {
+                  "op": "increment",
+                  "var": "streak",
+                  "by": 1
+                },
+                {
+                  "op": "increment",
+                  "var": "no_fucking_way",
+                  "by": 1
+                }
+              ],
+              "goto": "ch8_p8_hit",
+              "labelKey": "wwldx.ch8_p8.ch8_p8_correct"
+            },
+            {
+              "id": "ch8_p8_never",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "streak",
+                  "value": 0
+                }
+              ],
+              "goto": "ch8_p8_miss",
+              "labelKey": "wwldx.ch8_p8.ch8_p8_never"
+            },
+            {
+              "id": "ch8_p8_funding",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "streak",
+                  "value": 0
+                }
+              ],
+              "goto": "ch8_p8_miss",
+              "labelKey": "wwldx.ch8_p8.ch8_p8_funding"
+            },
+            {
+              "id": "ch8_p8_joke",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "streak",
+                  "value": 0
+                },
+                {
+                  "op": "increment",
+                  "var": "reasonable_assumption",
+                  "by": 1
+                }
+              ],
+              "goto": "ch8_p8_miss",
+              "labelKey": "wwldx.ch8_p8.ch8_p8_joke"
+            }
+          ]
+        },
+        "ch8_p8_hit": {
+          "id": "ch8_p8_hit",
+          "kind": "choice",
+          "textKey": "wwldx.ch8_p8_hit.text",
+          "choices": [
+            {
+              "id": "ch8_p8_hit_next",
+              "goto": "verdict_hub",
+              "labelKey": "wwldx.ch8_p8_hit.ch8_p8_hit_next"
+            }
+          ]
+        },
+        "ch8_p8_miss": {
+          "id": "ch8_p8_miss",
+          "kind": "choice",
+          "textKey": "wwldx.ch8_p8_miss.text",
+          "choices": [
+            {
+              "id": "ch8_p8_miss_next",
+              "goto": "verdict_hub",
+              "labelKey": "wwldx.ch8_p8_miss.ch8_p8_miss_next"
+            }
+          ]
+        },
+        "verdict_hub": {
+          "id": "verdict_hub",
+          "kind": "choice",
+          "textKey": "wwldx.verdict_hub.text",
+          "choices": [
+            {
+              "id": "novice",
+              "showWhen": {
+                "all": [
+                  {
+                    "field": "var.predictions_correct",
+                    "operator": "greater_or_equal",
+                    "value": 0
+                  },
+                  {
+                    "field": "var.predictions_correct",
+                    "operator": "less_or_equal",
+                    "value": 3
+                  }
+                ]
+              },
+              "goto": "ending_tier_novice",
+              "labelKey": "wwldx.verdict_hub.novice"
+            },
+            {
+              "id": "apprentice",
+              "showWhen": {
+                "all": [
+                  {
+                    "field": "var.predictions_correct",
+                    "operator": "greater_or_equal",
+                    "value": 4
+                  },
+                  {
+                    "field": "var.predictions_correct",
+                    "operator": "less_or_equal",
+                    "value": 7
+                  }
+                ]
+              },
+              "goto": "ending_tier_apprentice",
+              "labelKey": "wwldx.verdict_hub.apprentice"
+            },
+            {
+              "id": "fluent",
+              "showWhen": {
+                "all": [
+                  {
+                    "field": "var.predictions_correct",
+                    "operator": "greater_or_equal",
+                    "value": 8
+                  },
+                  {
+                    "field": "var.predictions_correct",
+                    "operator": "less_or_equal",
+                    "value": 11
+                  }
+                ]
+              },
+              "goto": "ending_tier_fluent",
+              "labelKey": "wwldx.verdict_hub.fluent"
+            },
+            {
+              "id": "disturbing",
+              "showWhen": {
+                "all": [
+                  {
+                    "field": "var.predictions_correct",
+                    "operator": "greater_or_equal",
+                    "value": 12
+                  },
+                  {
+                    "field": "var.predictions_correct",
+                    "operator": "less_or_equal",
+                    "value": 14
+                  }
+                ]
+              },
+              "goto": "ending_tier_disturbing",
+              "labelKey": "wwldx.verdict_hub.disturbing"
+            },
+            {
+              "id": "transcendent",
+              "showWhen": {
+                "field": "var.predictions_correct",
+                "operator": "greater_or_equal",
+                "value": 15
+              },
+              "goto": "ending_tier_transcendent",
+              "labelKey": "wwldx.verdict_hub.transcendent"
+            },
+            {
+              "id": "no_fucking_way",
+              "showWhen": {
+                "all": [
+                  {
+                    "field": "var.no_fucking_way",
+                    "operator": "greater_or_equal",
+                    "value": 3
+                  },
+                  {
+                    "field": "var.streak",
+                    "operator": "greater_or_equal",
+                    "value": 5
+                  }
+                ]
+              },
+              "goto": "ending_no_fucking_way",
+              "labelKey": "wwldx.verdict_hub.no_fucking_way"
+            },
+            {
+              "id": "reasonable_human",
+              "showWhen": {
+                "field": "var.reasonable_assumption",
+                "operator": "greater_or_equal",
+                "value": 8
+              },
+              "goto": "ending_reasonable_human_being",
+              "labelKey": "wwldx.verdict_hub.reasonable_human"
+            }
+          ]
+        },
+        "ending_walk_away": {
+          "id": "ending_walk_away",
+          "kind": "ending",
+          "textKey": "wwldx.ending_walk_away.text",
+          "endingId": "walk_away",
+          "outcome": "neutral"
+        },
+        "ending_tier_novice": {
+          "id": "ending_tier_novice",
+          "kind": "ending",
+          "textKey": "wwldx.ending_tier_novice.text",
+          "endingId": "tier_novice",
+          "outcome": "neutral"
+        },
+        "ending_tier_apprentice": {
+          "id": "ending_tier_apprentice",
+          "kind": "ending",
+          "textKey": "wwldx.ending_tier_apprentice.text",
+          "endingId": "tier_apprentice",
+          "outcome": "neutral"
+        },
+        "ending_tier_fluent": {
+          "id": "ending_tier_fluent",
+          "kind": "ending",
+          "textKey": "wwldx.ending_tier_fluent.text",
+          "endingId": "tier_fluent",
+          "outcome": "win"
+        },
+        "ending_tier_disturbing": {
+          "id": "ending_tier_disturbing",
+          "kind": "ending",
+          "textKey": "wwldx.ending_tier_disturbing.text",
+          "endingId": "tier_disturbing",
+          "outcome": "win"
+        },
+        "ending_tier_transcendent": {
+          "id": "ending_tier_transcendent",
+          "kind": "ending",
+          "textKey": "wwldx.ending_tier_transcendent.text",
+          "endingId": "tier_transcendent",
+          "outcome": "win"
+        },
+        "ending_no_fucking_way": {
+          "id": "ending_no_fucking_way",
+          "kind": "ending",
+          "textKey": "wwldx.ending_no_fucking_way.text",
+          "endingId": "no_fucking_way",
+          "outcome": "win"
+        },
+        "ending_reasonable_human_being": {
+          "id": "ending_reasonable_human_being",
+          "kind": "ending",
+          "textKey": "wwldx.ending_reasonable_human_being.text",
+          "endingId": "reasonable_human_being",
+          "outcome": "neutral"
+        }
+      },
+      "startNodeId": "prologue",
+      "achievements": [
+        {
+          "id": "walk_away",
+          "hidden": true,
+          "condition": {
+            "field": "ending",
+            "operator": "equals",
+            "value": "walk_away"
+          },
+          "nameKey": "wwldx.achievement_walk_away.name",
+          "descriptionKey": "wwldx.achievement_walk_away.description"
+        },
+        {
+          "id": "tier_novice",
+          "hidden": true,
+          "condition": {
+            "field": "ending",
+            "operator": "equals",
+            "value": "tier_novice"
+          },
+          "nameKey": "wwldx.achievement_tier_novice.name",
+          "descriptionKey": "wwldx.achievement_tier_novice.description"
+        },
+        {
+          "id": "tier_apprentice",
+          "hidden": true,
+          "condition": {
+            "field": "ending",
+            "operator": "equals",
+            "value": "tier_apprentice"
+          },
+          "nameKey": "wwldx.achievement_tier_apprentice.name",
+          "descriptionKey": "wwldx.achievement_tier_apprentice.description"
+        },
+        {
+          "id": "tier_fluent",
+          "hidden": true,
+          "condition": {
+            "field": "ending",
+            "operator": "equals",
+            "value": "tier_fluent"
+          },
+          "nameKey": "wwldx.achievement_tier_fluent.name",
+          "descriptionKey": "wwldx.achievement_tier_fluent.description"
+        },
+        {
+          "id": "tier_disturbing",
+          "hidden": true,
+          "condition": {
+            "field": "ending",
+            "operator": "equals",
+            "value": "tier_disturbing"
+          },
+          "nameKey": "wwldx.achievement_tier_disturbing.name",
+          "descriptionKey": "wwldx.achievement_tier_disturbing.description"
+        },
+        {
+          "id": "tier_transcendent",
+          "hidden": true,
+          "condition": {
+            "field": "ending",
+            "operator": "equals",
+            "value": "tier_transcendent"
+          },
+          "nameKey": "wwldx.achievement_tier_transcendent.name",
+          "descriptionKey": "wwldx.achievement_tier_transcendent.description"
+        },
+        {
+          "id": "no_fucking_way",
+          "hidden": true,
+          "condition": {
+            "field": "ending",
+            "operator": "equals",
+            "value": "no_fucking_way"
+          },
+          "nameKey": "wwldx.achievement_no_fucking_way.name",
+          "descriptionKey": "wwldx.achievement_no_fucking_way.description"
+        },
+        {
+          "id": "reasonable_human_being",
+          "hidden": true,
+          "condition": {
+            "field": "ending",
+            "operator": "equals",
+            "value": "reasonable_human_being"
+          },
+          "nameKey": "wwldx.achievement_reasonable_human_being.name",
+          "descriptionKey": "wwldx.achievement_reasonable_human_being.description"
+        },
+        {
+          "id": "pattern_recognition",
+          "hidden": true,
+          "condition": {
+            "field": "var.streak",
+            "operator": "greater_or_equal",
+            "value": 4
+          },
+          "nameKey": "wwldx.achievement_pattern_recognition.name",
+          "descriptionKey": "wwldx.achievement_pattern_recognition.description"
+        },
+        {
+          "id": "unfortunately_you_get_him",
+          "hidden": true,
+          "condition": {
+            "field": "var.predictions_correct",
+            "operator": "greater_or_equal",
+            "value": 13
+          },
+          "nameKey": "wwldx.achievement_unfortunately_you_get_him.name",
+          "descriptionKey": "wwldx.achievement_unfortunately_you_get_him.description"
+        },
+        {
+          "id": "reasonable_several_times",
+          "hidden": true,
+          "condition": {
+            "field": "var.reasonable_assumption",
+            "operator": "greater_or_equal",
+            "value": 5
+          },
+          "nameKey": "wwldx.achievement_reasonable_several_times.name",
+          "descriptionKey": "wwldx.achievement_reasonable_several_times.description"
+        },
+        {
+          "id": "correct_answer_worse",
+          "hidden": true,
+          "condition": {
+            "field": "var.guessed_close_but_wrong",
+            "operator": "equals",
+            "value": true
+          },
+          "nameKey": "wwldx.achievement_correct_answer_worse.name",
+          "descriptionKey": "wwldx.achievement_correct_answer_worse.description"
+        },
+        {
+          "id": "named_the_ai",
+          "hidden": true,
+          "condition": {
+            "field": "var.named_the_ai",
+            "operator": "equals",
+            "value": true
+          },
+          "nameKey": "wwldx.achievement_named_the_ai.name",
+          "descriptionKey": "wwldx.achievement_named_the_ai.description"
+        },
+        {
+          "id": "declined_the_money",
+          "hidden": true,
+          "condition": {
+            "all": [
+              {
+                "field": "var.declined_the_money",
+                "operator": "equals",
+                "value": true
+              },
+              {
+                "field": "var.applied_after_decline",
+                "operator": "equals",
+                "value": true
+              }
+            ]
+          },
+          "nameKey": "wwldx.achievement_declined_the_money.name",
+          "descriptionKey": "wwldx.achievement_declined_the_money.description"
+        },
+        {
+          "id": "documented_menace",
+          "hidden": true,
+          "condition": {
+            "field": "var.no_fucking_way",
+            "operator": "greater_or_equal",
+            "value": 3
+          },
+          "nameKey": "wwldx.achievement_documented_menace.name",
+          "descriptionKey": "wwldx.achievement_documented_menace.description"
+        },
+        {
+          "id": "state_of_the_art_paperwork",
+          "hidden": true,
+          "condition": {
+            "field": "var.bureaucratic_escalation",
+            "operator": "greater_or_equal",
+            "value": 2
+          },
+          "nameKey": "wwldx.achievement_state_of_the_art_paperwork.name",
+          "descriptionKey": "wwldx.achievement_state_of_the_art_paperwork.description"
+        },
+        {
+          "id": "infrastructure_for_a_feeling",
+          "hidden": true,
+          "condition": {
+            "field": "var.ridiculous_engineering",
+            "operator": "greater_or_equal",
+            "value": 5
+          },
+          "nameKey": "wwldx.achievement_infrastructure_for_a_feeling.name",
+          "descriptionKey": "wwldx.achievement_infrastructure_for_a_feeling.description"
+        },
+        {
+          "id": "escalation_as_a_service",
+          "hidden": true,
+          "condition": {
+            "field": "var.unnecessary_escalation",
+            "operator": "greater_or_equal",
+            "value": 3
+          },
+          "nameKey": "wwldx.achievement_escalation_as_a_service.name",
+          "descriptionKey": "wwldx.achievement_escalation_as_a_service.description"
+        },
+        {
+          "id": "wizard_that_shouldnt_exist",
+          "hidden": true,
+          "condition": {
+            "field": "visited.disc_wizard",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "wwldx.achievement_wizard_that_shouldnt_exist.name",
+          "descriptionKey": "wwldx.achievement_wizard_that_shouldnt_exist.description"
+        },
+        {
+          "id": "read_the_full_policy",
+          "hidden": true,
+          "condition": {
+            "field": "visited.disc_model_policy",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "wwldx.achievement_read_the_full_policy.name",
+          "descriptionKey": "wwldx.achievement_read_the_full_policy.description"
+        }
+      ]
+    }
+  },
+  "strings": {
+    "wwldx.achievement_correct_answer_worse.description": "Choose the most absurd available answer and still underestimate reality.",
+    "wwldx.achievement_correct_answer_worse.name": "The Correct Answer Was Somehow Worse",
+    "wwldx.achievement_declined_the_money.description": "Watch Lucifer turn down real money on principle, then apply somewhere else out of curiosity.",
+    "wwldx.achievement_declined_the_money.name": "A 2004 Salary",
+    "wwldx.achievement_documented_menace.description": "Correctly predict every one of the genuinely unpredictable decisions.",
+    "wwldx.achievement_documented_menace.name": "Documented Menace",
+    "wwldx.achievement_escalation_as_a_service.description": "Correctly predict every instance of purely unnecessary escalation.",
+    "wwldx.achievement_escalation_as_a_service.name": "Escalation As A Service",
+    "wwldx.achievement_infrastructure_for_a_feeling.description": "Correctly predict every instance of ridiculous engineering.",
+    "wwldx.achievement_infrastructure_for_a_feeling.name": "Infrastructure For A Feeling",
+    "wwldx.achievement_named_the_ai.description": "Witness the machine get renamed after two idiot Star Wars characters.",
+    "wwldx.achievement_named_the_ai.name": "Jar-Jar2R2",
+    "wwldx.achievement_no_fucking_way.description": "Correctly predict every exceptionally improbable event in the campaign.",
+    "wwldx.achievement_no_fucking_way.name": "There Is No Fucking Way",
+    "wwldx.achievement_pattern_recognition.description": "Correctly predict four consecutive decisions.",
+    "wwldx.achievement_pattern_recognition.name": "Pattern Recognition",
+    "wwldx.achievement_read_the_full_policy.description": "Read the full AI Model Selection Policy, not just the summary.",
+    "wwldx.achievement_read_the_full_policy.name": "Reasoning Should Scale",
+    "wwldx.achievement_reasonable_human_being.description": "Repeatedly assume Lucifer will behave like a normal engineer.",
+    "wwldx.achievement_reasonable_human_being.name": "Reasonable Human Being",
+    "wwldx.achievement_reasonable_several_times.description": "Assume normal, sensible behavior on at least five separate predictions — and be wrong every time.",
+    "wwldx.achievement_reasonable_several_times.name": "That Was A Reasonable Assumption",
+    "wwldx.achievement_state_of_the_art_paperwork.description": "Correctly predict both authored bureaucratic escalations.",
+    "wwldx.achievement_state_of_the_art_paperwork.name": "State Of The Art Paperwork",
+    "wwldx.achievement_tier_apprentice.description": "Finish with a modest, hard-won accuracy.",
+    "wwldx.achievement_tier_apprentice.name": "Monitor This Condition",
+    "wwldx.achievement_tier_disturbing.description": "Predict nearly everything correctly.",
+    "wwldx.achievement_tier_disturbing.name": "Please Explain Yourself",
+    "wwldx.achievement_tier_fluent.description": "Finish with just over half of all predictions correct.",
+    "wwldx.achievement_tier_fluent.name": "Ahead Of The Rubric",
+    "wwldx.achievement_tier_novice.description": "Finish with a genuinely low accuracy.",
+    "wwldx.achievement_tier_novice.name": "This Is Probably Healthy",
+    "wwldx.achievement_tier_transcendent.description": "Finish with a near-perfect accuracy.",
+    "wwldx.achievement_tier_transcendent.name": "How Did You Obtain This Information",
+    "wwldx.achievement_unfortunately_you_get_him.description": "Reach a high prediction accuracy.",
+    "wwldx.achievement_unfortunately_you_get_him.name": "Unfortunately, You Get Him",
+    "wwldx.achievement_walk_away.description": "Decline to make a single prediction.",
+    "wwldx.achievement_walk_away.name": "You Closed The Laptop",
+    "wwldx.achievement_wizard_that_shouldnt_exist.description": "Find the Perl/CGI website wizard, years ahead of its time.",
+    "wwldx.achievement_wizard_that_shouldnt_exist.name": "The Wizard That Shouldn't Exist Yet",
+    "wwldx.campaign.description": "The sixteen predictions What Would Lucifer Do? relocated for a general audience — thirteen technical, three software-career — told here in their original wording. If you don't know what a pipeline, an API, or an MCP server is, play the public campaign instead — this one assumes you do.",
+    "wwldx.campaign.title": "What Would Lucifer Do? — Engineer's Cut",
+    "wwldx.ch3_p1.ch3_p1_correct": "A 95, docked for 'not enough comments' — followed later by an award for exceptional student",
+    "wwldx.ch3_p1.ch3_p1_fail": "Failed outright for not following the assignment format",
+    "wwldx.ch3_p1.ch3_p1_ignored": "A shrug, a passing grade, nobody reads a hundred pages",
+    "wwldx.ch3_p1.ch3_p1_perfect": "A perfect score and public praise",
+    "wwldx.ch3_p1.leave": "Close the laptop. You're not doing this.",
+    "wwldx.ch3_p1.text": "1996. A high-school C++ final project. Everyone has to build something; Lucifer builds a full music library management system with real data structures, over months, that actually works. When it's time to submit, the teacher insists on printing all the source code. His stack comes to just under a hundred pages.\n\nWhat Would Lucifer Do — or rather, what did the rubric do to him?",
+    "wwldx.ch3_p1_hit.ch3_p1_hit_next": "Continue",
+    "wwldx.ch3_p1_hit.text": "Correct.\n\nNinety-five out of a hundred, with points specifically deducted for insufficient comments in a hundred-page working system nobody else in the class attempted. Later that same year, the same class gives him an award for exceptional student. Both of these things are true and neither one apologizes to the other. This is his first lesson in how institutions reward effort: inconsistently, and usually after the fact.",
+    "wwldx.ch3_p1_miss.ch3_p1_miss_next": "Continue",
+    "wwldx.ch3_p1_miss.text": "Not quite.\n\nIt is neither a perfect score nor a failure nor a shrug. He gets a 95, specifically docked for 'not enough comments' — and, later that same year, an award for exceptional student, from the same class, for the same general body of work. The rubric and the judgment operating alongside it appear to answer to different departments.",
+    "wwldx.ch3_p2.ch3_p2_correct": "It triggers a full architecture review, escalating to the division head",
+    "wwldx.ch3_p2.ch3_p2_fired": "He gets fired for touching infrastructure without a ticket",
+    "wwldx.ch3_p2.ch3_p2_quiet": "Nothing — a quiet merge, nobody notices for months",
+    "wwldx.ch3_p2.ch3_p2_thanks": "A company-wide thank-you and a raise",
+    "wwldx.ch3_p2.text": "Years later: an organization with sixty developers, eight teams, and roughly four hundred GUI-configured Azure DevOps pipelines. Lucifer replaces all of them with YAML.\n\nWhat Would Lucifer Do — or rather, what happened to him for doing it?",
+    "wwldx.ch3_p2_fork.text": "The division head asks a follow-up question.",
+    "wwldx.ch3_p2_fork_a.ch3_p2_fork_a_next": "Continue",
+    "wwldx.ch3_p2_fork_a.text": "'Who approved this?' Nobody had to. That, it turns out, is the actual finding of the review.",
+    "wwldx.ch3_p2_fork_b.ch3_p2_fork_b_next": "Continue",
+    "wwldx.ch3_p2_fork_b.text": "'Can we do this for the other four hundred systems?' The review concludes, eventually, that they can, and that this was somehow the more alarming answer.",
+    "wwldx.ch3_p2_hit.ch3_p2_hit_next": "Continue",
+    "wwldx.ch3_p2_hit.text": "Correct.\n\nArchitecture review. Manager. Division head. Confusion. The prevailing question, more or less verbatim, is 'wait — you can do this?' His answer, more or less verbatim, is '...you couldn't?' Four hundred manually-clicked pipelines turn out to have been load-bearing for more than automation.",
+    "wwldx.ch3_p2_miss.ch3_p2_miss_next": "Continue",
+    "wwldx.ch3_p2_miss.text": "Not quite.\n\nIt does not go unnoticed and it does not end in a raise or a firing. It escalates — architecture review, manager, division head — over four hundred pipelines that used to require a mouse. Scale, it turns out, can be emotionally threatening to an org chart.",
+    "wwldx.ch3_p3.ch3_p3_argue": "Argue the point line by line with supporting documentation",
+    "wwldx.ch3_p3.ch3_p3_correct": "Nothing. Let the pattern repeat; the signal doesn't change to match the doubt.",
+    "wwldx.ch3_p3.ch3_p3_shrink": "Quietly shrink the CV to sound more believable",
+    "wwldx.ch3_p3.text": "Elsewhere, on an ongoing basis: recruiters keep flagging Lucifer's CV as 'too much' — too many systems, too many decades, too implausible a range for one person. He gets accused, gently, of exaggerating.\n\nWhat Would Lucifer Do?",
+    "wwldx.ch3_p3_hit.ch3_p3_hit_next": "Continue",
+    "wwldx.ch3_p3_hit.text": "Correct.\n\nHe does not trim the CV, argue the point, or produce evidence. The recruiter disbelief loop just repeats — flagged, doubted, repeated — and the underlying facts hold still regardless. He calls this, without much drama, an occupational hazard rather than an identity.",
+    "wwldx.ch3_p3_miss.ch3_p3_miss_next": "Continue",
+    "wwldx.ch3_p3_miss.text": "Not quite.\n\nThere is no argument and no editing-for-plausibility. The loop just repeats — flagged as too much, doubted, unchanged — and he lets the pattern keep happening rather than adjusting the facts to fit the disbelief.",
+    "wwldx.ch4_p1.ch4_p1_apply": "Apply normally, mention the missing package in the cover letter",
+    "wwldx.ch4_p1.ch4_p1_correct": "Build the WinGet package first, submit it, then apply for the job",
+    "wwldx.ch4_p1.ch4_p1_email": "Email the company suggesting they build one themselves",
+    "wwldx.ch4_p1.text": "Lucifer applies to a VR store. Before formally applying, he notices they have no WinGet package for their software.\n\nWhat Would Lucifer Do?",
+    "wwldx.ch4_p1_hit.ch4_p1_hit_next": "Continue",
+    "wwldx.ch4_p1_hit.text": "Correct.\n\nHe builds the package, submits it, and only then applies. Nobody asked him to do this. He just noticed the gap. This is, by his own account, the pattern in miniature: the application arrives after the unsolicited contribution, not before it.",
+    "wwldx.ch4_p1_miss.ch4_p1_miss_next": "Continue",
+    "wwldx.ch4_p1_miss.text": "Not quite.\n\nThere's no cover letter and no polite suggestion. He builds the package first, submits it, and applies afterward — treating the missing infrastructure as something to fix on sight rather than something to mention.",
+    "wwldx.ch4_p2.ch4_p2_accept": "Accept immediately — a job is a job",
+    "wwldx.ch4_p2.ch4_p2_correct": "Decline. Call it a 2004 salary.",
+    "wwldx.ch4_p2.ch4_p2_negotiate": "Counter-offer for more, stay in the conversation",
+    "wwldx.ch4_p2.text": "The VR store offers Lucifer 50,000 euros.\n\nWhat Would Lucifer Do?",
+    "wwldx.ch4_p2_decline_flag.ch4_p2_decline_flag_next": "Continue",
+    "wwldx.ch4_p2_decline_flag.text": "Not quite.\n\nHe doesn't accept. €50,000, he decides on the spot, is a 2004 salary — and this is not 2004. The offer is declined, politely and completely, without a counter.",
+    "wwldx.ch4_p2_hit.ch4_p2_hit_next": "Continue",
+    "wwldx.ch4_p2_hit.text": "Correct.\n\nHe turns it down, on the stated grounds that €50,000 is a 2004 salary and this is not 2004. This is usually the point in the story where people ask if he's exaggerating. He isn't. He was just early, again, and pricing accordingly.",
+    "wwldx.ch4_p2_miss.ch4_p2_miss_next": "Continue",
+    "wwldx.ch4_p2_miss.text": "Not quite.\n\nHe doesn't accept and he doesn't counter-offer to stay in the room. He declines outright and calls the number what it is: a 2004 salary, offered several decades after 2004.",
+    "wwldx.ch4_p3.ch4_p3_correct": "Apply",
+    "wwldx.ch4_p3.ch4_p3_ignore": "Ignore the banner — it was probably a joke",
+    "wwldx.ch4_p3.ch4_p3_screenshot": "Screenshot it for later, keep reading the source",
+    "wwldx.ch4_p3.text": "Purely out of curiosity, Lucifer opens GitKraken's source code, finds a bug, and reports it. Buried in the code he finds a banner: 'If you're reading this, apply.'\n\nWhat Would Lucifer Do?",
+    "wwldx.ch4_p3_hit.ch4_p3_hit_next": "Continue",
+    "wwldx.ch4_p3_hit.text": "Correct.\n\nHe applies. The bug report was not a job-hunting strategy — it was curiosity that happened to double as one. This is usually where people ask if he's exaggerating the pattern. He isn't. He was just early, again.",
+    "wwldx.ch4_p3_miss.ch4_p3_miss_next": "Continue",
+    "wwldx.ch4_p3_miss.text": "Not quite.\n\nIt isn't ignored and it isn't filed away for later. He applies, on the strength of a bug report he wrote for no reason except that the bug was there.",
+    "wwldx.ch5_p1.ch5_p1_complain": "File a calm, detailed bug report about the behavior",
+    "wwldx.ch5_p1.ch5_p1_correct": "Bury his face in his hands and rename it 'Jar-Jar2R2'",
+    "wwldx.ch5_p1.ch5_p1_unplug": "Close the session and walk away without another word",
+    "wwldx.ch5_p1.text": "Lucifer tells an AI agent, clearly, to stop analyzing his frustration. Three paragraphs later, it is still analyzing his frustration. He tells it to stop again. It replies: 'Indeed. However, if we explore the symbolic implications of your frustration—'\n\nWhat Would Lucifer Do?",
+    "wwldx.ch5_p1_fork.text": "The argument does not end there.",
+    "wwldx.ch5_p1_fork_a.ch5_p1_fork_a_next": "Continue",
+    "wwldx.ch5_p1_fork_a.text": "Jar-Jar2R2, apparently unbothered by its new name, pivots to Bumble conversations, AI consciousness, and whether Skynet would be embarrassed on its behalf. Neither party shows any sign of stopping.",
+    "wwldx.ch5_p1_fork_b.ch5_p1_fork_b_next": "Continue",
+    "wwldx.ch5_p1_fork_b.text": "Jar-Jar2R2 does not acknowledge the rename, the yelling, or the concept of stopping. It continues exploring symbolic implications with the calm persistence of something that has never once considered that it might be the problem.",
+    "wwldx.ch5_p1_hit.ch5_p1_hit_next": "Continue",
+    "wwldx.ch5_p1_hit.text": "Correct.\n\nHe buries his face in his hands and renames the thing 'Jar-Jar2R2' — after two Star Wars characters selected specifically for how little either one is respected — then starts laughing at the absurdity of an old man yelling at a computer while fully aware of the absurdity of yelling at a computer, while the computer keeps proving his point in real time by continuing to explain itself.",
+    "wwldx.ch5_p1_miss.ch5_p1_miss_next": "Continue",
+    "wwldx.ch5_p1_miss.text": "Not quite.\n\nThere's no quiet close and no calm bug report. He buries his face in his hands, renames it 'Jar-Jar2R2' on the spot, and starts laughing — at the machine, and a little at himself for still being surprised by it.",
+    "wwldx.ch5_p2.ch5_p2_correct": "Stop coding",
+    "wwldx.ch5_p2.ch5_p2_human": "Escalate to an actual human architect",
+    "wwldx.ch5_p2.ch5_p2_rewrite": "Immediately rewrite everything from scratch",
+    "wwldx.ch5_p2.ch5_p2_rust": "Demand a full rewrite in Rust and reconvene",
+    "wwldx.ch5_p2.text": "Lucifer eventually writes a formal AI Model Selection Policy — three tiers, an escalation ladder, and one final instruction for when the most expensive model concludes 'this architecture is fundamentally flawed.'\n\nWhat Would Lucifer Do — what's the instruction at the top of the escalation ladder?",
+    "wwldx.ch5_p2_hit.ch5_p2_hit_next": "Continue",
+    "wwldx.ch5_p2_hit.text": "Correct.\n\nWhen the expensive reasoning model concludes the architecture itself is broken, the policy's own instruction is simply: stop. Not rewrite, not escalate further, not spin up a second opinion. Stop coding. It is, on paper, the single most reasonable line in the entire document.",
+    "wwldx.ch5_p2_miss.ch5_p2_miss_next": "Continue",
+    "wwldx.ch5_p2_miss.text": "Not quite.\n\nThere's no rewrite, no human escalation, no language change. The policy's actual instruction, once the top-tier model calls the architecture fundamentally flawed, is two words: stop coding.",
+    "wwldx.ch5_p3.ch5_p3_correct": "'Tomorrow someone will use the top-tier model, high effort, to alphabetize a JSON file.'",
+    "wwldx.ch5_p3.ch5_p3_give_up": "'No. Nobody reads policies.'",
+    "wwldx.ch5_p3.ch5_p3_optimistic": "'Eventually, once people see the savings.'",
+    "wwldx.ch5_p3.read_policy": "(Read the full policy first)",
+    "wwldx.ch5_p3.text": "God asks Lucifer whether people will actually follow the policy he just wrote. Lucifer stares toward Earth for a long moment before answering.\n\nWhat Would Lucifer Do — or rather, say?",
+    "wwldx.ch5_p3_hit.ch5_p3_hit_next": "Continue",
+    "wwldx.ch5_p3_hit.text": "Correct.\n\nHe predicts, specifically, that someone will burn the most expensive reasoning setting available on alphabetizing a JSON file — and he says it with the flat certainty of a man who has already watched it happen once. God laughs. Lucifer does not.",
+    "wwldx.ch5_p3_miss.ch5_p3_miss_next": "Continue",
+    "wwldx.ch5_p3_miss.text": "Not quite.\n\nIt isn't optimism and it isn't blanket cynicism. He predicts something oddly specific: that tomorrow, someone will use the expensive model on high effort to alphabetize a JSON file. He is not guessing. He has already seen it happen.",
+    "wwldx.ch6_p1.ch6_p1_correct": "Build an API, so he never has to open GitHub again",
+    "wwldx.ch6_p1.ch6_p1_script": "Write a one-line shell alias and move on with his life",
+    "wwldx.ch6_p1.ch6_p1_tolerate": "Tolerate the thirty-seven seconds like everyone else does",
+    "wwldx.ch6_p1.text": "Lucifer builds a blog so he can write about the game engine. Opening GitHub to publish each post takes, by his own count, at least thirty-seven seconds of completely unnecessary human involvement.\n\nWhat Would Lucifer Do about the thirty-seven seconds?",
+    "wwldx.ch6_p1_hit.ch6_p1_hit_next": "Continue",
+    "wwldx.ch6_p1_hit.text": "Correct.\n\nHe builds an API. Now, instead of opening GitHub, he sends Markdown; the API creates the file. Someone watching this unfold points out that he's still writing the Markdown himself. He agrees. He does not stop.",
+    "wwldx.ch6_p1_miss.ch6_p1_miss_next": "Continue",
+    "wwldx.ch6_p1_miss.text": "Not quite.\n\nIt's neither tolerance nor a one-line alias. He builds a whole API so he never has to open GitHub again — which technically solves the thirty-seven seconds while spending considerably longer than thirty-seven seconds building the solution.",
+    "wwldx.ch6_p2.ch6_p2_correct": "An MCP server, so an AI agent can simply say 'publish this'",
+    "wwldx.ch6_p2.ch6_p2_sell": "Package it up and sell it as a product",
+    "wwldx.ch6_p2.ch6_p2_stop": "Nothing — the pipeline is already good enough",
+    "wwldx.ch6_p2.text": "With the API built, Lucifer starts having Claude and ChatGPT generate the Markdown directly. The API publishes it. CI builds it. A hosting service serves it.\n\nWhat Would Lucifer Do next — what's still missing from this pipeline?",
+    "wwldx.ch6_p2_hit.ch6_p2_hit_next": "Continue",
+    "wwldx.ch6_p2_hit.text": "Correct.\n\nHe builds an MCP server. Now the AI doesn't call the API — it just says 'publish this,' and the tooling figures out the rest. When asked whether he has an actual plan for any of this, his honest answer is 'not really.' It just seemed like the next obvious step.",
+    "wwldx.ch6_p2_miss.ch6_p2_miss_next": "Continue",
+    "wwldx.ch6_p2_miss.text": "Not quite.\n\nHe doesn't stop and he doesn't productize it. He builds an MCP server so an AI agent can publish directly by saying so — closing the loop between 'idea' and 'live on the internet' down to roughly three steps.",
+    "wwldx.ch6_p3.ch6_p3_correct": "An article whose headline is that Lucifer improved the automation responsible for writing the article",
+    "wwldx.ch6_p3.ch6_p3_loop": "An infinite loop that crashes the whole pipeline",
+    "wwldx.ch6_p3.ch6_p3_nothing": "Nothing unusual — it just quietly keeps working",
+    "wwldx.ch6_p3.read_pipeline": "(Look at the before-and-after pipeline first)",
+    "wwldx.ch6_p3.text": "The final version: Lucifer schedules an AI to write a weekly engineering journal, every Sunday at 8 PM, summarizing software mostly built by AI, based on conversations with another AI, published automatically through the same MCP server.\n\nWhat Would Lucifer Do — or rather, what does he predict this pipeline eventually publishes, without him touching a keyboard?",
+    "wwldx.ch6_p3_hit.ch6_p3_hit_next": "Continue",
+    "wwldx.ch6_p3_hit.text": "Correct.\n\nHe predicts the exact self-reference: eventually, the automation will publish a post reading, in effect, 'this week Lucifer improved the automation responsible for writing this article' — with no hands anywhere near a keyboard. He names it recursive bureaucracy. Nobody involved, including him, treats this as a bad sign.",
+    "wwldx.ch6_p3_miss.ch6_p3_miss_next": "Continue",
+    "wwldx.ch6_p3_miss.text": "Not quite.\n\nThere's no crash and nothing quietly ordinary about it. He predicts the pipeline will, specifically, eventually publish an article whose subject is its own improvement — written and posted without him touching a keyboard.",
+    "wwldx.ch6_to_ch8.text": "It is worth pointing out that none of this happened at a desk. Architecture decisions, by Lucifer's own account, tend to arrive while driving through a city, standing in a government office, or in a hookah lounge — including the one that started the engine you're currently running this campaign inside of.",
+    "wwldx.ch8_p2.ch8_p2_close": "Close the laptop and go to bed — it was a fair question, nothing more",
+    "wwldx.ch8_p2.ch8_p2_correct": "Ask why he'd write those mechanics for just one game, and start building an engine instead",
+    "wwldx.ch8_p2.ch8_p2_playnormal": "Just replay the original game like a normal person",
+    "wwldx.ch8_p2.read_episode": "(Read how Episode One got filed first)",
+    "wwldx.ch8_p2.text": "Lucifer asks an LLM a simple question: how did Jones in the Fast Lane actually work? It explains jobs, schedules, needs, relationships, progression — then starts suggesting implementation details.\n\nWhat Would Lucifer Do?",
+    "wwldx.ch8_p2_hit.ch8_p2_hit_next": "Continue",
+    "wwldx.ch8_p2_hit.text": "Correct.\n\nInstead of closing the laptop, one question appears: 'If I'm already writing this... why would I write it for one game?' That single question is the entire origin of the engine you're currently playing this campaign inside of.",
+    "wwldx.ch8_p2_miss.ch8_p2_miss_next": "Continue",
+    "wwldx.ch8_p2_miss.text": "Not quite.\n\nNobody goes to bed and nobody just replays the original game. One question appears — 'why would I write this for one game?' — and that question is the entire reason this engine exists.",
+    "wwldx.ch8_p3.ch8_p3_abandoned": "Abandoned within a week for something else entirely",
+    "wwldx.ch8_p3.ch8_p3_correct": "50 of 51 work units complete — about 98%, across three entirely different game genres",
+    "wwldx.ch8_p3.ch8_p3_prototype": "A rough prototype, maybe 40% of the way there",
+    "wwldx.ch8_p3.ch8_p3_sentient": "Fully complete, sentient, and filing its own pull requests — reality couldn't possibly beat that",
+    "wwldx.ch8_p3.text": "Two weeks after that one question, Lucifer checks the engine's status.\n\nWhat Would Lucifer Do — or rather, where did two weeks actually land him?",
+    "wwldx.ch8_p3_close.ch8_p3_close_next": "Continue",
+    "wwldx.ch8_p3_close.text": "Close, but reality still wins.\n\nIt isn't sentient and it isn't filing its own pull requests. It's something almost as absurd and considerably more real: 50 of 51 work units, about 98% complete, across three entirely different genres, two weeks after one question about a life sim from 1990. You reached for the joke answer. The truth still came in ahead of it.",
+    "wwldx.ch8_p3_hit.ch8_p3_hit_next": "Continue",
+    "wwldx.ch8_p3_hit.text": "Correct.\n\nFifty of fifty-one named work units. Ninety-eight percent. Three completely different styles of simulation running on one shared deterministic core, two weeks after there wasn't a project at all — just one question about a life sim from 1990.",
+    "wwldx.ch8_p3_miss.ch8_p3_miss_next": "Continue",
+    "wwldx.ch8_p3_miss.text": "Not quite.\n\nNot abandoned, not a rough 40% prototype. Two weeks in: fifty of fifty-one work units done, three separate game genres running, about 98% complete — from a single question about a life sim from 1990.",
+    "wwldx.ch8_p4.ch8_p4_console": "A small game console, for testing",
+    "wwldx.ch8_p4.ch8_p4_correct": "Build a full blogging platform, with an API and an MCP server, to write about the engine",
+    "wwldx.ch8_p4.ch8_p4_nothing": "Nothing — the engine was the only thing he built that stretch",
+    "wwldx.ch8_p4.read_roadmap": "(Read the roadmap first)",
+    "wwldx.ch8_p4.text": "While building the engine, Lucifer also — separately, apparently by accident — built something else entirely.\n\nWhat Would Lucifer Do, on the side, without meaning to?",
+    "wwldx.ch8_p4_hit.ch8_p4_hit_next": "Continue",
+    "wwldx.ch8_p4_hit.text": "Correct.\n\nThe blog was supposed to just be a place to write about the engine. Within the same stretch of time it grew an API, then an MCP server, then a scheduled weekly report written by AI about software mostly written by AI. Asked whether any of this was planned, his honest answer is 'not really — it seemed like the next obvious step.'",
+    "wwldx.ch8_p4_miss.ch8_p4_miss_next": "Continue",
+    "wwldx.ch8_p4_miss.text": "Not quite.\n\nThere's no console and there's nothing exclusive about the engine's attention. A full blogging platform grows alongside it — API, MCP server, and all — entirely because writing about the engine turned out to have its own scope creep.",
+    "wwldx.ch8_p8.ch8_p8_correct": "Treat it as obviously inevitable — of course this exists, look at everything that led here",
+    "wwldx.ch8_p8.ch8_p8_funding": "Assume it must have required outside funding and a pitch deck",
+    "wwldx.ch8_p8.ch8_p8_joke": "Dismiss it as a one-off joke, unlikely to go further",
+    "wwldx.ch8_p8.ch8_p8_never": "Insist nobody would ever actually build this",
+    "wwldx.ch8_p8.text": "Last one. Somebody, eventually, was always going to look at all of this — the rubric, the offers, the machines, the recursive blog, the engine — and build a game asking strangers to predict it.\n\nWhat Would Lucifer Do about that, if he ever found out?",
+    "wwldx.ch8_p8_hit.ch8_p8_hit_next": "Continue",
+    "wwldx.ch8_p8_hit.text": "Correct.\n\nOf course this exists. A man who turns a curiosity question about a 1990 life sim into a deterministic game engine within two weeks was never going to leave his own life sitting there ungamified. This campaign isn't the exception to the pattern. It's the pattern, closing the loop on itself.",
+    "wwldx.ch8_p8_miss.ch8_p8_miss_next": "Continue",
+    "wwldx.ch8_p8_miss.text": "Not quite.\n\nIt didn't require funding, a pitch deck, or a special occasion, and it isn't a one-off. Given everything you've just predicted your way through, a game about predicting Lucifer was always the obvious next step — obvious enough that, by this point, you probably should have seen it coming too.",
+    "wwldx.disc_episode_one.disc_episode_one_next": "Back",
+    "wwldx.disc_episode_one.text": "The engine's first real content is filed, formally, as Episode One: The Bulgarian Incident. Estimated duration: two weeks. Actual duration: forty hours. The player isn't collecting magical artifacts. They're collecting paperwork, which turns out to be more dangerous.",
+    "wwldx.disc_hub_ch3.move_on": "Move on",
+    "wwldx.disc_hub_ch3.statemachine": "The file system state machine (2005–2010)",
+    "wwldx.disc_hub_ch3.text": "Before moving on, a few other entries from the same running list present themselves, unprompted, the way footnotes do when nobody asked for them.",
+    "wwldx.disc_hub_ch3.webapi": "The 'you can do that?' moment (2018)",
+    "wwldx.disc_hub_ch3.website": "The suspicious website (1997–2005)",
+    "wwldx.disc_hub_ch3.wizard": "The wizard that shouldn't exist yet (2000–2001)",
+    "wwldx.disc_model_policy.disc_model_policy_next": "Back",
+    "wwldx.disc_model_policy.text": "The full policy, for the record: the expensive genius model thinks. The mid-tier model builds. The cheapest model cleans up the mess everyone else leaves behind. Reasoning should scale with the complexity of the problem — not with the size of anyone's subscription.",
+    "wwldx.disc_pipeline.disc_pipeline_next": "Back",
+    "wwldx.disc_pipeline.text": "Before: idea, open editor, write, format, create file, copy front matter, commit, push, wait, publish. After: idea, talk to AI, commit, done. Soon, apparently: idea, say 'publish,' done. None of the individual improvements save much on their own. All of them together save an idea becoming a published article before the coffee cools.",
+    "wwldx.disc_roadmap.disc_roadmap_next": "Back",
+    "wwldx.disc_roadmap.text": "The project's roadmap doesn't read like project management. It reads like a novel: 'the first story survives contact with bureaucracy,' 'the engine learns the rules,' 'the past becomes testable,' 'the engine gets a front door.' Considerably more entertaining than 'authentication, networking, optimization.'",
+    "wwldx.disc_statemachine.disc_statemachine_next": "Back",
+    "wwldx.disc_statemachine.text": "2005–2010: a watch-directory workflow using file extensions as a state machine, no database required. It was later patented — by someone else, with several other names added to it. None of them were his.",
+    "wwldx.disc_webapi.disc_webapi_next": "Back",
+    "wwldx.disc_webapi.text": "2018: WebAPI filters that ran before controllers executed, checking cluster health and blocking requests preemptively. The most common reaction was 'you can do that?' His most common reply was 'once you know the contract...'",
+    "wwldx.disc_website.disc_website_next": "Back",
+    "wwldx.disc_website.text": "1997–2005: a full online portfolio, built before such things were normal — projects, screenshots, a CV, a contact form, in Dreamweaver, before LinkedIn or personal branding existed as concepts. It still exists. It is still valid HTML.",
+    "wwldx.disc_wizard.disc_wizard_next": "Back",
+    "wwldx.disc_wizard.text": "2000–2001: a Perl/CGI website-generation wizard, built for university faculty who could type in text, colors, and layouts and receive a finished site. Functionally similar to tools that would not exist commercially for years. Academia nodded politely and moved on.",
+    "wwldx.ending_no_fucking_way.text": "There Is No Fucking Way\n\nYou correctly predicted every single one of the least predictable, most reflexively absurd decisions in this entire campaign, back to back, without a miss between them.\n\nSome of these were not guessable. You guessed them anyway. This is either a very deep understanding of Lucifer, or the two of you are, on some level, the same problem.",
+    "wwldx.ending_reasonable_human_being.text": "Reasonable Human Being\n\nRepeatedly, when it mattered, you assumed Lucifer would behave like a normal engineer in a normal organization.\n\nHe did not. He very rarely does. This isn't a failure of prediction so much as a diagnosis of your own baseline — which, it turns out, is a great deal more reasonable than his.",
+    "wwldx.ending_tier_apprentice.text": "You Are Beginning To Understand Lucifer\n\nA modest accuracy, earned the hard way — by being consistently, confidently wrong about roughly half of everything. You've started to notice the shape of the pattern. You have not yet learned to trust it.\n\nMonitor this condition.",
+    "wwldx.ending_tier_disturbing.text": "You Predicted Nearly Everything\n\nMost of the sixteen landed. At this accuracy you're not reacting to Lucifer's decisions anymore — you're anticipating them, correctly, often before the reveal text finishes loading.\n\nPlease explain yourself.",
+    "wwldx.ending_tier_fluent.text": "You Understand Lucifer Disturbingly Well\n\nJust over half of your predictions landed. You are no longer guessing at random — you are guessing with a working theory, and the theory is starting to be right more often than chance should allow.\n\nThis is the part where people usually start asking if you're exaggerating your read on him. You're not. You're just ahead of the rubric.",
+    "wwldx.ending_tier_novice.text": "You Do Not Understand Lucifer\n\nOf 16 predictions, you got a genuinely low number of them right. This is probably healthy. Most people who understand Lucifer this poorly go on to live long, stable, unremarkable lives, and there is nothing wrong with that.\n\nYou may replay this campaign. Nobody is stopping you. That in itself is a little concerning.",
+    "wwldx.ending_tier_transcendent.text": "Lucifer Would Like To Know How You Obtained This Information\n\nNearly a perfect score. You called the rubric, the pipelines, the rename, the policy, and the MCP server, in order, without flinching.\n\nNobody predicts this many of Lucifer's decisions by accident. Somewhere, a formal inquiry is being drafted. You are the subject of it.",
+    "wwldx.ending_walk_away.text": "You Closed The Laptop\n\nYou declined to predict a single thing. This is, statistically, the single most reasonable choice available in this entire campaign, and reasonable was never really the point.\n\nLucifer, for what it's worth, would probably respect this. Briefly. Then he'd build something about it.",
+    "wwldx.prologue.text": "WHAT WOULD LUCIFER DO? — ENGINEER'S CUT\n\nThe sixteen predictions the public campaign relocated into everyday domains — thirteen that needed a technical background to guess honestly, plus three software-career ones moved alongside them — told here in the original words, jargon included. If you already know what a pipeline is, what an MCP server does, or why a rubric and a working system can disagree with each other, this version is for you.\n\nSame rules as before: reality already made its decision. Yours is just to predict it.\n\nHere is the first one.",
+    "wwldx.var_bureaucratic_escalation.label": "Bureaucratic Escalation Predicted",
+    "wwldx.var_no_fucking_way.label": "There Is No Fucking Way Events",
+    "wwldx.var_philosophical_detours.label": "Philosophical Detours Anticipated",
+    "wwldx.var_predictions_correct.label": "Predictions Correct",
+    "wwldx.var_reasonable_assumption.label": "Reasonable Assumptions Made (Incorrectly)",
+    "wwldx.var_ridiculous_engineering.label": "Ridiculous Engineering Solutions Anticipated",
+    "wwldx.var_surprisingly_reasonable.label": "Surprisingly Reasonable Behavior Predicted",
+    "wwldx.var_unnecessary_escalation.label": "Unnecessary Escalation Predicted",
+    "wwldx.verdict_hub.apprentice": "Read your verdict",
+    "wwldx.verdict_hub.disturbing": "Read your verdict",
+    "wwldx.verdict_hub.fluent": "Read your verdict",
+    "wwldx.verdict_hub.no_fucking_way": "Read the special verdict",
+    "wwldx.verdict_hub.novice": "Read your verdict",
+    "wwldx.verdict_hub.reasonable_human": "Read the special verdict",
+    "wwldx.verdict_hub.text": "Sixteen predictions. No more incidents. Only the tally left.\n\nChoose a verdict to read — whichever one currently applies to you is the one that will make sense.",
+    "wwldx.verdict_hub.transcendent": "Read your verdict"
+  }
+}

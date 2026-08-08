@@ -1,0 +1,5 @@
+engine/
+public/campaigns/
+dist/
+node_modules/
+src/play/browser/__screenshots__/

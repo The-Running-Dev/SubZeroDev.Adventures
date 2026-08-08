@@ -88,6 +88,7 @@ describe("visual baseline (W65.5)", () => {
     it(`playing at ${width}px`, async () => {
       await page.viewport(width, 900);
       const { container } = await reachPlaying();
+      hideNonDeterministicContent(container);
       resetScroll();
       await expect
         .element(page.elementLocator(container))
@@ -108,6 +109,7 @@ describe("visual baseline (W65.5)", () => {
       await page.viewport(width, 900);
       const { container, restore } = await reachPersistenceWarning();
       try {
+        hideNonDeterministicContent(container);
         resetScroll();
         await expect
           .element(page.elementLocator(container))

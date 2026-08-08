@@ -16,32 +16,60 @@ import {
 import type { ThemeId } from "../theme";
 import { BbsPrompt } from "./BbsPrompt";
 import { BrowserClient, type PlayState } from "./browser-client";
-import { createBrowserDemo, type BrowserDemo } from "./composition";
+import {
+  createBrowserDemo,
+  type BrowserDemo,
+  type StatBounds,
+} from "./composition";
 import { MatrixRain } from "./MatrixRain";
 
+/**
+ * Every registered campaign has an entry, hidden ones included -- a direct
+ * `?campaign=` link is a hidden campaign's only door in, and a campaign with no
+ * entry here falls back to "UNCLASSIFIED STORY" and the house accent, which is
+ * a visible identity gap rather than a neutral default.
+ *
+ * Accents are skins, not ids, so sharing one is fine: the two Lucifer
+ * prediction campaigns share `cobalt` because they are one family, and Saki
+ * reuses `violet` simply because there is no seventh accent. The eyebrow is
+ * what actually distinguishes them.
+ */
 const cabinetThemes: Readonly<
   Record<string, { accent: string; eyebrow: string }>
 > = {
+  "what-would-lucifer-do": { accent: "cobalt", eyebrow: "PREDICTION LOG" },
+  "what-would-lucifer-do-engineers-cut": {
+    accent: "cobalt",
+    eyebrow: "PREDICTION LOG // ENGINEER'S CUT",
+  },
   "lucifer-chronicles": { accent: "ember", eyebrow: "CELESTIAL CASE FILE" },
   "bulgaria-bureaucracy": { accent: "red", eyebrow: "MUNICIPAL ARCHIVE" },
   "bulgaria-return": { accent: "teal", eyebrow: "RETURN DEPARTMENT" },
   "bulgaria-driving": { accent: "yellow", eyebrow: "ROAD SAFETY OFFICE" },
   "bulgaria-inheritance": { accent: "green", eyebrow: "ESTATE RECORDS" },
   "bulgaria-enterprise": { accent: "violet", eyebrow: "ENTERPRISE DESK" },
+  "saki-quest-for-redemption": {
+    accent: "violet",
+    eyebrow: "REDEMPTION FILE",
+  },
 };
+
+interface Stat {
+  readonly var: string;
+  readonly labelKey: string;
+  readonly value: string | number | boolean;
+}
 
 function viewOf(state: PlayState) {
   const view = state.view.kindView as {
-    stats?: {
-      var: string;
-      labelKey: string;
-      value: string | number | boolean;
-    }[];
+    stats?: Stat[];
     unlockedAchievements?: string[];
+    turn?: number;
   };
   return {
     stats: view.stats ?? [],
     achievements: view.unlockedAchievements ?? [],
+    turn: view.turn,
   };
 }
 
@@ -135,6 +163,129 @@ function SceneRegion({
         ))}
       </p>
     </section>
+  );
+}
+
+const NO_STATS: ReadonlySet<string> = new Set();
+/**
+ * Long enough to notice on a glance back at the panel, short enough that a stat
+ * which moved two turns ago is not still lit. Kept in step with the
+ * `.stat-changed` animation duration in play.css.
+ */
+const STAT_HIGHLIGHT_MS = 1100;
+
+/**
+ * Which stats changed on the turn just committed.
+ *
+ * A stat moving is this game's main feedback signal, and the projection reports
+ * only the *new* value -- after a turn, "3" is indistinguishable from "3 again"
+ * without remembering what the previous turn showed. Comparing against the
+ * previously rendered values is what makes the change visible at all.
+ *
+ * Nothing is highlighted on a run's first render (every stat is new, not
+ * changed), which is what keeps a freshly loaded story from flashing all eight
+ * readouts at once. State lives in a signature string rather than the `stats`
+ * array because `viewOf` builds a fresh array every render -- depending on the
+ * array itself would re-run this on every render, not on every actual change.
+ */
+function useChangedStats(stats: readonly Stat[]): ReadonlySet<string> {
+  /*
+   * JSON rather than a delimiter-joined string: an `enum` stat's value is
+   * authored content, so there is no separator this could assume it is free of.
+   */
+  const signature = JSON.stringify(
+    Object.fromEntries(stats.map((stat) => [stat.var, String(stat.value)])),
+  );
+  const previous = useRef<string | undefined>(undefined);
+  const [changed, setChanged] = useState<ReadonlySet<string>>(NO_STATS);
+
+  useEffect(() => {
+    const before = previous.current;
+    previous.current = signature;
+    if (before === undefined || before === signature) return;
+
+    const past = JSON.parse(before) as Record<string, string>;
+    const now = JSON.parse(signature) as Record<string, string>;
+    const moved = new Set(
+      Object.keys(now).filter(
+        (name) => past[name] !== undefined && past[name] !== now[name],
+      ),
+    );
+    if (moved.size === 0) return;
+
+    setChanged(moved);
+    const timer = setTimeout(() => setChanged(NO_STATS), STAT_HIGHLIGHT_MS);
+    return () => clearTimeout(timer);
+  }, [signature]);
+
+  return changed;
+}
+
+/**
+ * The player-visible stats.
+ *
+ * A bounded int renders as `value / max` over a meter rather than a bare
+ * number: the campaign declares the range (`predictions_correct` is 0-26, i.e.
+ * a score out of 26), and without the denominator the panel shows a count with
+ * nothing to read it against. Bounds come from the campaign this client already
+ * fetched, since the projection deliberately carries the value alone.
+ *
+ * A stat still sitting at its floor is dimmed rather than hidden -- the set of
+ * stats is itself a hint about what the story measures, so dropping the
+ * untouched ones would hide the shape of the run, but leaving them at full
+ * strength is what makes an all-zero panel read as noise.
+ */
+function StatReadouts({
+  stats,
+  strings,
+  bounds,
+}: {
+  stats: readonly Stat[];
+  strings: PlayState["strings"];
+  bounds: Readonly<Record<string, StatBounds>>;
+}) {
+  const changed = useChangedStats(stats);
+  return (
+    <dl className="stat-readouts">
+      {stats.map((stat) => {
+        const range = bounds[stat.var];
+        const floor = range?.min ?? 0;
+        const ceiling = range?.max;
+        const numeric = typeof stat.value === "number";
+        const metered = numeric && ceiling !== undefined && ceiling > floor;
+        const className = [
+          numeric && stat.value === floor ? "stat-idle" : "",
+          metered ? "stat-metered" : "",
+          changed.has(stat.var) ? "stat-changed" : "",
+        ]
+          .filter(Boolean)
+          .join(" ");
+        return (
+          <div
+            key={stat.var}
+            {...(className ? { className } : {})}
+            {...(metered
+              ? {
+                  style: {
+                    "--stat-fill": `${Math.round(
+                      (((stat.value as number) - floor) / (ceiling! - floor)) *
+                        100,
+                    )}%`,
+                  } as CSSProperties,
+                }
+              : {})}
+          >
+            <dt>{strings[stat.labelKey]}</dt>
+            <dd>
+              {String(stat.value)}
+              {ceiling !== undefined && (
+                <span className="stat-ceiling"> / {ceiling}</span>
+              )}
+            </dd>
+          </div>
+        );
+      })}
+    </dl>
   );
 }
 
@@ -697,16 +848,16 @@ function PlayAppReady({ demo }: { demo: BrowserDemo }) {
                 <div className="console-heading">
                   <p className="eyebrow">SIDE PANEL // MEMORY</p>
                   <h2 id="console-title">Player status</h2>
+                  {viewOf(state).turn !== undefined && (
+                    <p className="turn-readout">Turn {viewOf(state).turn}</p>
+                  )}
                 </div>
                 {viewOf(state).stats.length ? (
-                  <dl className="stat-readouts">
-                    {viewOf(state).stats.map((stat) => (
-                      <div key={stat.var}>
-                        <dt>{state.strings[stat.labelKey]}</dt>
-                        <dd>{String(stat.value)}</dd>
-                      </div>
-                    ))}
-                  </dl>
+                  <StatReadouts
+                    stats={viewOf(state).stats}
+                    strings={state.strings}
+                    bounds={selected?.statBounds ?? {}}
+                  />
                 ) : (
                   <p className="console-empty">
                     No visible statistics have been authorized for this case.
@@ -718,8 +869,20 @@ function PlayAppReady({ demo }: { demo: BrowserDemo }) {
                     Achievement stamps: {viewOf(state).achievements.length}
                   </p>
                 )}
-                <details className="journey-log">
-                  <summary>Travel log</summary>
+                {/*
+                 * Open by default: this is the run's own history, it fills the
+                 * console's otherwise-dead lower half on desktop, and behind a
+                 * collapsed `[+]` most players never find it. `open` is set
+                 * once, not controlled -- React only rewrites the attribute
+                 * when the prop value changes, so closing it stays closed.
+                 */}
+                <details className="journey-log" open>
+                  <summary>
+                    Travel log
+                    <span className="journey-count">
+                      {journey.length} {journey.length === 1 ? "page" : "pages"}
+                    </span>
+                  </summary>
                   <ol>
                     {journey.map((entry, index) => (
                       <li

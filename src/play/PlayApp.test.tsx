@@ -294,11 +294,24 @@ describe("PlayApp cabinet presentation", () => {
     expect(screen.getByText("Wait for the municipal registry")).toBeVisible();
     expect(screen.getByText("// accepted")).toBeVisible();
 
-    await user.click(screen.getByText("Travel log"));
+    // The log opens with the run, so the journey is readable without a click.
     expect(screen.getByText(/Where I came from:/)).toBeVisible();
     expect(
       screen.queryByText(/actionLog|kindState|currentNodeId|seed/i),
     ).not.toBeInTheDocument();
+  });
+
+  it("gives the featured campaign its own cabinet identity, not the unclassified fallback", async () => {
+    const user = userEvent.setup();
+    render(<PlayApp />);
+    await screen.findByRole("heading", { name: "Adventure disk library" });
+
+    await user.click(
+      screen.getByRole("button", { name: /What Would Lucifer Do\?/i }),
+    );
+
+    expect(screen.getByText("PREDICTION LOG")).toBeVisible();
+    expect(screen.queryByText("UNCLASSIFIED STORY")).not.toBeInTheDocument();
   });
 
   it("offers a resume for a campaign with a local save, and reloads that run", async () => {
@@ -329,6 +342,63 @@ describe("PlayApp cabinet presentation", () => {
     expect(
       screen.queryByRole("heading", { name: "Adventure disk library" }),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe("PlayApp status console", () => {
+  beforeEach(() => {
+    localStorage.setItem(THEME_STORAGE_KEY, "dos");
+  });
+
+  async function openFlagship(): Promise<void> {
+    const user = userEvent.setup();
+    render(<PlayApp />);
+    await screen.findByRole("heading", { name: "Adventure disk library" });
+    await user.click(
+      screen.getByRole("button", { name: /What Would Lucifer Do\?/i }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Load selected adventure" }),
+    );
+    await screen.findByRole("heading", { name: "Player status" });
+  }
+
+  it("reads a bounded stat against its declared ceiling, over a meter", async () => {
+    await openFlagship();
+
+    const rows = [...document.querySelectorAll(".stat-readouts div")];
+    expect(rows.length).toBeGreaterThan(0);
+
+    // Every visible variable in this campaign is a bounded int, so each row
+    // carries the denominator the projection alone does not supply.
+    for (const row of rows) {
+      expect(row).toHaveClass("stat-metered");
+      expect(row.querySelector(".stat-ceiling")?.textContent).toMatch(
+        /\/\s*\d+/,
+      );
+    }
+  });
+
+  it("dims a stat still sitting at its floor rather than hiding it", async () => {
+    await openFlagship();
+
+    const rows = [...document.querySelectorAll(".stat-readouts div")];
+    // Nothing has been earned on the opening scene, so every row starts idle
+    // -- still present, because the set of stats says what the story measures.
+    for (const row of rows) expect(row).toHaveClass("stat-idle");
+  });
+
+  it("shows the current turn", async () => {
+    await openFlagship();
+    expect(screen.getByText(/^Turn \d+$/)).toBeVisible();
+  });
+
+  it("opens the travel log with the run and counts its pages", async () => {
+    await openFlagship();
+
+    const log = document.querySelector<HTMLDetailsElement>(".journey-log")!;
+    expect(log.open).toBe(true);
+    expect(screen.getByText("1 page")).toBeVisible();
   });
 });
 

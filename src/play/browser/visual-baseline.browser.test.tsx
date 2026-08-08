@@ -55,7 +55,15 @@ afterEach(async () => {
  * does not weaken what the baseline exists to prove.
  */
 function hideNonDeterministicContent(container: Element): void {
-  const selectors = [".stat-readouts", ".journey-log", ".achievement-note"];
+  const selectors = [
+    ".stat-readouts",
+    ".journey-log",
+    ".achievement-note",
+    // The turn counter is the same class of value: how many turns a route took
+    // to reach an ending depends on which way it forked, so it is stable within
+    // a run and not across runs.
+    ".turn-readout",
+  ];
   for (const selector of selectors) {
     for (const el of container.querySelectorAll<HTMLElement>(selector)) {
       el.style.display = "none";

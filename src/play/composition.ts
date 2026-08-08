@@ -13,6 +13,12 @@ import {
   type SessionStore,
 } from "@the-running-dev/game-engine";
 
+/** The declared clamp range of one visible int stat, for rendering it as a meter rather than a bare number. */
+export interface StatBounds {
+  readonly min?: number;
+  readonly max?: number;
+}
+
 export interface BrowserCampaign {
   readonly campaignId: string;
   readonly title: string;
@@ -23,6 +29,51 @@ export interface BrowserCampaign {
   /** Playable and registered, but omitted from the public dossier grid — reachable only by a direct `?campaign=` link. */
   readonly hidden?: boolean;
   readonly sources?: readonly { label: string; href: string }[];
+  /**
+   * Declared `min`/`max` for each visible int variable, keyed by variable name.
+   * Empty for a campaign whose stats are all unbounded, and for any kind that
+   * does not declare variables this way.
+   */
+  readonly statBounds: Readonly<Record<string, StatBounds>>;
+}
+
+/**
+ * `Campaign.content` is deliberately `unknown` to the core — kind-specific and
+ * opaque (registry/types.ts). The player projection carries a stat's *value* but
+ * not its declared range (`VisibleStat`, story-graph/view.ts, which omits it to
+ * avoid duplicating campaign content in the view), so rendering "3 / 26" instead
+ * of a bare "3" means reading the range from the campaign this client already
+ * fetched.
+ *
+ * That makes this a read across the same non-contract boundary `CLAUDE.md` flags
+ * for `fromPortable`: a story-graph `VariableSchema` shape assumed structurally,
+ * not imported. It is therefore written to degrade rather than throw — a kind
+ * with no `variables` (simulation, world-graph), or a variable missing the
+ * fields, simply yields no bounds and the stat renders as it does today.
+ */
+function statBoundsOf(content: unknown): Record<string, StatBounds> {
+  const variables = (
+    content as {
+      variables?: Record<
+        string,
+        { type?: unknown; visible?: unknown; min?: unknown; max?: unknown }
+      >;
+    }
+  )?.variables;
+  if (typeof variables !== "object" || variables === null) return {};
+
+  const bounds: Record<string, StatBounds> = {};
+  for (const [name, decl] of Object.entries(variables)) {
+    if (decl?.type !== "int" || decl.visible !== true) continue;
+    const min = typeof decl.min === "number" ? decl.min : undefined;
+    const max = typeof decl.max === "number" ? decl.max : undefined;
+    if (min === undefined && max === undefined) continue;
+    bounds[name] = {
+      ...(min === undefined ? {} : { min }),
+      ...(max === undefined ? {} : { max }),
+    };
+  }
+  return bounds;
 }
 
 // The `SaveRecordStore` contract keys every operation by `saveId` (types.ts): `get`/`put`/
@@ -162,6 +213,7 @@ export async function createBrowserDemo(): Promise<BrowserDemo> {
     featured: catalog.featured,
     ...(catalog.hidden ? { hidden: true } : {}),
     ...(catalog.sources ? { sources: catalog.sources } : {}),
+    statBounds: Object.freeze(statBoundsOf(built.campaign.content)),
   }));
 
   return {

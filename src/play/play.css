@@ -248,6 +248,15 @@
   border-right: 1px solid var(--rule);
 }
 
+/*
+ * An odd-numbered catalog (7 today) otherwise leaves the final grid cell empty,
+ * which reads as a missing tile rather than the end of the list.
+ */
+.dossier:last-child:nth-child(odd) {
+  border-right: 0;
+  grid-column: 1 / -1;
+}
+
 .dossier::before {
   color: var(--text-faint);
   content: "·";
@@ -312,7 +321,11 @@
 }
 
 .briefing {
-  align-items: stretch;
+  /*
+   * `start`, not `stretch`: the emblem is a fixed 6rem badge, and stretching it
+   * to match the text column turned it into a 96x318 near-empty box.
+   */
+  align-items: start;
   background: var(--surface-raised);
   border: 2px solid var(--amber);
   color: var(--muted);
@@ -419,6 +432,21 @@
   display: grid;
   gap: 0;
   grid-template-columns: minmax(0, 1fr) minmax(17rem, 0.34fr);
+}
+
+/*
+ * Scene length varies enormously between turns -- a long opening followed by
+ * "Not quite." and one Continue made the whole cabinet visibly shrink under the
+ * reader between turns. A floor keeps the frame still and lets the text print
+ * into it, which is both calmer and closer to a real terminal.
+ *
+ * Desktop only: below 768px each page is already `min-height: 100dvh` under the
+ * phone two-page model (§8.2), which this would fight.
+ */
+@media (min-width: 768px) {
+  .cabinet-layout {
+    min-height: 32rem;
+  }
 }
 
 .scene-viewport {
@@ -586,6 +614,15 @@
   margin: 0.35rem 0 1.25rem;
 }
 
+/* Sits tight under the heading, so the negative top margin closes its gap. */
+.turn-readout {
+  color: var(--text-dim);
+  font-size: 0.8125rem;
+  letter-spacing: 0.08em;
+  margin: -0.75rem 0 1.25rem;
+  text-transform: uppercase;
+}
+
 .stat-readouts {
   border: 1px solid var(--rule-strong);
   display: grid;
@@ -600,6 +637,62 @@
   gap: 0.75rem;
   justify-content: space-between;
   padding: 0.6rem;
+  /* Positions the bounded-stat meter below. */
+  position: relative;
+}
+
+/*
+ * A stat still sitting at its declared floor is dimmed rather than removed --
+ * the list of stats is itself a hint about what the story measures, so hiding
+ * the untouched ones would hide the shape of the run. `--text-dim` (not
+ * `--text-faint`) because these are real labels that must stay legible; the
+ * fainter tier does not clear 4.5:1 against `--surface`.
+ */
+.stat-idle dt,
+.stat-idle dd {
+  color: var(--text-dim);
+}
+
+.stat-ceiling {
+  color: var(--text-dim);
+  font-weight: 400;
+}
+
+/*
+ * The filled portion of a bounded int's meter, sitting on the row's own bottom
+ * rule. `--stat-fill` is set per row in PlayApp.tsx; an unbounded stat gets no
+ * `.stat-metered` class and so no bar at all.
+ */
+.stat-metered::after {
+  background: var(--cyan);
+  bottom: -1px;
+  content: "";
+  height: 2px;
+  left: 0;
+  position: absolute;
+  width: var(--stat-fill, 0%);
+}
+
+/*
+ * A stat that just moved. Only the row's background animates -- the text colors
+ * hold still, so contrast never dips below its resting value mid-animation.
+ *
+ * The duration matches `STAT_HIGHLIGHT_MS` in PlayApp.tsx, which is what removes
+ * the class; keep the two in step or the row either stops animating while still
+ * marked, or drops the class mid-fade.
+ */
+.stat-changed {
+  animation: stat-bump 1.1s ease-out;
+}
+
+@keyframes stat-bump {
+  0%,
+  25% {
+    background: var(--surface-featured);
+  }
+  100% {
+    background: transparent;
+  }
 }
 
 .stat-readouts div:last-child {
@@ -613,9 +706,12 @@
 
 .stat-readouts dd {
   color: var(--amber);
+  /* A long wrapped label must not squeeze "0 / 10" onto two lines. */
+  flex: 0 0 auto;
   font-variant-numeric: tabular-nums;
   font-weight: 900;
   margin: 0;
+  white-space: nowrap;
 }
 
 .console-empty,
@@ -646,6 +742,13 @@
   list-style: none;
   min-height: 44px;
   text-transform: uppercase;
+}
+
+.journey-count {
+  color: var(--text-dim);
+  font-weight: 400;
+  margin-left: 0.5rem;
+  text-transform: none;
 }
 
 .journey-log summary::before {
@@ -795,6 +898,12 @@
   --cyan: #65c8ff;
 }
 
+/* The Lucifer prediction campaigns -- the flagship and its engineer's cut. */
+.accent-cobalt {
+  --magenta: #5b8cff;
+  --cyan: #8fd6ff;
+}
+
 /*
  * The accent overrides above sit lower in the tree than `:root`/`[data-theme]`
  * and win under any theme by default, so a Matrix or Amber run would still
@@ -831,6 +940,11 @@
   --cyan: #62ffd6;
 }
 
+[data-theme="matrix"] .accent-cobalt {
+  --magenta: #2effa8;
+  --cyan: #a0ffd0;
+}
+
 [data-theme="amber"] .accent-ember {
   --magenta: #ff8a3d;
   --cyan: #ffc266;
@@ -859,6 +973,11 @@
 [data-theme="amber"] .accent-violet {
   --magenta: #ff7a3d;
   --cyan: #ffa94d;
+}
+
+[data-theme="amber"] .accent-cobalt {
+  --magenta: #ffa33d;
+  --cyan: #ffd28a;
 }
 
 /* Real CGA color pairs, one hue-family per campaign, matching the palette in themes.css. */
@@ -890,6 +1009,11 @@
 [data-theme="bbs"] .accent-violet {
   --magenta: #aa00aa;
   --cyan: #ff55ff;
+}
+
+[data-theme="bbs"] .accent-cobalt {
+  --magenta: #0000aa;
+  --cyan: #5555ff;
 }
 
 /*
@@ -1031,7 +1155,18 @@
   gap: 0.15rem;
   /* Visually tight, but still a real touch target -- see the same note on `.action-card button` below. */
   min-height: 44px;
-  padding: 0.4rem 0 0.4rem 1.25rem;
+  /*
+   * The base theme's 2.2rem left padding clears the absolutely-positioned `>`
+   * marker; this theme's old 1.25rem did not. The marker starts at 1rem and the
+   * glyph is about half of that wide, so it printed on top of the title's first
+   * letter on the selected row. Pulling the marker left and widening the gutter
+   * fixes it without loosening the row.
+   */
+  padding: 0.4rem 0 0.4rem 1.5rem;
+}
+
+[data-theme="bbs"] .dossier::before {
+  left: 0.35rem;
 }
 
 [data-theme="bbs"] .dossier:nth-child(odd) {

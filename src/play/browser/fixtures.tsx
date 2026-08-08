@@ -16,6 +16,16 @@ export interface Reached {
 }
 
 async function mountAndOpen(campaignPattern: RegExp): Promise<Reached> {
+  /**
+   * These fixtures test the arcade-cabinet composition specifically -- the
+   * phone two-page model, hit-area floors, visual baselines -- none of
+   * which exist under every theme (BBS Terminal strips that composition
+   * out entirely). Pinning `dos` here decouples "what these regression
+   * specs are about" from "whatever the app's default theme happens to be
+   * today," so a future default change doesn't silently start testing the
+   * wrong thing.
+   */
+  localStorage.setItem("subzerodev.play.theme.v1", "dos");
   const user = userEvent.setup();
   const { container, unmount } = render(<PlayApp />);
   await user.click(

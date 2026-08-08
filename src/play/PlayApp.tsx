@@ -1,7 +1,23 @@
-import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
-import { SiteFooter, SiteHeader } from "../shared";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type RefObject,
+} from "react";
+import { ThemeSelector } from "../ThemeSelector";
+import {
+  applyTheme,
+  DEFAULT_THEME,
+  readStoredTheme,
+  storeTheme,
+} from "../theme";
+import type { ThemeId } from "../theme";
+import { BbsPrompt } from "./BbsPrompt";
 import { BrowserClient, type PlayState } from "./browser-client";
 import { createBrowserDemo, type BrowserDemo } from "./composition";
+import { MatrixRain } from "./MatrixRain";
 
 const cabinetThemes: Readonly<
   Record<string, { accent: string; eyebrow: string }>
@@ -46,19 +62,58 @@ function excerpt(text: string): string {
   return text.length <= 150 ? text : `${text.slice(0, 147).trimEnd()}…`;
 }
 
+/** "1" for a single option, "1-N" otherwise -- used in both the BBS prompt's hint line and its range errors. */
+function rangeLabel(count: number): string {
+  return count <= 1 ? "1" : `1-${count}`;
+}
+
+/** A retro 8.3-style DOS name for the prompt sigil -- e.g. "The Bureaucracy" -> "BUREAUCR". */
+function dosName(title: string): string {
+  const cleaned = title
+    .toUpperCase()
+    .replace(/^(THE|A|AN)\s+/, "")
+    .replace(/[^A-Z0-9]/g, "");
+  return cleaned.slice(0, 8) || "STORY";
+}
+
+/** A brisk reveal, not a literal words-per-minute simulation -- floors and caps keep very short or very long excerpts from feeling instant or endless. */
+const REVEAL_CHARS_PER_SECOND = 55;
+const REVEAL_MIN_MS = 400;
+const REVEAL_MAX_MS = 900;
+/** Matrix reads slightly slower than the other skins -- part of its distinct pacing. */
+const MATRIX_REVEAL_MULTIPLIER = 1.25;
+
+function revealDuration(text: string, theme: ThemeId): number {
+  const raw = (text.length / REVEAL_CHARS_PER_SECOND) * 1000;
+  const clamped = Math.min(REVEAL_MAX_MS, Math.max(REVEAL_MIN_MS, raw));
+  return theme === "matrix" ? clamped * MATRIX_REVEAL_MULTIPLIER : clamped;
+}
+
 /**
  * A labelled region with a short real heading, not the authored prose
  * itself -- a paragraph marked up as a heading makes the phone
  * screen-reader's heading rotor return a wall of story instead of a
  * landmark (14 §8.5).
+ *
+ * The story text is split into per-character spans, each with its own
+ * `animation-delay`, so it visibly prints one character at a time rather
+ * than as a single block-wide wipe. Every character is present in the DOM
+ * from the first render -- only its `opacity` is staggered -- so
+ * `textContent` is complete immediately: no test or screen reader has to
+ * wait out the reveal to see the full scene.
  */
 function SceneRegion({
   text,
   regionRef,
+  theme,
 }: {
   text: string;
   regionRef: RefObject<HTMLElement | null>;
+  theme: ThemeId;
 }) {
+  const chars = useMemo(() => Array.from(text), [text]);
+  const total = revealDuration(text, theme);
+  const perChar = chars.length ? total / chars.length : 0;
   return (
     <section
       ref={regionRef}
@@ -69,7 +124,16 @@ function SceneRegion({
       <h2 id="scene-heading" className="sr-only">
         Scene
       </h2>
-      <p className="scene-body">{text}</p>
+      <p
+        className="scene-body"
+        style={{ "--reveal-total": `${total}ms` } as CSSProperties}
+      >
+        {chars.map((char, index) => (
+          <span key={index} style={{ animationDelay: `${index * perChar}ms` }}>
+            {char}
+          </span>
+        ))}
+      </p>
     </section>
   );
 }
@@ -140,6 +204,9 @@ function PlayAppReady({ demo }: { demo: BrowserDemo }) {
   const [arrivalChoice, setArrivalChoice] = useState<string>();
   const [journey, setJourney] = useState<readonly JourneyEntry[]>([]);
   const [busy, setBusy] = useState(false);
+  /** Bumped on every return to the shelf, so the BBS prompt can clear its stale response/input independently of ordinary in-game state changes. */
+  const [bbsResetToken, setBbsResetToken] = useState(0);
+  const [displayTheme, setDisplayTheme] = useState<ThemeId>(DEFAULT_THEME);
   const sceneRegion = useRef<HTMLElement>(null);
   const scenePage = useRef<HTMLDivElement>(null);
   const choicePage = useRef<HTMLDivElement>(null);
@@ -149,13 +216,30 @@ function PlayAppReady({ demo }: { demo: BrowserDemo }) {
   const autoStarted = useRef(false);
 
   const selected = demo.findCampaign((state ? campaignId : selectedId) ?? "");
-  const theme = cabinetThemes[selected?.campaignId ?? ""];
+  const cabinetTheme = cabinetThemes[selected?.campaignId ?? ""];
   const ended = state?.scene.status === "ended";
   const sceneText = state?.scene.body.text;
 
+  /**
+   * BBS Terminal's whole point is playing without the mouse -- the command
+   * prompt keeps focus for itself there instead (BbsPrompt.tsx), so the
+   * usual scene-focus handoff would just fight it on every turn.
+   */
   useEffect(() => {
-    if (sceneText) sceneRegion.current?.focus();
-  }, [sceneText]);
+    if (sceneText && displayTheme !== "bbs") sceneRegion.current?.focus();
+  }, [sceneText, displayTheme]);
+
+  useEffect(() => {
+    const stored = readStoredTheme();
+    setDisplayTheme(stored);
+    applyTheme(stored);
+  }, []);
+
+  function changeTheme(id: ThemeId) {
+    setDisplayTheme(id);
+    applyTheme(id);
+    storeTheme(id);
+  }
 
   /**
    * A permanent `?campaign=` link loads the adventure directly -- no dossier click, no
@@ -290,12 +374,104 @@ function PlayAppReady({ demo }: { demo: BrowserDemo }) {
     setArrivalChoice(undefined);
     setJourney([]);
     setBusy(false);
+    setBbsResetToken((token) => token + 1);
   }
+
+  /**
+   * The BBS Terminal prompt's only route into the game -- everything it can
+   * do, a button on screen can also do, using the same numbering already
+   * rendered (`DISK 01`, `.action-number`). A number outside the current
+   * range gets its own message rather than the catch-all error below it, so
+   * "I typed a real number, just the wrong one" reads differently from
+   * genuinely unparseable input -- which answers with the actual GW-BASIC
+   * `INPUT` error, the one joke in the theme.
+   */
+  function runCommand(raw: string): string | undefined {
+    const upper = raw.toUpperCase();
+    const index = /^\d+$/.test(raw) ? Number.parseInt(raw, 10) : undefined;
+
+    if (upper === "HELP" || upper === "?") {
+      if (!state)
+        return "Commands: [number] select a disk, LOAD, RESUME, HELP.";
+      if (ended) return "Commands: AGAIN (or RESTART), QUIT, HELP.";
+      return "Commands: [number] take that action, QUIT, HELP.";
+    }
+
+    if (!state) {
+      if (index !== undefined) {
+        if (index >= 1 && index <= demo.catalog.length) {
+          const campaign = demo.catalog[index - 1]!;
+          setSelectedId(campaign.campaignId);
+          return `Selected disk ${index}: ${campaign.title}.`;
+        }
+        return `Invalid choice. Type ${rangeLabel(demo.catalog.length)}.`;
+      }
+      if (upper === "LOAD" || upper === "GO") {
+        if (!selected) return "?Redo from start";
+        void start(selected.campaignId);
+        return undefined;
+      }
+      if (upper === "RESUME") {
+        if (!selected) return "?Redo from start";
+        const saveId = demo.findLocalSave(selected.campaignId);
+        if (!saveId) return "No saved run for this disk.";
+        void resume(selected.campaignId, saveId);
+        return undefined;
+      }
+      return "?Redo from start";
+    }
+
+    if (ended) {
+      if (upper === "AGAIN" || upper === "RESTART") {
+        if (campaignId) void start(campaignId);
+        return undefined;
+      }
+      if (upper === "QUIT") {
+        returnToShelf();
+        return undefined;
+      }
+      return "?Redo from start";
+    }
+
+    if (upper === "QUIT") {
+      returnToShelf();
+      return undefined;
+    }
+    if (index !== undefined) {
+      if (index >= 1 && index <= state.actions.length) {
+        const action = state.actions[index - 1]!;
+        if (!action.available)
+          return `Unavailable: ${action.reason ?? "This choice is not available."}`;
+        void choose(action.id);
+        return undefined;
+      }
+      return `Invalid choice. Type ${rangeLabel(state.actions.length)}.`;
+    }
+    return "?Redo from start";
+  }
+
+  /** Reads like a real DOS path -- updates the moment a disk is selected, on the shelf or in play, not only once loaded. */
+  const bbsSigil = selected
+    ? `C:\\STORIES\\${dosName(selected.title)}>`
+    : "C:\\STORIES>";
+  const selectedSave =
+    !state && selected ? demo.findLocalSave(selected.campaignId) : undefined;
+  const bbsHint = !state
+    ? selectedSave
+      ? `Saved run found. Type RESUME to continue, or ${rangeLabel(demo.catalog.length)} for a different disk.`
+      : `Type ${rangeLabel(demo.catalog.length)}, LOAD, RESUME, or HELP.`
+    : ended
+      ? "Type AGAIN, QUIT, or HELP."
+      : `Type ${rangeLabel(state.actions.length)}, QUIT, or HELP.`;
+  /** Any game-state change -- typed or mouse-driven -- hands focus back to the prompt. */
+  const bbsFocusToken = `${selectedId ?? ""}|${campaignId ?? ""}|${sceneText ?? ""}|${ended}`;
 
   return (
     <>
-      <SiteHeader />
+      {displayTheme === "matrix" && <MatrixRain />}
       <main className="play-main">
+        <div className="boot-flash" key={displayTheme} aria-hidden="true" />
+        <ThemeSelector theme={displayTheme} onChange={changeTheme} />
         {!state ? (
           <section className="archive" aria-labelledby="shelf-title">
             <div className="archive-heading">
@@ -381,13 +557,13 @@ function PlayAppReady({ demo }: { demo: BrowserDemo }) {
           </section>
         ) : (
           <section
-            className={`cabinet accent-${theme?.accent ?? "default"}`}
+            className={`cabinet accent-${cabinetTheme?.accent ?? "default"}`}
             aria-label={`${selected?.title ?? "Story"} adventure terminal`}
           >
             <header className="cabinet-marquee">
               <div>
                 <p className="eyebrow">
-                  {theme?.eyebrow ?? "STORY IN PROGRESS"}
+                  {cabinetTheme?.eyebrow ?? "STORY IN PROGRESS"}
                 </p>
                 <h1>{selected?.title}</h1>
               </div>
@@ -412,8 +588,10 @@ function PlayAppReady({ demo }: { demo: BrowserDemo }) {
                   <>
                     <p className="scene-kicker">SESSION COMPLETE</p>
                     <SceneRegion
+                      key={sceneText}
                       text={state.scene.body.text}
                       regionRef={sceneRegion}
+                      theme={displayTheme}
                     />
                     <ArrivalReceipt arrivalChoice={arrivalChoice} />
                     <div className="ending-controls">
@@ -449,8 +627,10 @@ function PlayAppReady({ demo }: { demo: BrowserDemo }) {
                     <div className="scene-page" ref={scenePage}>
                       <p className="scene-kicker">ROOM DESCRIPTION</p>
                       <SceneRegion
+                        key={sceneText}
                         text={state.scene.body.text}
                         regionRef={sceneRegion}
+                        theme={displayTheme}
                       />
                       <ArrivalReceipt arrivalChoice={arrivalChoice} />
                       <button
@@ -473,7 +653,10 @@ function PlayAppReady({ demo }: { demo: BrowserDemo }) {
                         aria-label="Available actions"
                         aria-busy={busy}
                       >
-                        <p className="deck-label">What will you do?</p>
+                        <p className="deck-label">
+                          {displayTheme === "bbs" && `${bbsSigil} `}
+                          What will you do?
+                        </p>
                         {state.actions.map((action, index) => (
                           <div
                             className={`action-card ${!action.available ? "unavailable" : ""}`}
@@ -574,8 +757,17 @@ function PlayAppReady({ demo }: { demo: BrowserDemo }) {
             </div>
           </section>
         )}
+        {displayTheme === "bbs" && (
+          <BbsPrompt
+            sigil={bbsSigil}
+            hint={bbsHint}
+            focusToken={bbsFocusToken}
+            resetToken={bbsResetToken}
+            busy={busy}
+            onCommand={runCommand}
+          />
+        )}
       </main>
-      <SiteFooter />
     </>
   );
 }

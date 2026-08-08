@@ -1,0 +1,247 @@
+/*
+ * Single owner for every color in the app. `:root` carries the default (DOS
+ * Blue) palette so the app renders correctly even with no `data-theme`
+ * attribute present -- true in browser-mode specs, which render `<PlayApp />`
+ * with no `index.html` and thus no pre-paint script (see index.html).
+ */
+:root {
+  /* Page chrome (was index.css literals) */
+  --page-bg: #090a0d;
+  --page-text: #f4f5f7;
+  --focus-ring: #82d8ff;
+  --page-inline: 1rem;
+
+  /* Cabinet/screen (was .play-main's scoped vars) */
+  --screen: #060b21;
+  --screen-blue: #07134a;
+  --ink: #fff2b6;
+  --muted: #a9b9c9;
+  --amber: #ffb000;
+  --cyan: #31e6e2;
+  --cyan-hover: #1b9c9a;
+  --magenta: #ef4eb8;
+  --shadow: #000;
+
+  /* Surfaces */
+  --surface: #090f2e;
+  --surface-raised: #11183c;
+  --surface-sunken: #03081c;
+  --surface-deep: #020615;
+  --surface-featured: #26103a;
+
+  /* Rules */
+  --rule: #47548f;
+  --rule-soft: #303b71;
+  --rule-strong: #6574bd;
+  --rule-dashed: #6874a8;
+
+  /* Text tiers */
+  --text-body: #e9ebef;
+  --text-dim: #8f9ab6;
+  --text-faint: #68729f;
+  --text-receipt: #c2c9dd;
+  --text-quiet: #b5bfd8;
+
+  /* Accent inversions (text/marks sitting on a --cyan or --amber fill) */
+  --on-cyan: #001c2d;
+  --on-cyan-strong: #ffffff;
+  --on-cyan-number: #633600;
+  --on-cyan-hover: #16342f;
+  --on-cyan-hover-text: #d7fbfa;
+  --on-amber: #241300;
+  --amber-border: #ffe291;
+
+  /* Drop shadows */
+  --shadow-title: #7c255f;
+  --shadow-title-soft: #6b2359;
+  --shadow-emblem: #641e59;
+  --shadow-button: #005e75;
+  --shadow-button-primary: #7f3c00;
+
+  /* Notices */
+  --notice-bg: #170d24;
+  --notice-text: #eaa1ce;
+  --danger: #ff6b63;
+  --danger-bg: #2d0b23;
+  --danger-border: #ff6961;
+  --danger-text: #ffc5c1;
+
+  /* Atmosphere */
+  --inset-glow: #08135a66;
+  --scanline: #0003;
+}
+
+[data-theme="matrix"] {
+  --page-bg: #000000;
+  --page-text: #c8ffc8;
+  --focus-ring: #00ff41;
+  --screen: #010a01;
+  --screen-blue: #011f0d;
+  --ink: #c8ffc8;
+  --muted: #4fae5b;
+  --amber: #00ff41;
+  --cyan: #00ff41;
+  --cyan-hover: #008f11;
+  --magenta: #39ff6a;
+  --shadow: #000;
+
+  --surface: #020a02;
+  --surface-raised: #04140a;
+  --surface-sunken: #010601;
+  --surface-deep: #000200;
+  --surface-featured: #052b12;
+
+  --rule: #0f5c22;
+  --rule-soft: #0a3d17;
+  --rule-strong: #0f7a2d;
+  --rule-dashed: #0c5320;
+
+  --text-body: #d4ffd4;
+  --text-dim: #6fc47c;
+  --text-faint: #3a7a44;
+  --text-receipt: #a6f5ad;
+  --text-quiet: #7fce8a;
+
+  --on-cyan: #001a05;
+  --on-cyan-strong: #eaffea;
+  --on-cyan-number: #003d0d;
+  --on-cyan-hover: #002a08;
+  --on-cyan-hover-text: #d4ffd4;
+  --on-amber: #001a05;
+  --amber-border: #7bffa0;
+
+  --shadow-title: #005c1a;
+  --shadow-title-soft: #004d16;
+  --shadow-emblem: #003d10;
+  --shadow-button: #003d10;
+  --shadow-button-primary: #002608;
+
+  --notice-bg: #041c08;
+  --notice-text: #8fffa0;
+  --danger: #ff5544;
+  --danger-bg: #1c0503;
+  --danger-border: #ff5544;
+  --danger-text: #ffcfc8;
+
+  --inset-glow: #00ff4133;
+  --scanline: #0006;
+}
+
+[data-theme="amber"] {
+  --page-bg: #140c00;
+  --page-text: #ffd699;
+  --focus-ring: #ffb000;
+  --screen: #1a0f00;
+  --screen-blue: #241600;
+  --ink: #ffd699;
+  --muted: #c98f3f;
+  --amber: #ffb000;
+  --cyan: #ffb000;
+  --cyan-hover: #b57a00;
+  --magenta: #ff8c1a;
+  --shadow: #000;
+
+  --surface: #1f1300;
+  --surface-raised: #2b1c00;
+  --surface-sunken: #140b00;
+  --surface-deep: #0d0700;
+  --surface-featured: #3a2400;
+
+  --rule: #7a5210;
+  --rule-soft: #5c3c0c;
+  --rule-strong: #8f6318;
+  --rule-dashed: #6b4a10;
+
+  --text-body: #ffe0b0;
+  --text-dim: #c99a55;
+  --text-faint: #8a6a3a;
+  --text-receipt: #f0c483;
+  --text-quiet: #d9ac66;
+
+  --on-cyan: #2b1800;
+  --on-cyan-strong: #fff3e0;
+  --on-cyan-number: #402200;
+  --on-cyan-hover: #402200;
+  --on-cyan-hover-text: #ffe9c8;
+  --on-amber: #2b1800;
+  --amber-border: #ffd699;
+
+  --shadow-title: #7a3d00;
+  --shadow-title-soft: #663300;
+  --shadow-emblem: #663300;
+  --shadow-button: #663300;
+  --shadow-button-primary: #4d2600;
+
+  --notice-bg: #2b1800;
+  --notice-text: #ffb84d;
+  --danger: #ff6a3a;
+  --danger-bg: #2b0f00;
+  --danger-border: #ff6a3a;
+  --danger-text: #ffd0b8;
+
+  --inset-glow: #ffb00033;
+  --scanline: #0004;
+}
+
+/*
+ * The real 16-color CGA/EGA text palette, not an invented hex set -- this is
+ * the one theme that also strips the arcade-cabinet composition itself (see
+ * play.css's `[data-theme="bbs"]` section), so every surface collapses to
+ * black and the shadow/glow/scanline vars are switched off through the
+ * variables already wired for them rather than needing separate overrides.
+ */
+[data-theme="bbs"] {
+  --page-bg: #000000;
+  --page-text: #aaaaaa;
+  --focus-ring: #55ffff;
+  --screen: #000000;
+  --screen-blue: #000000;
+  --ink: #ffffff;
+  --muted: #aaaaaa;
+  --amber: #ffff55;
+  --cyan: #55ffff;
+  --cyan-hover: #00aaaa;
+  --magenta: #ff55ff;
+  --shadow: transparent;
+
+  --surface: #000000;
+  --surface-raised: #000000;
+  --surface-sunken: #000000;
+  --surface-deep: #000000;
+  --surface-featured: #000000;
+
+  --rule: #555555;
+  --rule-soft: #555555;
+  --rule-strong: #555555;
+  --rule-dashed: #555555;
+
+  --text-body: #aaaaaa;
+  --text-dim: #555555;
+  --text-faint: #555555;
+  --text-receipt: #aaaaaa;
+  --text-quiet: #aaaaaa;
+
+  --on-cyan: #000000;
+  --on-cyan-strong: #000000;
+  --on-cyan-number: #000000;
+  --on-cyan-hover: #000000;
+  --on-cyan-hover-text: #ffffff;
+  --on-amber: #000000;
+  --amber-border: #ffff55;
+
+  --shadow-title: transparent;
+  --shadow-title-soft: transparent;
+  --shadow-emblem: transparent;
+  --shadow-button: transparent;
+  --shadow-button-primary: transparent;
+
+  --notice-bg: #000000;
+  --notice-text: #ff55ff;
+  --danger: #ff5555;
+  --danger-bg: #000000;
+  --danger-border: #ff5555;
+  --danger-text: #ff5555;
+
+  --inset-glow: transparent;
+  --scanline: transparent;
+}

@@ -1,6 +1,15 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import PlayApp from "./PlayApp";
 import manifestJson from "../../public/campaigns/manifest.json";
 import whatWouldLuciferDoJson from "../../public/campaigns/what-would-lucifer-do.json";
@@ -45,7 +54,37 @@ afterAll(() => {
   globalThis.fetch = originalFetch;
 });
 
+/**
+ * `.scene-body` splits its text into one `<span>` per character (the
+ * per-character reveal animation), so it has no direct text-node children
+ * left -- Testing Library's `getByText`/`findByText` only reads an
+ * element's own text nodes, not full recursive `textContent`, so they can
+ * never match here. `textContent` itself is unaffected and always complete,
+ * so reading it directly is the correct replacement, not a workaround.
+ */
+async function findSceneBody(pattern: RegExp): Promise<HTMLElement> {
+  return waitFor(() => {
+    const el = document.querySelector<HTMLElement>(".scene-body");
+    if (!el || !pattern.test(el.textContent ?? "")) {
+      throw new Error(`.scene-body did not match ${pattern}`);
+    }
+    return el;
+  });
+}
+
+const THEME_STORAGE_KEY = "subzerodev.play.theme.v1";
+
 describe("PlayApp cabinet presentation", () => {
+  /**
+   * This suite is about the arcade-cabinet composition specifically (its
+   * focus contract, its copy, its DOM) -- not whichever theme happens to be
+   * the app's current default, which "PlayApp display theme" below tests
+   * directly and deliberately leaves unpinned.
+   */
+  beforeEach(() => {
+    localStorage.setItem(THEME_STORAGE_KEY, "dos");
+  });
+
   it("renders a selectable dossier shelf and opens a plain-language briefing", async () => {
     const user = userEvent.setup();
     render(<PlayApp />);
@@ -76,9 +115,7 @@ describe("PlayApp cabinet presentation", () => {
       screen.getByRole("button", { name: "Load selected adventure" }),
     );
 
-    expect(
-      await screen.findByText(/handwritten/i, { selector: ".scene-body" }),
-    ).toBeVisible();
+    expect(await findSceneBody(/handwritten/i)).toBeVisible();
     expect(
       screen.queryByRole("dialog", { name: "Before loading this program" }),
     ).not.toBeInTheDocument();
@@ -103,9 +140,7 @@ describe("PlayApp cabinet presentation", () => {
     window.history.pushState({}, "", "/?campaign=bulgaria-bureaucracy");
     try {
       render(<PlayApp />);
-      expect(
-        await screen.findByText(/handwritten/i, { selector: ".scene-body" }),
-      ).toBeVisible();
+      expect(await findSceneBody(/handwritten/i)).toBeVisible();
       expect(
         screen.queryByRole("heading", { name: "Adventure disk library" }),
       ).not.toBeInTheDocument();
@@ -188,9 +223,7 @@ describe("PlayApp cabinet presentation", () => {
       screen.getByRole("button", { name: "Load selected adventure" }),
     );
 
-    expect(
-      await screen.findByText(/handwritten/i, { selector: ".scene-body" }),
-    ).toBeVisible();
+    expect(await findSceneBody(/handwritten/i)).toBeVisible();
     expect(
       screen.getByRole("heading", { name: "Player status" }),
     ).toBeVisible();
@@ -212,7 +245,7 @@ describe("PlayApp cabinet presentation", () => {
     await user.click(
       screen.getByRole("button", { name: "Load selected adventure" }),
     );
-    await screen.findByText(/handwritten/i, { selector: ".scene-body" });
+    await findSceneBody(/handwritten/i);
 
     const region = screen.getByRole("region", { name: "Scene" });
     expect(region).toHaveFocus();
@@ -296,5 +329,165 @@ describe("PlayApp cabinet presentation", () => {
     expect(
       screen.queryByRole("heading", { name: "Adventure disk library" }),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe("PlayApp display theme", () => {
+  afterEach(() => {
+    localStorage.removeItem(THEME_STORAGE_KEY);
+    delete document.documentElement.dataset.theme;
+  });
+
+  it("offers all four display modes with the default selected", async () => {
+    render(<PlayApp />);
+    await screen.findByRole("heading", { name: "Adventure disk library" });
+
+    const select = screen.getByRole("combobox", { name: "DISPLAY MODE" });
+    expect(select).toHaveValue("bbs");
+    expect(
+      screen.getByRole("option", { name: "DOS Blue" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Matrix" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("option", { name: "Amber CRT" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("option", { name: "Terminal" }),
+    ).toBeInTheDocument();
+  });
+
+  it("applies the chosen theme to the document and persists it", async () => {
+    const user = userEvent.setup();
+    render(<PlayApp />);
+    await screen.findByRole("heading", { name: "Adventure disk library" });
+
+    const select = screen.getByRole("combobox", { name: "DISPLAY MODE" });
+    await user.selectOptions(select, "matrix");
+
+    expect(document.documentElement.dataset.theme).toBe("matrix");
+    expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe("matrix");
+  });
+
+  it("applies a previously stored theme on mount", async () => {
+    localStorage.setItem(THEME_STORAGE_KEY, "amber");
+    render(<PlayApp />);
+    await screen.findByRole("heading", { name: "Adventure disk library" });
+
+    await waitFor(() => {
+      expect(document.documentElement.dataset.theme).toBe("amber");
+      expect(
+        screen.getByRole("combobox", { name: "DISPLAY MODE" }),
+      ).toHaveValue("amber");
+    });
+  });
+
+  it("falls back to the default theme when storage throws", async () => {
+    const spy = vi
+      .spyOn(Storage.prototype, "getItem")
+      .mockImplementation(() => {
+        throw new DOMException("Simulated storage failure");
+      });
+
+    render(<PlayApp />);
+    await screen.findByRole("heading", { name: "Adventure disk library" });
+
+    expect(screen.getByRole("combobox", { name: "DISPLAY MODE" })).toHaveValue(
+      "bbs",
+    );
+
+    spy.mockRestore();
+  });
+});
+
+describe("PlayApp BBS Terminal prompt", () => {
+  afterEach(() => {
+    localStorage.removeItem(THEME_STORAGE_KEY);
+    delete document.documentElement.dataset.theme;
+  });
+
+  it("renders the prompt only once the BBS theme is active", async () => {
+    localStorage.setItem(THEME_STORAGE_KEY, "dos");
+    render(<PlayApp />);
+    await screen.findByRole("heading", { name: "Adventure disk library" });
+
+    /*
+     * The default theme is `bbs`, so `displayTheme`'s initial render value
+     * is `bbs` too -- the stored "dos" preference only takes effect once
+     * the mount effect that reads it has run. `waitFor` gives that a beat
+     * instead of racing it.
+     */
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("textbox", { name: "Command" }),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  it("selects a disk by number, loads it, and takes an action by number", async () => {
+    localStorage.setItem(THEME_STORAGE_KEY, "bbs");
+    const user = userEvent.setup();
+    render(<PlayApp />);
+    await screen.findByRole("heading", { name: "Adventure disk library" });
+
+    const input = await screen.findByRole("textbox", { name: "Command" });
+    await user.type(input, "3{enter}");
+    expect(await screen.findByText(/Selected disk 3/)).toBeVisible();
+
+    await user.type(input, "LOAD{enter}");
+    await findSceneBody(/handwritten/i);
+    const initialText = document.querySelector(".scene-body")?.textContent;
+
+    await user.type(input, "1{enter}");
+    await waitFor(() => {
+      expect(document.querySelector(".scene-body")?.textContent).not.toBe(
+        initialText,
+      );
+    });
+  });
+
+  it("returns ?Redo from start on unparseable input without changing state", async () => {
+    localStorage.setItem(THEME_STORAGE_KEY, "bbs");
+    const user = userEvent.setup();
+    render(<PlayApp />);
+    await screen.findByRole("heading", { name: "Adventure disk library" });
+
+    const input = await screen.findByRole("textbox", { name: "Command" });
+    await user.type(input, "gibberish{enter}");
+
+    expect(await screen.findByText("?Redo from start")).toBeVisible();
+    expect(
+      screen.getByRole("heading", { name: "Adventure disk library" }),
+    ).toBeVisible();
+  });
+
+  it("lists the current commands on HELP", async () => {
+    localStorage.setItem(THEME_STORAGE_KEY, "bbs");
+    const user = userEvent.setup();
+    render(<PlayApp />);
+    await screen.findByRole("heading", { name: "Adventure disk library" });
+
+    const input = await screen.findByRole("textbox", { name: "Command" });
+    await user.type(input, "HELP{enter}");
+
+    expect(
+      await screen.findByText(/select a disk, LOAD, RESUME, HELP/),
+    ).toBeVisible();
+  });
+
+  it("returns to the shelf on QUIT while playing", async () => {
+    localStorage.setItem(THEME_STORAGE_KEY, "bbs");
+    const user = userEvent.setup();
+    render(<PlayApp />);
+    await screen.findByRole("heading", { name: "Adventure disk library" });
+
+    const input = await screen.findByRole("textbox", { name: "Command" });
+    await user.type(input, "3{enter}");
+    await user.type(input, "LOAD{enter}");
+    await findSceneBody(/handwritten/i);
+
+    await user.type(input, "QUIT{enter}");
+    expect(
+      await screen.findByRole("heading", { name: "Adventure disk library" }),
+    ).toBeVisible();
   });
 });

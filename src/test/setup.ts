@@ -33,8 +33,28 @@ function installLocalStorage(): void {
   });
 }
 
+/**
+ * jsdom implements neither `localStorage` (see above) nor `matchMedia`. A stub
+ * that always reports no-match is enough for the app's `reducedMotion()` and
+ * `MatrixRain`'s mount guard, both of which only branch on `.matches`.
+ */
+function installMatchMedia(): void {
+  window.matchMedia = (query: string) =>
+    ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    }) as MediaQueryList;
+}
+
 beforeEach(() => {
   installLocalStorage();
+  installMatchMedia();
 });
 
 afterEach(() => {

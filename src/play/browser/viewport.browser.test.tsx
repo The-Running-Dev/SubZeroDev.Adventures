@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { page } from "vitest/browser";
 import { assertNoHorizontalOverflow } from "../../test/browser/assertions";
 import { clearEmulatedMedia, emulateMedia } from "../../test/browser/cdp";
@@ -9,10 +9,16 @@ import PlayApp from "../PlayApp";
  * W65.2: the runner can set viewport width and height, and can emulate
  * `prefers-reduced-motion` and forced colours. These are the two real-device
  * capabilities W66's phone-composition criteria (14 §8) need that jsdom
- * cannot provide at all.
+ * cannot provide at all. Pinned to `dos` for the same reason as
+ * `./fixtures`'s `mountAndOpen` -- W66's phone-composition criteria are
+ * about the arcade-cabinet composition specifically.
  */
 
 const PORTRAIT_WIDTHS = [320, 360, 390, 414, 768, 1280] as const;
+
+beforeEach(() => {
+  localStorage.setItem("subzerodev.play.theme.v1", "dos");
+});
 
 afterEach(async () => {
   await clearEmulatedMedia();

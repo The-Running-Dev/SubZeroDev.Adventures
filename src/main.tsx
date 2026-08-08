@@ -1,7 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import "./themes.css";
 import "./index.css";
-import "./site.css";
 import "./play/play.css";
 import PlayApp from "./play/PlayApp";
 

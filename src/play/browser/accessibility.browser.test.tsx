@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import PlayApp from "../PlayApp";
 import {
   reachEnded,
@@ -17,7 +17,14 @@ import {
  * build on a violation. Every state is reached by driving the real, shipped
  * `PlayApp` through a real campaign (`./fixtures`) -- never a fixture
  * standing in for the rendered UI.
+ *
+ * Pinned to `dos`, same as `./fixtures`'s `mountAndOpen` -- this suite is
+ * about the arcade-cabinet composition specifically, not whichever theme
+ * happens to be the app's current default.
  */
+beforeEach(() => {
+  localStorage.setItem("subzerodev.play.theme.v1", "dos");
+});
 
 async function scanForViolations(container: Element): Promise<void> {
   const results = await axe.run(container, { resultTypes: ["violations"] });

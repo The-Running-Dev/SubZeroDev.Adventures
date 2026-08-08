@@ -27,6 +27,20 @@
     <meta name="theme-color" content="#090a0d" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>SubZeroDev Adventures</title>
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem("subzerodev.play.theme.v1");
+          var theme =
+            stored === "dos" || stored === "matrix" || stored === "amber"
+              ? stored
+              : "bbs";
+          document.documentElement.dataset.theme = theme;
+        } catch (e) {
+          document.documentElement.dataset.theme = "bbs";
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

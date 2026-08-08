@@ -6,8 +6,8 @@ import { afterEach } from "vitest";
 // browser-mode spec renders a component directly, so every computed-style,
 // hit-area, contrast, and visual-snapshot assertion in this harness would
 // otherwise measure unstyled markup instead of the shipped page.
+import "../themes.css";
 import "../index.css";
-import "../site.css";
 import "../play/play.css";
 
 afterEach(() => {

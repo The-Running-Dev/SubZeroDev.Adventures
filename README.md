@@ -17,13 +17,13 @@ and how to regenerate the visual-regression baselines.
 
 ## Scripts
 
-| Script | Does |
-|---|---|
-| `npm run dev` | Local dev server |
-| `npm run build` | Production build to `dist/` |
-| `npm run check` | The full local gate: format, lint, typecheck, unit tests, real-browser tests, build |
-| `npm run setup` | Build the engine submodule (`engine/src/engine`) — needed after a fresh clone or a submodule bump |
-| `npm run sync:campaigns` | Regenerate `public/campaigns/` from the pinned engine submodule |
+| Script                   | Does                                                                                              |
+| ------------------------ | ------------------------------------------------------------------------------------------------- |
+| `npm run dev`            | Local dev server                                                                                  |
+| `npm run build`          | Production build to `dist/`                                                                       |
+| `npm run check`          | The full local gate: format, lint, typecheck, unit tests, real-browser tests, build               |
+| `npm run setup`          | Build the engine submodule (`engine/src/engine`) — needed after a fresh clone or a submodule bump |
+| `npm run sync:campaigns` | Regenerate `public/campaigns/` from the pinned engine submodule                                   |
 
 ## Credit
 

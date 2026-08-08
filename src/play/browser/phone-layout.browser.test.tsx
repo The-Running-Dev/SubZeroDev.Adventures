@@ -1,6 +1,7 @@
-import { screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
 import { page } from "vitest/browser";
+import PlayApp from "../PlayApp";
 import {
   assertMinFontSize,
   assertMinGap,
@@ -64,7 +65,6 @@ describe("type and target floors at 320px (W66.1)", () => {
     }
 
     assertMinHitArea(container.querySelector(".cabinet-button")!);
-    assertMinHitArea(screen.getByRole("button", { name: /choices? ⌄/ }), 44);
   });
 
   it("meets the type and hit-area floors on an ended run", async () => {
@@ -86,55 +86,58 @@ describe("type and target floors at 320px (W66.1)", () => {
 });
 
 /**
- * W66.2/W66.5: below 768px a turn is two snap-scrolled pages in one ordinary
- * scrolling column -- the cue is a real button that reveals the choice page,
- * the pinned echo is a real button that returns to the scene page, and
- * neither is the only route (both pages are always in the DOM).
+ * The phone reading model: one continuous column, choices directly under the
+ * scene. This replaces §8.2's two snap-scrolled pages, where the choices sat a
+ * screen away behind a cue button -- so the load-bearing assertion is now that
+ * reaching them costs no interaction at all.
  */
-describe("the phone reading model (W66.2)", () => {
-  it("keeps both pages in the DOM and lets the cue and echo move between them", async () => {
+describe("the phone reading model", () => {
+  it("shows the choices on the same screen as the scene, with nothing to tap first", async () => {
     await page.viewport(320, 900);
-    await emulateMedia([{ name: "prefers-reduced-motion", value: "reduce" }]);
     const { container } = await reachPlaying();
 
     const sceneBody = container.querySelector<HTMLElement>(".scene-body")!;
     const deck = container.querySelector<HTMLElement>(".action-deck")!;
-    // Both pages already exist -- nothing is conditionally unmounted.
     expect(sceneBody).toBeInTheDocument();
-    expect(deck).toBeInTheDocument();
 
-    const cue = screen.getByRole("button", { name: /choices? ⌄/ });
-    cue.click();
-    await waitFor(() => {
-      const rect = deck.getBoundingClientRect();
-      expect(rect.top).toBeLessThan(window.innerHeight);
-      expect(rect.bottom).toBeGreaterThan(0);
-    });
-
-    const echo = screen.getByRole("button", { name: /^Scene:/ });
-    echo.click();
-    await waitFor(() => {
-      const rect = sceneBody.getBoundingClientRect();
-      expect(rect.top).toBeLessThan(window.innerHeight);
-      expect(rect.bottom).toBeGreaterThan(0);
-    });
+    // Both are in the first viewport already -- no cue, no jump, no scroll.
+    const sceneRect = sceneBody.getBoundingClientRect();
+    const deckRect = deck.getBoundingClientRect();
+    expect(sceneRect.top).toBeLessThan(window.innerHeight);
+    expect(deckRect.top).toBeLessThan(window.innerHeight);
+    expect(deckRect.top).toBeGreaterThan(sceneRect.top);
+    expect(window.scrollY).toBe(0);
 
     assertNoHorizontalOverflow();
   });
 
-  it("lands a committed action on the new turn's scene page (W66.5)", async () => {
+  it("retires the cue and echo controls the two-page model needed", async () => {
+    await page.viewport(320, 900);
+    const { container } = await reachPlaying();
+
+    expect(container.querySelector(".scene-cue")).toBeNull();
+    expect(container.querySelector(".scene-echo")).toBeNull();
+    expect(screen.queryByRole("button", { name: /choices? ⌄/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Scene:/ })).toBeNull();
+  });
+
+  it("does not snap-scroll the document at any width", async () => {
+    await page.viewport(320, 900);
+    await reachPlaying();
+    expect(getComputedStyle(document.documentElement).scrollSnapType).toBe(
+      "none",
+    );
+    assertNoHorizontalOverflow();
+  });
+
+  it("keeps a committed action's new scene focused and in view (W66.5)", async () => {
     await page.viewport(320, 900);
     await emulateMedia([{ name: "prefers-reduced-motion", value: "reduce" }]);
     const { container, user } = await reachPlaying();
 
-    screen.getByRole("button", { name: /choices? ⌄/ }).click();
-    const firstChoice = await waitFor(() => {
-      const button = container.querySelector<HTMLButtonElement>(
-        ".action-card button:not(:disabled)",
-      );
-      expect(button).toBeTruthy();
-      return button!;
-    });
+    const firstChoice = container.querySelector<HTMLButtonElement>(
+      ".action-card button:not(:disabled)",
+    )!;
     await user.click(firstChoice);
 
     await waitFor(() => {
@@ -147,27 +150,37 @@ describe("the phone reading model (W66.2)", () => {
 
     assertNoHorizontalOverflow();
   });
+});
 
-  it("scrolls without animation when reduced motion is preferred (W66.10)", async () => {
+/**
+ * BBS Terminal's command prompt is a keyboard affordance, and a phone has no
+ * keyboard until one is summoned over a third of the screen. Every command it
+ * accepts is already a button using the same numbering it prints, so the phone
+ * simply uses those.
+ */
+describe("the BBS command prompt is desktop-only", () => {
+  it("renders no command bar on a phone", async () => {
     await page.viewport(320, 900);
-    await emulateMedia([{ name: "prefers-reduced-motion", value: "reduce" }]);
-    await reachPlaying();
+    localStorage.setItem("subzerodev.play.theme.v1", "bbs");
+    render(<PlayApp />);
+    await screen.findByRole("heading", { name: "Adventure disk library" });
 
-    const spy = vi.spyOn(Element.prototype, "scrollIntoView");
-    screen.getByRole("button", { name: /choices? ⌄/ }).click();
-    expect(spy).toHaveBeenCalledWith(
-      expect.objectContaining({ behavior: "auto" }),
-    );
-    spy.mockRestore();
+    await waitFor(() => {
+      expect(document.querySelector(".bbs-prompt")).toBeNull();
+    });
+    expect(screen.queryByRole("textbox", { name: "Command" })).toBeNull();
+    assertNoHorizontalOverflow();
   });
 
-  it("does not snap or paginate at 768px and above", async () => {
-    await page.viewport(768, 900);
-    const { container } = await reachPlaying();
+  it("still renders it on a desktop viewport", async () => {
+    await page.viewport(1280, 900);
+    localStorage.setItem("subzerodev.play.theme.v1", "bbs");
+    render(<PlayApp />);
+    await screen.findByRole("heading", { name: "Adventure disk library" });
 
-    const cue = container.querySelector(".scene-cue");
-    expect(cue).not.toBeVisible();
-    assertNoHorizontalOverflow();
+    expect(
+      await screen.findByRole("textbox", { name: "Command" }),
+    ).toBeInTheDocument();
   });
 });
 

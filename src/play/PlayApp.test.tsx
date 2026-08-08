@@ -254,7 +254,7 @@ describe("PlayApp cabinet presentation", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("names the scene-cue button after exactly the shown choices (W66's phone reading model)", async () => {
+  it("renders the choices with the scene, behind no cue control", async () => {
     const user = userEvent.setup();
     render(<PlayApp />);
     await screen.findByRole("heading", { name: "Adventure disk library" });
@@ -263,16 +263,17 @@ describe("PlayApp cabinet presentation", () => {
     await user.click(
       screen.getByRole("button", { name: "Load selected adventure" }),
     );
-    await screen.findByRole("button", { name: /choices? ⌄/ });
-
-    const deck = document.querySelector(".action-deck");
-    const shownChoices = deck?.querySelectorAll(".action-card").length ?? 0;
-    expect(shownChoices).toBeGreaterThan(0);
-    expect(
-      screen.getByRole("button", {
-        name: new RegExp(`^${shownChoices} choices?`),
-      }),
-    ).toBeVisible();
+    const deck = await waitFor(() => {
+      const el = document.querySelector(".action-deck");
+      expect(el?.querySelectorAll(".action-card").length ?? 0).toBeGreaterThan(
+        0,
+      );
+      return el!;
+    });
+    expect(deck).toBeVisible();
+    // The two-page phone model's cue and echo are gone in every theme.
+    expect(screen.queryByRole("button", { name: /choices? ⌄/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Scene:/ })).toBeNull();
   });
 
   it("records only committed projected pages in the read-only journey", async () => {

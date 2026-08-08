@@ -3,6 +3,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type CSSProperties,
   type RefObject,
 } from "react";
@@ -305,6 +306,36 @@ function ArrivalReceipt({ arrivalChoice }: { arrivalChoice?: string }) {
   );
 }
 
+/** The same 768px boundary the stylesheet's phone rules use. */
+const PHONE_QUERY = "(max-width: 767px)";
+
+/**
+ * Whether the viewport is phone-sized -- the one thing here that genuinely
+ * cannot be expressed in CSS, since it decides whether the BBS command prompt
+ * is in the DOM at all rather than merely how it looks.
+ *
+ * `useSyncExternalStore`, not `useState` + an effect, because its snapshot is
+ * re-read on every render: a missed `change` event then costs at most a stale
+ * frame, instead of pinning the wrong answer until the next resize. That is not
+ * hypothetical -- viewport changes driven through CDP (how the browser specs
+ * resize) do not always emit one, which left the prompt missing on desktop.
+ */
+function useIsPhone(): boolean {
+  return useSyncExternalStore(
+    (onStoreChange) => {
+      const query = window.matchMedia(PHONE_QUERY);
+      query.addEventListener("change", onStoreChange);
+      window.addEventListener("resize", onStoreChange);
+      return () => {
+        query.removeEventListener("change", onStoreChange);
+        window.removeEventListener("resize", onStoreChange);
+      };
+    },
+    () => window.matchMedia(PHONE_QUERY).matches,
+    () => false,
+  );
+}
+
 // SPIKE: campaigns are runtime-loaded JSON, so building the browser demo is now async
 // (a fetch, not a synchronous compiled-in build). This gate loads it once and hands the
 // resolved `BrowserDemo` down as a prop, so `PlayAppReady` below is unchanged from the
@@ -359,8 +390,15 @@ function PlayAppReady({ demo }: { demo: BrowserDemo }) {
   const [bbsResetToken, setBbsResetToken] = useState(0);
   const [displayTheme, setDisplayTheme] = useState<ThemeId>(DEFAULT_THEME);
   const sceneRegion = useRef<HTMLElement>(null);
-  const scenePage = useRef<HTMLDivElement>(null);
-  const choicePage = useRef<HTMLDivElement>(null);
+  const isPhone = useIsPhone();
+  /**
+   * BBS Terminal is keyboard-first, which is a desktop premise: on a phone the
+   * fixed prompt costs a third of the screen to summon an on-screen keyboard,
+   * and every command it accepts is already a tappable button using the same
+   * numbering it prints. So the prompt is desktop-only, and the theme falls
+   * back to the buttons it has always rendered.
+   */
+  const showBbsPrompt = displayTheme === "bbs" && !isPhone;
   /** Invalidates in-flight submissions when the player leaves or restarts a run. */
   const runToken = useRef(0);
   /** A `?campaign=` link auto-starts once, on the initial mount -- not on every re-render. */
@@ -374,11 +412,14 @@ function PlayAppReady({ demo }: { demo: BrowserDemo }) {
   /**
    * BBS Terminal's whole point is playing without the mouse -- the command
    * prompt keeps focus for itself there instead (BbsPrompt.tsx), so the
-   * usual scene-focus handoff would just fight it on every turn.
+   * usual scene-focus handoff would just fight it on every turn. Keyed on the
+   * prompt actually being rendered, not on the theme: with no prompt on a
+   * phone, nothing is competing and the scene should take focus as it does
+   * everywhere else.
    */
   useEffect(() => {
-    if (sceneText && displayTheme !== "bbs") sceneRegion.current?.focus();
-  }, [sceneText, displayTheme]);
+    if (sceneText && !showBbsPrompt) sceneRegion.current?.focus();
+  }, [sceneText, showBbsPrompt]);
 
   useEffect(() => {
     const stored = readStoredTheme();
@@ -408,24 +449,6 @@ function PlayAppReady({ demo }: { demo: BrowserDemo }) {
     if (saveId) void resume(requested, saveId);
     else void start(requested);
   }, [demo]);
-
-  function reducedMotion(): boolean {
-    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  }
-
-  function scrollToChoices() {
-    choicePage.current?.scrollIntoView({
-      behavior: reducedMotion() ? "auto" : "smooth",
-      block: "start",
-    });
-  }
-
-  function scrollToScene() {
-    scenePage.current?.scrollIntoView({
-      behavior: reducedMotion() ? "auto" : "smooth",
-      block: "start",
-    });
-  }
 
   async function start(id: string) {
     const token = ++runToken.current;
@@ -777,64 +800,44 @@ function PlayAppReady({ demo }: { demo: BrowserDemo }) {
                   </>
                 ) : (
                   <>
-                    <div className="scene-page" ref={scenePage}>
-                      <p className="scene-kicker">ROOM DESCRIPTION</p>
-                      <SceneRegion
-                        key={sceneText}
-                        text={state.scene.body.text}
-                        regionRef={sceneRegion}
-                        theme={displayTheme}
-                      />
-                      <ArrivalReceipt arrivalChoice={arrivalChoice} />
-                      <button
-                        type="button"
-                        className="scene-cue"
-                        onClick={scrollToChoices}
-                      >
-                        {state.actions.length}{" "}
-                        {state.actions.length === 1 ? "choice" : "choices"} ⌄
-                      </button>
-                    </div>
-                    <div className="choice-page" ref={choicePage}>
-                      <div className="scene-echo">
-                        <button type="button" onClick={scrollToScene}>
-                          Scene: {state.scene.body.text}
-                        </button>
-                      </div>
-                      <div
-                        className="action-deck"
-                        aria-label="Available actions"
-                        aria-busy={busy}
-                      >
-                        <p className="deck-label">
-                          {displayTheme === "bbs" && `${bbsSigil} `}
-                          What will you do?
-                        </p>
-                        {state.actions.map((action, index) => (
-                          <div
-                            className={`action-card ${!action.available ? "unavailable" : ""}`}
-                            key={action.id}
+                    <p className="scene-kicker">ROOM DESCRIPTION</p>
+                    <SceneRegion
+                      key={sceneText}
+                      text={state.scene.body.text}
+                      regionRef={sceneRegion}
+                      theme={displayTheme}
+                    />
+                    <ArrivalReceipt arrivalChoice={arrivalChoice} />
+                    <div
+                      className="action-deck"
+                      aria-label="Available actions"
+                      aria-busy={busy}
+                    >
+                      <p className="deck-label">
+                        {displayTheme === "bbs" && `${bbsSigil} `}
+                        What will you do?
+                      </p>
+                      {state.actions.map((action, index) => (
+                        <div
+                          className={`action-card ${!action.available ? "unavailable" : ""}`}
+                          key={action.id}
+                        >
+                          <button
+                            disabled={busy || !action.available}
+                            onClick={() => choose(action.id)}
                           >
-                            <button
-                              disabled={busy || !action.available}
-                              onClick={() => choose(action.id)}
-                            >
-                              <span
-                                className="action-number"
-                                aria-hidden="true"
-                              >
-                                {index + 1}
-                              </span>
-                              {action.label}
-                            </button>
-                            {!action.available && (
-                              <p className="play-reason">
-                                Unavailable: {action.reason}
-                              </p>
-                            )}
-                          </div>
-                        ))}
-                      </div>
+                            <span className="action-number" aria-hidden="true">
+                              {index + 1}
+                            </span>
+                            {action.label}
+                          </button>
+                          {!action.available && (
+                            <p className="play-reason">
+                              Unavailable: {action.reason}
+                            </p>
+                          )}
+                        </div>
+                      ))}
                     </div>
                   </>
                 )}
@@ -922,7 +925,7 @@ function PlayAppReady({ demo }: { demo: BrowserDemo }) {
             </div>
           </section>
         )}
-        {displayTheme === "bbs" && (
+        {showBbsPrompt && (
           <BbsPrompt
             sigil={bbsSigil}
             hint={bbsHint}

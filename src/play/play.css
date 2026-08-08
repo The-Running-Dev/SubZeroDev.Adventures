@@ -1415,21 +1415,21 @@
 }
 
 /*
- * §8.2's two snapped pages are structural only below 768px. Above it,
- * `display: contents` removes both wrappers from the box model entirely so
- * the desktop composition (§8.3's two upper rows) is unaffected by their
- * presence in the DOM.
+ * The phone composition. One continuous column in every theme: the scene, then
+ * the choices directly under it.
+ *
+ * This replaces §8.2's two snap-scrolled 100dvh pages, in which the choices sat
+ * a deliberate screen away behind a cue button. That model cost a tap and a
+ * jump on every single turn to reach the only controls on the page, and the
+ * scroll it triggered fought the scene-focus handoff §8.5 requires. Reading and
+ * choosing are one act here, so they share one screen. The spec for the old
+ * model lives upstream (14 §8.2) and now describes something this client no
+ * longer does.
+ *
+ * Everything below the composition rules is spacing: a phone earns its density
+ * from padding and margins, never from type size or hit area, both of which
+ * have floors in §8.1 that `phone-layout.browser.test.tsx` measures.
  */
-.scene-page,
-.choice-page {
-  display: contents;
-}
-
-.scene-cue,
-.scene-echo {
-  display: none;
-}
-
 @media (max-width: 767px) {
   .dossier-grid,
   .cabinet-layout {
@@ -1443,11 +1443,14 @@
   .status-console {
     border-left: 0;
     border-top: 3px solid var(--magenta);
+    padding: 1rem;
   }
 
   .cabinet-marquee {
     align-items: start;
     flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.75rem var(--page-inline);
   }
 
   .marquee-controls {
@@ -1457,10 +1460,12 @@
   /* Full-bleed cabinet (14 §8.4): an offset shadow outside a full-width
      element is a horizontal-overflow defect at 320px, not decoration. */
   .play-main {
+    padding-block: 0.75rem 2rem;
     padding-inline: 0;
   }
 
   .system-bar {
+    margin-bottom: 0.75rem;
     padding-inline: var(--page-inline);
   }
 
@@ -1471,62 +1476,70 @@
     box-shadow: inset 0 0 40px var(--inset-glow);
   }
 
-  html {
-    scroll-snap-type: y proximity;
+  .archive {
+    padding: 1rem var(--page-inline);
   }
 
-  .scene-page,
-  .choice-page {
-    display: block;
-    min-height: 100dvh;
-    scroll-snap-align: start;
+  .archive::before {
+    margin-bottom: 1.25rem;
   }
 
-  .scene-cue {
-    align-items: center;
-    background: var(--surface-sunken);
-    border: 2px solid var(--cyan);
-    color: var(--cyan);
-    display: flex;
-    font-size: 1rem;
-    font-weight: 700;
-    justify-content: center;
-    margin-top: 1.5rem;
+  .archive h1,
+  .cabinet h1 {
+    margin: 0.3rem 0 0.6rem;
+  }
+
+  .dossier-grid {
+    margin: 1.25rem 0 1rem;
+  }
+
+  .dossier {
+    /* 6rem is a desktop tile; on a phone it is three rows of dead space. */
     min-height: 44px;
-    padding: 0.85rem 1rem calc(0.85rem + env(safe-area-inset-bottom));
-    text-transform: uppercase;
-    width: 100%;
+    padding: 0.7rem 0.9rem 0.7rem 2rem;
   }
 
-  .scene-echo {
-    background: var(--screen-blue);
-    border-bottom: 2px dashed var(--cyan);
-    display: block;
-    padding-top: env(safe-area-inset-top);
-    position: sticky;
-    top: 0;
-    z-index: 1;
+  .dossier::before {
+    top: 1.35rem;
   }
 
-  .scene-echo button {
-    background: transparent;
-    border: 0;
-    color: var(--ink);
-    cursor: pointer;
-    display: block;
-    font-size: 0.875rem;
-    min-height: 44px;
-    overflow: hidden;
-    padding: 0.6rem 0.9rem;
-    text-align: left;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    width: 100%;
+  .briefing {
+    gap: 0.9rem;
+    padding: 1rem;
+  }
+
+  .scene-viewport {
+    padding: 1rem var(--page-inline);
+  }
+
+  .scene-body {
+    margin: 0.5rem 0 1rem;
+    /* The desktop reserve stops short scenes collapsing the stage; on a phone
+       the stage is the whole screen and the reserve is just empty space. */
+    min-height: 0;
+  }
+
+  .arrival-receipt {
+    margin-bottom: 1rem;
   }
 
   .action-deck,
   .ending-controls {
     padding-bottom: env(safe-area-inset-bottom);
+    padding-top: 1rem;
+  }
+
+  .stat-readouts div {
+    padding: 0.5rem;
+  }
+
+  .journey-log {
+    margin-top: 1rem;
+    padding-top: 0.75rem;
+  }
+
+  .source-links {
+    margin-top: 1rem;
   }
 
   .ending-controls .cabinet-button:last-child {
@@ -1534,24 +1547,15 @@
   }
 
   /*
-   * A fixed bottom command prompt and a snap-scrolled two-page phone model
-   * fight each other, and one continuous scrolling column is closer to a
-   * real terminal anyway -- so BBS Terminal opts out of §8.2 entirely.
+   * BBS Terminal's command prompt is desktop-only (see `showBbsPrompt` in
+   * PlayApp.tsx), so nothing is fixed over the bottom of the page here and the
+   * clearance the prompt needed is dead space. The theme zeroes every panel's
+   * padding, which would otherwise leave its text flush against the bezel once
+   * the cabinet goes full-bleed -- so it keeps its own gutter instead.
    */
-  html[data-theme="bbs"] {
-    scroll-snap-type: none;
-  }
-
-  [data-theme="bbs"] .scene-page,
-  [data-theme="bbs"] .choice-page {
-    display: contents;
-    min-height: auto;
-    scroll-snap-align: none;
-  }
-
-  [data-theme="bbs"] .scene-cue,
-  [data-theme="bbs"] .scene-echo {
-    display: none;
+  [data-theme="bbs"] .play-main {
+    padding-bottom: calc(1.5rem + env(safe-area-inset-bottom));
+    padding-inline: var(--page-inline);
   }
 }
 
@@ -1559,12 +1563,14 @@
   .archive,
   .scene-viewport,
   .status-console {
-    padding: 0.9rem;
+    padding: 0.8rem;
   }
 
   .archive::before {
     font-size: 0.58rem;
-    margin-bottom: 1.5rem;
+    /* Never more than the wider phone rule above -- a narrower screen earning
+       more empty space is the bug this used to have. */
+    margin-bottom: 1rem;
   }
 
   .briefing {
@@ -1578,10 +1584,7 @@
   .arrival-receipt {
     align-items: start;
     flex-direction: column;
-  }
-
-  .scene-body {
-    min-height: 0;
+    gap: 0.3rem;
   }
 }
 

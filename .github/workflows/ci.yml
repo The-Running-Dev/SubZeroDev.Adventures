@@ -35,6 +35,14 @@ jobs:
       - name: Check (format, lint, typecheck, unit + browser tests, build)
         run: npm run check
 
+      - name: Upload visual-regression diffs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vitest-attachments
+          path: .vitest-attachments/
+          if-no-files-found: ignore
+
       - name: Verify campaign content is not stale
         run: |
           npm run sync:campaigns

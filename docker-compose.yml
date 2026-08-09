@@ -19,8 +19,13 @@
 #   - `proxy-net` must already exist (`docker network create proxy-net`). Declared
 #     `external: true`, so Compose fails fast rather than silently creating an isolated
 #     network the reverse proxy is not attached to.
-#   - A git-ignored `.env` next to this file. Copy `.env.example` and fill it in; the
-#     `:?` interpolations below name each variable that has no safe default.
+#   - The variables below with a `:?` interpolation and no default. Deployed via
+#     Portainer, set these in the stack's own "Environment variables" -- Portainer feeds
+#     them into `${...}` interpolation directly and never writes a `.env` file, so an
+#     `env_file:` directive on the services below would break under Portainer even
+#     though it works from a manual `docker compose` invocation. Running this file by
+#     hand instead, copy `.env.example` to a git-ignored `.env` next to it; Compose loads
+#     that automatically for the same interpolation, no `env_file:` needed either way.
 #   - The api.adventures.subzerodev.com DNS record.
 
 # Pinned rather than derived from the directory name, which is what names the
@@ -36,8 +41,12 @@ x-adventures-api-common: &adventures-api-common
   # the host happens to hold and silently run the previous build.
   pull_policy: always
   restart: unless-stopped
-  env_file:
-    - .env
+  # No `env_file:` here, deliberately -- see SubZeroDev.com/docker-compose.yml and
+  # SubZeroDev.Blog/docker-compose.yml for the same pattern. `env_file:` requires an
+  # actual file on disk, which a Portainer-deployed stack never has: Portainer's stack
+  # "Environment variables" only feed `${...}` interpolation (below), not a written
+  # .env file. Every variable this stack needs is therefore spelled out as `${VAR}`
+  # interpolation, never relied on being injected wholesale from a file.
   environment:
     # `db` resolves on adventures-internal below. Assembled here rather than set whole in
     # .env so the password stays the single secret and cannot drift from POSTGRES_PASSWORD.

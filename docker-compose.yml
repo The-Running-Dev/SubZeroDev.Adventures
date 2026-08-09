@@ -26,7 +26,7 @@
 #     though it works from a manual `docker compose` invocation. Running this file by
 #     hand instead, copy `.env.example` to a git-ignored `.env` next to it; Compose loads
 #     that automatically for the same interpolation, no `env_file:` needed either way.
-#   - The api.adventures.subzerodev.com DNS record.
+#   - The adventures-api.subzerodev.com DNS record.
 
 # Pinned rather than derived from the directory name, which is what names the
 # `adventures-db` volume. `deploy-api.yml` deploys into `~/subzerodev-adventures`, so this
@@ -54,7 +54,7 @@ x-adventures-api-common: &adventures-api-common
     NODE_ENV: production
     PORT: "8787"
     SITE_URL: "${SITE_URL:-https://adventures.subzerodev.com}"
-    API_URL: "${API_URL:-https://api.adventures.subzerodev.com}"
+    API_URL: "${API_URL:-https://adventures-api.subzerodev.com}"
     # Optional, unlike DB_PASSWORD above: server/src/routes/github-oauth.ts treats an unset
     # clientId as a normal runtime state (503 oauth_not_configured on that one route), not a
     # startup precondition, so deployment must not be blocked on the OAuth app existing yet.

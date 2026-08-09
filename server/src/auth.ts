@@ -46,6 +46,11 @@ async function createPlayer(
   };
 }
 
+// Expired auth_sessions rows are otherwise only ever filtered, never deleted -- there is
+// no cron in this deployment to do it separately. Sweeping on ~1% of issues bounds the
+// table's growth without adding a delete to the hot path of every session mint.
+const SWEEP_SAMPLE_RATE = 0.01;
+
 async function issueSession(
   pool: Pool,
   reply: FastifyReply,
@@ -57,6 +62,9 @@ async function issueSession(
     `insert into auth_sessions (token_hash, player_id, expires_at) values ($1, $2, $3)`,
     [hashToken(token), playerId, expiresAt],
   );
+  if (Math.random() < SWEEP_SAMPLE_RATE) {
+    await pool.query(`delete from auth_sessions where expires_at <= now()`);
+  }
   reply.setCookie(SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",
@@ -96,11 +104,27 @@ export function requirePlayer(pool: Pool) {
     const existing = token ? await lookupPlayer(pool, token) : undefined;
     if (existing) {
       request.player = existing;
+      request.playerOrNull = existing;
       return;
     }
     const guest = await createPlayer(pool, "guest");
     await issueSession(pool, reply, guest.playerId);
     request.player = guest;
+    request.playerOrNull = guest;
+  };
+}
+
+/**
+ * Read-only counterpart to `requirePlayer`: resolves an existing session cookie but never
+ * mints a guest row. A cookieless or expired request is simply anonymous here. Attach to
+ * any route that only needs to know *whether* there's a player, not to have one -- an
+ * unauthenticated crawler hitting `/api/me` or `/api/saves` should not grow the `players`
+ * table.
+ */
+export function resolvePlayer(pool: Pool) {
+  return async (request: FastifyRequest): Promise<void> => {
+    const token = request.cookies[SESSION_COOKIE];
+    request.playerOrNull = token ? await lookupPlayer(pool, token) : undefined;
   };
 }
 
@@ -118,62 +142,33 @@ export async function logout(
 }
 
 /**
- * GitHub upgrade: converts the current guest in place if `githubId` is unclaimed (every
- * session/save the guest already owns keeps pointing at the same `player_id`, so there is
- * no data migration), or re-points the guest's sessions/saves onto the existing
- * GitHub-linked player and discards the now-empty guest row.
+ * Re-points every session/save owned by `fromPlayerId` onto `toPlayerId` and deletes the
+ * now-empty `fromPlayerId` row, in one transaction. Shared by the GitHub upgrade below and
+ * transfer-code redemption (`routes/transfer.ts`) -- both are "fold one player's history
+ * into another's" operations, differing only in how the target player is identified.
+ * No-ops (does not delete `fromPlayerId`) when the two ids are already equal.
  */
-export async function upgradeToGithub(
+export async function mergePlayers(
   pool: Pool,
-  guestPlayerId: string,
-  githubId: string,
-  displayName: string | undefined,
-): Promise<Player> {
+  fromPlayerId: string,
+  toPlayerId: string,
+): Promise<void> {
+  if (fromPlayerId === toPlayerId) return;
   const client = await pool.connect();
   try {
     await client.query("begin");
-    const existing = await client.query(
-      `select player_id, kind, display_name from players where github_id = $1`,
-      [githubId],
+    await client.query(
+      `update sessions set profile_id = $1 where profile_id = $2`,
+      [toPlayerId, fromPlayerId],
     );
-
-    let player: Player;
-    if (existing.rows.length === 0) {
-      const updated = await client.query(
-        `update players set kind = 'github', github_id = $2, display_name = coalesce($3, display_name)
-         where player_id = $1
-         returning player_id, kind, display_name`,
-        [guestPlayerId, githubId, displayName ?? null],
-      );
-      player = {
-        playerId: updated.rows[0].player_id,
-        kind: updated.rows[0].kind,
-        displayName: updated.rows[0].display_name,
-      };
-    } else {
-      const target = existing.rows[0].player_id as string;
-      if (target !== guestPlayerId) {
-        await client.query(
-          `update sessions set profile_id = $1 where profile_id = $2`,
-          [target, guestPlayerId],
-        );
-        await client.query(
-          `update saves set profile_id = $1 where profile_id = $2`,
-          [target, guestPlayerId],
-        );
-        await client.query(`delete from players where player_id = $1`, [
-          guestPlayerId,
-        ]);
-      }
-      player = {
-        playerId: target,
-        kind: "github",
-        displayName: existing.rows[0].display_name,
-      };
-    }
-
+    await client.query(
+      `update saves set profile_id = $1 where profile_id = $2`,
+      [toPlayerId, fromPlayerId],
+    );
+    await client.query(`delete from players where player_id = $1`, [
+      fromPlayerId,
+    ]);
     await client.query("commit");
-    return player;
   } catch (error) {
     await client.query("rollback");
     throw error;
@@ -182,8 +177,80 @@ export async function upgradeToGithub(
   }
 }
 
+/**
+ * Rotates the session cookie: deletes the old `auth_sessions` row and issues a fresh
+ * token bound to `playerId`. Called at every privilege boundary (GitHub upgrade, transfer
+ * redemption) so a token minted for a guest can't go on authenticating a now-upgraded
+ * account -- textbook session-fixation hygiene, cheap because `auth_sessions` is
+ * token-keyed already.
+ */
+export async function rotateSession(
+  pool: Pool,
+  request: FastifyRequest,
+  reply: FastifyReply,
+  playerId: string,
+): Promise<void> {
+  const oldToken = request.cookies[SESSION_COOKIE];
+  if (oldToken)
+    await pool.query(`delete from auth_sessions where token_hash = $1`, [
+      hashToken(oldToken),
+    ]);
+  await issueSession(pool, reply, playerId);
+}
+
+/**
+ * GitHub upgrade: converts the current guest in place if `githubId` is unclaimed (every
+ * session/save the guest already owns keeps pointing at the same `player_id`, so there is
+ * no data migration), or merges the guest's history onto the existing GitHub-linked player
+ * via `mergePlayers` and discards the now-empty guest row. Rotates the session token
+ * either way -- see `rotateSession`.
+ */
+export async function upgradeToGithub(
+  pool: Pool,
+  request: FastifyRequest,
+  reply: FastifyReply,
+  guestPlayerId: string,
+  githubId: string,
+  displayName: string | undefined,
+): Promise<Player> {
+  const existing = await pool.query(
+    `select player_id, kind, display_name from players where github_id = $1`,
+    [githubId],
+  );
+
+  let player: Player;
+  if (existing.rows.length === 0) {
+    const updated = await pool.query(
+      `update players set kind = 'github', github_id = $2, display_name = coalesce($3, display_name)
+       where player_id = $1
+       returning player_id, kind, display_name`,
+      [guestPlayerId, githubId, displayName ?? null],
+    );
+    player = {
+      playerId: updated.rows[0].player_id,
+      kind: updated.rows[0].kind,
+      displayName: updated.rows[0].display_name,
+    };
+  } else {
+    const target = existing.rows[0].player_id as string;
+    await mergePlayers(pool, guestPlayerId, target);
+    player = {
+      playerId: target,
+      kind: "github",
+      displayName: existing.rows[0].display_name,
+    };
+  }
+
+  await rotateSession(pool, request, reply, player.playerId);
+  return player;
+}
+
 declare module "fastify" {
   interface FastifyRequest {
     player: Player;
+    /** Set by both `requirePlayer` and `resolvePlayer` -- the latter leaves it `undefined`
+     *  rather than minting. Routes that must not create a `players` row on a bare read
+     *  (`/api/me`, `/api/saves`, `/api/progress`) use this instead of `player`. */
+    playerOrNull: Player | undefined;
   }
 }

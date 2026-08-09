@@ -39,6 +39,10 @@ export interface CatalogEntry {
    * does not declare variables this way.
    */
   readonly statBounds: Readonly<Record<string, StatBounds>>;
+  /** Distinct terminal `endingId`s reachable in this campaign's content, for a spoiler-safe
+   *  "n of m discovered" -- 0 for a kind (simulation, world-graph) that doesn't declare
+   *  nodes this way, same degrade-gracefully posture as `statBoundsOf`. */
+  readonly endingCount: number;
 }
 
 export const KINDS = {
@@ -86,6 +90,28 @@ export function statBoundsOf(content: unknown): Record<string, StatBounds> {
   return bounds;
 }
 
+/**
+ * Same non-contract read as `statBoundsOf` above: `content.nodes` is a story-graph
+ * structural assumption, not an imported type, and degrades to 0 for any other kind rather
+ * than throwing.
+ */
+export function endingCountOf(content: unknown): number {
+  const nodes = (
+    content as {
+      nodes?: Record<string, { kind?: unknown; endingId?: unknown }>;
+    }
+  )?.nodes;
+  if (typeof nodes !== "object" || nodes === null) return 0;
+
+  const endingIds = new Set<string>();
+  for (const node of Object.values(nodes)) {
+    if (node?.kind === "ending" && typeof node.endingId === "string") {
+      endingIds.add(node.endingId);
+    }
+  }
+  return endingIds.size;
+}
+
 export interface BuiltCatalog {
   readonly registry: ContentRegistry;
   /** Every registered campaign, listed and hidden. Callers filter for their own listing surface. */
@@ -120,6 +146,7 @@ export function buildCatalog(
     ...(catalog.hidden ? { hidden: true } : {}),
     ...(catalog.sources ? { sources: catalog.sources } : {}),
     statBounds: Object.freeze(statBoundsOf(built.campaign.content)),
+    endingCount: endingCountOf(built.campaign.content),
   }));
 
   return { registry: registry.value, all: Object.freeze(all) };

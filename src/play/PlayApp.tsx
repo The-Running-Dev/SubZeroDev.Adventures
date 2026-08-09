@@ -15,13 +15,21 @@ import {
   storeTheme,
 } from "../theme";
 import type { ThemeId } from "../theme";
+import { AccountPanel } from "./AccountPanel";
 import { BbsPrompt } from "./BbsPrompt";
 import { BrowserClient, type PlayState } from "./browser-client";
 import {
   createBrowserDemo,
+  type BrowserCampaign,
   type BrowserDemo,
   type StatBounds,
 } from "./composition";
+import {
+  consumeAuthError,
+  useIdentity,
+  useProgress,
+  type CampaignProgress,
+} from "./identity";
 import { MatrixRain } from "./MatrixRain";
 
 /**
@@ -94,6 +102,21 @@ function excerpt(text: string): string {
 /** "1" for a single option, "1-N" otherwise -- used in both the BBS prompt's hint line and its range errors. */
 function rangeLabel(count: number): string {
   return count <= 1 ? "1" : `1-${count}`;
+}
+
+/** The dossier tile's one-line progress hint. Endings take priority when the campaign
+ *  declares any (a spoiler-safe count, never which ones remain); otherwise falls back to
+ *  a plain in-progress/finished status. */
+function progressLabel(
+  campaign: BrowserCampaign,
+  entry: CampaignProgress,
+): string {
+  if (campaign.endingCount > 0) {
+    return `${entry.endings.discovered.length}/${campaign.endingCount} endings found`;
+  }
+  return entry.status === "ended"
+    ? "Finished"
+    : `In progress · ${entry.stepCount} steps`;
 }
 
 /** A retro 8.3-style DOS name for the prompt sigil -- e.g. "The Bureaucracy" -> "BUREAUCR". */
@@ -389,6 +412,17 @@ function PlayAppReady({ demo }: { demo: BrowserDemo }) {
   /** Bumped on every game load and every return to the shelf, so the BBS prompt can clear its stale response/input independently of ordinary in-game state changes (choosing an action, selecting a disk). */
   const [bbsResetToken, setBbsResetToken] = useState(0);
   const [displayTheme, setDisplayTheme] = useState<ThemeId>(DEFAULT_THEME);
+
+  // Account chip + progress panel (AccountPanel.tsx) -- only meaningful in remote mode,
+  // where `demo.apiUrl` is set (composition.ts). `identityRefreshToken` bumps after a
+  // sign-in/out/transfer round trip to re-fetch `/api/me` and `/api/progress`.
+  const [identityRefreshToken, setIdentityRefreshToken] = useState(0);
+  const { identity, loading: identityLoading } = useIdentity(
+    demo.apiUrl,
+    identityRefreshToken,
+  );
+  const progress = useProgress(demo.apiUrl, identity.playerId);
+  const [authError] = useState(() => consumeAuthError());
   const sceneRegion = useRef<HTMLElement>(null);
   const isPhone = useIsPhone();
   /**
@@ -657,6 +691,17 @@ function PlayAppReady({ demo }: { demo: BrowserDemo }) {
                 Select a program. Your choices, bad luck, and improbable
                 consequences run entirely on this machine.
               </p>
+              {demo.apiUrl && (
+                <AccountPanel
+                  apiUrl={demo.apiUrl}
+                  identity={identity}
+                  loading={identityLoading}
+                  authError={authError}
+                  onChanged={() =>
+                    setIdentityRefreshToken((token) => token + 1)
+                  }
+                />
+              )}
             </div>
             <div className="dossier-grid" aria-label="Story dossiers">
               {demo.catalog.map((campaign, index) => (
@@ -672,6 +717,14 @@ function PlayAppReady({ demo }: { demo: BrowserDemo }) {
                   </span>
                   <strong>{campaign.title}</strong>
                   <span>{campaign.duration}</span>
+                  {progress.get(campaign.campaignId) && (
+                    <span className="dossier-progress">
+                      {progressLabel(
+                        campaign,
+                        progress.get(campaign.campaignId)!,
+                      )}
+                    </span>
+                  )}
                 </button>
               ))}
             </div>

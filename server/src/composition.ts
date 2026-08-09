@@ -96,7 +96,7 @@ export async function createServerDemo(pool: Pool): Promise<ServerDemo> {
     store: createInMemorySessionStore({
       engine,
       registry,
-      persistence: createPostgresPersistence(pool),
+      persistence: createPostgresPersistence(pool, KINDS),
       profiles: createPostgresProfileStore(pool),
     }),
   };

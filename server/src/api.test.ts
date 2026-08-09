@@ -43,15 +43,44 @@ describeIfDb("server API", () => {
     );
   });
 
+  // A bare GET no longer mints (see "does not mint a guest on a bare GET" below) --
+  // every other test needs a real cookie to attach to its own requests, so this goes
+  // through the one route that always mints: creating a session.
   async function guestCookie(): Promise<string> {
-    const response = await app.inject({ method: "GET", url: "/api/me" });
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/sessions",
+      payload: { campaignId: "what-would-lucifer-do" },
+    });
     return cookieFrom(response);
   }
 
   it("mints a guest identity on first contact", async () => {
-    const response = await app.inject({ method: "GET", url: "/api/me" });
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/sessions",
+      payload: { campaignId: "what-would-lucifer-do" },
+    });
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toMatchObject({ kind: "guest" });
+    const me = await app.inject({
+      method: "GET",
+      url: "/api/me",
+      headers: { cookie: cookieFrom(response) },
+    });
+    expect(me.json()).toMatchObject({ kind: "guest" });
+  });
+
+  it("does not mint a guest on a bare GET (/api/me, /api/saves)", async () => {
+    const me = await app.inject({ method: "GET", url: "/api/me" });
+    expect(me.headers["set-cookie"]).toBeUndefined();
+    expect(me.json()).toMatchObject({ playerId: null, kind: "anonymous" });
+
+    const saves = await app.inject({ method: "GET", url: "/api/saves" });
+    expect(saves.headers["set-cookie"]).toBeUndefined();
+    expect(saves.json()).toMatchObject({ saves: [] });
+
+    const { rows } = await pool.query("select count(*)::int from players");
+    expect(rows[0].count).toBe(0);
   });
 
   it("lists the campaign catalog", async () => {

@@ -9,6 +9,7 @@ import {
   SessionStoreError,
   type StoredSessionRecord,
 } from "@the-running-dev/game-engine";
+import { KINDS } from "../../../shared/campaign-registry.js";
 import type { ServerDemo } from "../composition.js";
 import { requirePlayer } from "../auth.js";
 import { createPostgresPersistence, sessionOwner } from "../persistence.js";
@@ -33,7 +34,7 @@ async function loadSessionRow(
   pool: Pool,
   sessionId: string,
 ): Promise<StoredSessionRecord> {
-  const persistence = createPostgresPersistence(pool);
+  const persistence = createPostgresPersistence(pool, KINDS);
   const record = await persistence.sessions.get(sessionId);
   if (!record) throw new SessionStoreError("replay", "unknown_session");
   return record;
@@ -89,7 +90,7 @@ export function registerReplayRoutes(
 
       const now = new Date().toISOString();
       const newSessionId = randomUUID();
-      const persistence = createPostgresPersistence(pool);
+      const persistence = createPostgresPersistence(pool, KINDS);
       const branched: StoredSessionRecord = {
         sessionId: newSessionId,
         blob: result.finalBlob,

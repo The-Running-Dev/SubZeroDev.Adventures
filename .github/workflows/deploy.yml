@@ -39,6 +39,8 @@ jobs:
         run: npm ci
 
       - name: Build
+        env:
+          VITE_API_URL: https://adventures-api.subzerodev.com
         run: npm run build
 
       - name: Setup Pages

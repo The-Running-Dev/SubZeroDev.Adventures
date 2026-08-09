@@ -19,9 +19,12 @@ interface AccountPanelProps {
  * Guest -> "Sign in with GitHub" plus a quiet note that progress otherwise lives only in
  * this browser, and a device-transfer code for anyone who doesn't want to sign in at all
  * (server/src/routes/transfer.ts). Signed in -> name and sign out. This is the one piece
- * of the guest-first design (server/src/auth.ts) that previously had no UI at all -- the
- * OAuth routes and transfer codes existed and worked, but nothing on the page ever told a
- * player they were playing as an anonymous cookie.
+ * of the guest-first design (server/src/principal.ts) that previously had no UI at all --
+ * the OAuth routes and transfer codes existed and worked, but nothing on the page ever
+ * told a player they were playing as an anonymous cookie. GitHub is the only provider with
+ * a sign-in entry point here so far, even though the server (server/src/identity/) can
+ * carry more -- a signed-in player is generically `identity.kind === "member"` regardless
+ * of which provider they linked.
  */
 export function AccountPanel({
   apiUrl,
@@ -73,7 +76,7 @@ export function AccountPanel({
           body?.error?.code === "invalid_or_expired_code"
             ? "That code is invalid or has expired."
             : body?.error?.code === "already_linked_account"
-              ? "Sign out of this GitHub account before redeeming a transfer code."
+              ? "Sign out of this account before redeeming a transfer code."
               : "Couldn't redeem that code. Try again.",
         );
         return;
@@ -95,9 +98,9 @@ export function AccountPanel({
           {AUTH_ERROR_MESSAGES[authError] ?? "Sign-in failed. Try again."}
         </p>
       )}
-      {identity.kind === "github" ? (
+      {identity.kind === "member" ? (
         <div className="account-chip">
-          <span>Signed in as {identity.displayName ?? "GitHub player"}</span>
+          <span>Signed in as {identity.displayName ?? "player"}</span>
           <button
             className="cabinet-button"
             disabled={busy}

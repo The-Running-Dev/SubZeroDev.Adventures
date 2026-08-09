@@ -55,11 +55,16 @@ x-adventures-api-common: &adventures-api-common
     PORT: "8787"
     SITE_URL: "${SITE_URL:-https://adventures.subzerodev.com}"
     API_URL: "${API_URL:-https://adventures-api.subzerodev.com}"
-    # Optional, unlike DB_PASSWORD above: server/src/routes/github-oauth.ts treats an unset
-    # clientId as a normal runtime state (503 oauth_not_configured on that one route), not a
-    # startup precondition, so deployment must not be blocked on the OAuth app existing yet.
+    # Optional, unlike DB_PASSWORD above: server/src/identity/registry.ts treats an unset
+    # credential pair as "this provider isn't configured" (503 oauth_not_configured on its
+    # routes), not a startup precondition, so deployment must not be blocked on either
+    # identity provider existing yet.
     GITHUB_CLIENT_ID: "${GITHUB_CLIENT_ID:-}"
     GITHUB_CLIENT_SECRET: "${GITHUB_CLIENT_SECRET:-}"
+    OIDC_ISSUER_URL: "${OIDC_ISSUER_URL:-}"
+    OIDC_CLIENT_ID: "${OIDC_CLIENT_ID:-}"
+    OIDC_CLIENT_SECRET: "${OIDC_CLIENT_SECRET:-}"
+    OIDC_PROVIDER_NAME: "${OIDC_PROVIDER_NAME:-}"
 
 services:
   db:

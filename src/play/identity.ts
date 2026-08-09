@@ -8,7 +8,7 @@ import { useEffect, useState } from "react";
 
 export interface Identity {
   readonly playerId: string | null;
-  readonly kind: "anonymous" | "guest" | "github";
+  readonly kind: "anonymous" | "guest" | "member";
   readonly displayName: string | null;
 }
 
@@ -111,7 +111,7 @@ export async function signOut(apiUrl: string): Promise<void> {
 }
 
 /** Reads and strips `?auth_error=` left by a failed OAuth round trip
- *  (server/src/routes/github-oauth.ts's `redirectWithError`) -- read once, then cleaned
+ *  (server/src/routes/identity.ts's `redirectWithError`) -- read once, then cleaned
  *  from the URL so a refresh doesn't keep re-showing it. */
 export function consumeAuthError(): string | null {
   const url = new URL(window.location.href);

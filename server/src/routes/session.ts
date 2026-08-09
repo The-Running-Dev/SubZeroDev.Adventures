@@ -12,7 +12,7 @@ import {
   type SessionStore,
 } from "@the-running-dev/game-engine";
 import type { ServerDemo } from "../composition.js";
-import { requirePlayer, resolvePlayer, logout } from "../auth.js";
+import { requirePrincipal, resolvePrincipal, logout } from "../principal.js";
 import { listSavesForPlayer, saveOwner, sessionOwner } from "../persistence.js";
 
 const ERROR_STATUS: Record<string, number> = {
@@ -47,7 +47,7 @@ function ownershipGuard(pool: Pool, kind: "session" | "save") {
       kind === "session"
         ? await sessionOwner(pool, id)
         : await saveOwner(pool, id);
-    if (owner !== null && owner !== request.player.playerId) {
+    if (owner !== null && owner !== request.principal.playerId) {
       await reply
         .code(403)
         .send({ error: { operation: kind, code: "forbidden" } });
@@ -61,10 +61,10 @@ export function registerSessionRoutes(
   demo: ServerDemo,
 ): void {
   const store: SessionStore = demo.store;
-  const auth = requirePlayer(pool);
+  const auth = requirePrincipal(pool);
   // Read-only: resolves an existing session but never mints a guest row, so a bare GET
   // from a crawler or a logged-out browser doesn't grow the `players` table.
-  const resolve = resolvePlayer(pool);
+  const resolve = resolvePrincipal(pool);
 
   app.setErrorHandler((error, request, reply) => {
     if (error instanceof SessionStoreError) {
@@ -99,13 +99,13 @@ export function registerSessionRoutes(
   }));
 
   app.get("/api/me", { preHandler: resolve }, async (request) => {
-    const player = request.playerOrNull;
-    if (!player)
+    const principal = request.principalOrNull;
+    if (!principal)
       return { playerId: null, kind: "anonymous", displayName: null };
     return {
-      playerId: player.playerId,
-      kind: player.kind,
-      displayName: player.displayName,
+      playerId: principal.playerId,
+      kind: principal.kind,
+      displayName: principal.displayName,
     };
   });
 
@@ -117,8 +117,8 @@ export function registerSessionRoutes(
   });
 
   app.get("/api/saves", { preHandler: resolve }, async (request) => ({
-    saves: request.playerOrNull
-      ? await listSavesForPlayer(pool, request.playerOrNull.playerId)
+    saves: request.principalOrNull
+      ? await listSavesForPlayer(pool, request.principalOrNull.playerId)
       : [],
   }));
 
@@ -128,7 +128,7 @@ export function registerSessionRoutes(
       campaignId: body.campaignId,
       ...(body.seed !== undefined ? { seed: body.seed } : {}),
       audience: "player",
-      profileId: request.player.playerId,
+      profileId: request.principal.playerId,
     });
   });
 

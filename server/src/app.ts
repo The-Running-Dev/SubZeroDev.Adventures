@@ -6,9 +6,10 @@ import { createServerDemo } from "./composition.js";
 import { registerHealthRoute } from "./health.js";
 import { registerSessionRoutes } from "./routes/session.js";
 import { registerReplayRoutes } from "./routes/replay.js";
-import { registerGithubOAuthRoutes } from "./routes/github-oauth.js";
+import { registerIdentityRoutes } from "./routes/identity.js";
 import { registerProgressRoutes } from "./routes/progress.js";
 import { registerTransferRoutes } from "./routes/transfer.js";
+import { loadIdentityProviders } from "./identity/registry.js";
 
 /** Builds the wired Fastify instance without binding a port -- shared by `index.ts`
  *  (which calls `listen`) and the test suite (which uses `app.inject()`). */
@@ -60,9 +61,10 @@ export async function buildApp(
   registerHealthRoute(app, pool);
 
   const demo = await createServerDemo(pool);
+  const identityProviders = await loadIdentityProviders();
   registerSessionRoutes(app, pool, demo);
   registerReplayRoutes(app, pool, demo);
-  registerGithubOAuthRoutes(app, pool);
+  registerIdentityRoutes(app, pool, identityProviders);
   registerProgressRoutes(app, pool, demo);
   registerTransferRoutes(app, pool);
 

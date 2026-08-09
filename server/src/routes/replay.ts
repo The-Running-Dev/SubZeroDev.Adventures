@@ -11,7 +11,7 @@ import {
 } from "@the-running-dev/game-engine";
 import { KINDS } from "../../../shared/campaign-registry.js";
 import type { ServerDemo } from "../composition.js";
-import { requirePlayer } from "../auth.js";
+import { requirePrincipal } from "../principal.js";
 import { createPostgresPersistence, sessionOwner } from "../persistence.js";
 import { replay, verifyReplay } from "../replay.js";
 
@@ -22,7 +22,7 @@ function ownershipGuard(pool: Pool) {
   ): Promise<void> => {
     const { id } = request.params as { id: string };
     const owner = await sessionOwner(pool, id);
-    if (owner !== null && owner !== request.player.playerId) {
+    if (owner !== null && owner !== request.principal.playerId) {
       await reply
         .code(403)
         .send({ error: { operation: "session", code: "forbidden" } });
@@ -45,7 +45,7 @@ export function registerReplayRoutes(
   pool: Pool,
   demo: ServerDemo,
 ): void {
-  const auth = requirePlayer(pool);
+  const auth = requirePrincipal(pool);
   const owned = ownershipGuard(pool);
 
   app.get(

@@ -1,15 +1,15 @@
 /**
  * Guest -> guest progress transfer, no third party involved: the device with progress
  * mints a short-lived one-time code, and a second device redeems it to fold that
- * progress onto its own identity. The GitHub upgrade (`auth.ts`) solves cross-device for
- * anyone willing to sign in; this solves it for anyone who isn't, at the cost of a weaker
- * recovery story -- lose the code, lose the transfer, same tradeoff as the upgrade
+ * progress onto its own identity. The identity upgrade (`principal.ts`) solves cross-device
+ * for anyone willing to sign in; this solves it for anyone who isn't, at the cost of a
+ * weaker recovery story -- lose the code, lose the transfer, same tradeoff as the upgrade
  * account-abandonment risk it doesn't touch.
  */
 import { createHash, randomBytes } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import type { Pool } from "pg";
-import { mergePlayers, rotateSession, requirePlayer } from "../auth.js";
+import { mergePlayers, rotateSession, requirePrincipal } from "../principal.js";
 
 const CODE_TTL_MS = 1000 * 60 * 15; // 15 minutes
 // Crockford base32 -- excludes I, L, O, U so a misread character never collides with
@@ -62,7 +62,7 @@ function redeemAllowed(ip: string): boolean {
 }
 
 export function registerTransferRoutes(app: FastifyInstance, pool: Pool): void {
-  const auth = requirePlayer(pool);
+  const auth = requirePrincipal(pool);
 
   app.post("/api/transfer/create", { preHandler: auth }, async (request) => {
     const code = mintCode();
@@ -72,7 +72,7 @@ export function registerTransferRoutes(app: FastifyInstance, pool: Pool): void {
     // agree on the same pre-hash shape or a freshly issued code would never match itself.
     await pool.query(
       `insert into transfer_codes (code_hash, player_id, expires_at) values ($1, $2, $3)`,
-      [hashCode(normalizeCode(code)), request.player.playerId, expiresAt],
+      [hashCode(normalizeCode(code)), request.principal.playerId, expiresAt],
     );
     return { code, expiresAt: expiresAt.toISOString() };
   });
@@ -115,7 +115,7 @@ export function registerTransferRoutes(app: FastifyInstance, pool: Pool): void {
         };
       }
       const sourcePlayerId = rows[0].player_id as string;
-      const currentPlayerId = request.player.playerId;
+      const currentPlayerId = request.principal.playerId;
 
       if (sourcePlayerId === currentPlayerId) {
         reply.code(400);
@@ -127,9 +127,9 @@ export function registerTransferRoutes(app: FastifyInstance, pool: Pool): void {
         };
       }
       // Merging the redeeming player away (mergePlayers deletes the "from" side) would
-      // silently discard a real signed-in account if it's already GitHub-linked -- the one
-      // outcome here that can't be undone. A guest redeeming is the supported case.
-      if (request.player.kind === "github") {
+      // silently discard a real signed-in account if it's already linked to an identity --
+      // the one outcome here that can't be undone. A guest redeeming is the supported case.
+      if (request.principal.kind === "member") {
         reply.code(403);
         return {
           error: {

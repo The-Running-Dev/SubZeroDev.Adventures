@@ -1,9 +1,9 @@
 /**
  * `GET /api/progress` — per-campaign progress for the current player, built entirely off
  * the denormalized `sessions` columns `persistence.ts` writes on every put (005 migration)
- * plus the existing `achievements` table. Read-only, so it goes through `resolvePlayer`
- * (never mints, `auth.ts`) rather than `requirePlayer` — a logged-out visitor just gets an
- * empty list, not a new `players` row.
+ * plus the existing `achievements` table. Read-only, so it goes through `resolvePrincipal`
+ * (never mints, `principal.ts`) rather than `requirePrincipal` — a logged-out visitor just
+ * gets an empty list, not a new `players` row.
  *
  * Spoiler-safe by construction: `endings.discovered` is built only from `ending_id`s this
  * player's own sessions actually produced, never from the campaign's full ending set —
@@ -12,7 +12,7 @@
  */
 import type { FastifyInstance } from "fastify";
 import type { Pool } from "pg";
-import { resolvePlayer } from "../auth.js";
+import { resolvePrincipal } from "../principal.js";
 import type { ServerDemo } from "../composition.js";
 
 export function registerProgressRoutes(
@@ -20,11 +20,11 @@ export function registerProgressRoutes(
   pool: Pool,
   demo: ServerDemo,
 ): void {
-  const resolve = resolvePlayer(pool);
+  const resolve = resolvePrincipal(pool);
 
   app.get("/api/progress", { preHandler: resolve }, async (request) => {
-    const player = request.playerOrNull;
-    if (!player) return { progress: [] };
+    const principal = request.principalOrNull;
+    if (!principal) return { progress: [] };
 
     // `latest` picks the most-recently-touched session per campaign for status/step
     // count -- a player can have several sessions per campaign (retries, branches), and
@@ -45,14 +45,14 @@ export function registerProgressRoutes(
        )
        select l.campaign_id, l.status, l.step_count, l.last_played_at, a.session_count, a.first_played_at, a.ending_ids
        from latest l join agg a using (campaign_id)`,
-      [player.playerId],
+      [principal.playerId],
     );
 
     const { rows: achievementRows } = await pool.query(
       `select campaign_id, array_agg(achievement_id) as achievement_ids
        from achievements where player_id = $1
        group by campaign_id`,
-      [player.playerId],
+      [principal.playerId],
     );
     const achievementsByCampaign = new Map<string, string[]>(
       achievementRows.map((row) => [

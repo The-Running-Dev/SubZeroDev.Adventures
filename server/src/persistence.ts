@@ -6,10 +6,63 @@
  */
 import type { Pool } from "pg";
 import type {
+  KindRegistry,
   SessionPersistence,
   StoredSaveRecord,
   StoredSessionRecord,
 } from "@the-running-dev/game-engine";
+
+/**
+ * Reads the four columns `/api/progress` (routes/progress.ts) queries across every
+ * session without deserializing each blob through the engine -- `blob` is
+ * `canonicalStringify(GameState)` (002_sessions_and_saves.sql), so `campaignId`,
+ * `status`, and `actionLog.length` sit at fixed top-level paths. `endingId` is the one
+ * field that isn't: it's the kind's own `outcome(kindState)`
+ * (core/kernel/types.ts's "cross-version-stable terminal identity"), so it takes the
+ * registry to resolve which kind owns this session and calls through to it. Only
+ * `storyGraphKind`'s outcome shape (`{endingId}`) is recognized here -- a future kind
+ * with a differently-shaped outcome simply reports no ending, rather than this code
+ * guessing at its fields.
+ */
+function deriveProgressColumns(
+  kinds: KindRegistry,
+  blob: string,
+): {
+  campaignId: string;
+  status: string;
+  stepCount: number;
+  endingId: string | null;
+} {
+  const state = JSON.parse(blob) as {
+    campaignId: string;
+    status: string;
+    kindId: string;
+    kindState: unknown;
+    actionLog: unknown[];
+  };
+  const stepCount = Array.isArray(state.actionLog) ? state.actionLog.length : 0;
+
+  let endingId: string | null = null;
+  if (state.status === "ended") {
+    const kind = kinds[state.kindId as keyof KindRegistry];
+    const outcome = kind?.outcome(state.kindState);
+    if (
+      outcome !== null &&
+      typeof outcome === "object" &&
+      "endingId" in outcome &&
+      typeof (outcome as { endingId: unknown }).endingId === "string"
+    ) {
+      endingId = (outcome as { endingId: string }).endingId;
+    }
+  }
+
+  return {
+    campaignId: state.campaignId,
+    status: state.status,
+    stepCount,
+    endingId,
+  };
+}
 
 function toSessionRecord(row: {
   session_id: string;
@@ -51,7 +104,10 @@ function toSaveRecord(row: {
   };
 }
 
-export function createPostgresPersistence(pool: Pool): SessionPersistence {
+export function createPostgresPersistence(
+  pool: Pool,
+  kinds: KindRegistry,
+): SessionPersistence {
   return {
     sessions: {
       async get(sessionId) {
@@ -63,16 +119,21 @@ export function createPostgresPersistence(pool: Pool): SessionPersistence {
         return rows[0] ? toSessionRecord(rows[0]) : undefined;
       },
       async put(record) {
+        const progress = deriveProgressColumns(kinds, record.blob);
         await pool.query(
-          `insert into sessions (session_id, blob, audience, attempt_counter, replay_compatible, profile_id, created_at, updated_at)
-           values ($1, $2, $3, $4, $5, $6, $7, $8)
+          `insert into sessions (session_id, blob, audience, attempt_counter, replay_compatible, profile_id, created_at, updated_at, campaign_id, status, ending_id, step_count)
+           values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
            on conflict (session_id) do update set
              blob = excluded.blob,
              audience = excluded.audience,
              attempt_counter = excluded.attempt_counter,
              replay_compatible = excluded.replay_compatible,
              profile_id = excluded.profile_id,
-             updated_at = excluded.updated_at`,
+             updated_at = excluded.updated_at,
+             campaign_id = excluded.campaign_id,
+             status = excluded.status,
+             ending_id = excluded.ending_id,
+             step_count = excluded.step_count`,
           [
             record.sessionId,
             record.blob,
@@ -82,6 +143,10 @@ export function createPostgresPersistence(pool: Pool): SessionPersistence {
             record.profileId ?? null,
             record.createdAt,
             record.updatedAt,
+            progress.campaignId,
+            progress.status,
+            progress.endingId,
+            progress.stepCount,
           ],
         );
       },

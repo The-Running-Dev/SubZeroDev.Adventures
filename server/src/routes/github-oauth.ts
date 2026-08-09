@@ -8,6 +8,15 @@ import type { FastifyInstance } from "fastify";
 import type { Pool } from "pg";
 import { requirePlayer, upgradeToGithub } from "../auth.js";
 
+/** OAuth failures land here after a browser navigation, not a JSON response the browser
+ *  has nowhere to show -- `?auth_error=<code>` lets the site surface a message and clear
+ *  it from the URL. */
+function redirectWithError(siteUrl: string, code: string): string {
+  const url = new URL(siteUrl);
+  url.searchParams.set("auth_error", code);
+  return url.toString();
+}
+
 const STATE_COOKIE = "sza_oauth_state";
 const GITHUB_AUTHORIZE_URL = "https://github.com/login/oauth/authorize";
 const GITHUB_TOKEN_URL = "https://github.com/login/oauth/access_token";
@@ -38,10 +47,8 @@ export function registerGithubOAuthRoutes(
     { preHandler: requirePlayer(pool) },
     async (_request, reply) => {
       if (!clientId) {
-        reply.code(503);
-        return {
-          error: { operation: "github_start", code: "oauth_not_configured" },
-        };
+        reply.redirect(redirectWithError(siteUrl, "oauth_not_configured"));
+        return;
       }
       const state = randomBytes(16).toString("hex");
       reply.setCookie(STATE_COOKIE, state, {
@@ -66,20 +73,16 @@ export function registerGithubOAuthRoutes(
     { preHandler: requirePlayer(pool) },
     async (request, reply) => {
       if (!clientId || !clientSecret) {
-        reply.code(503);
-        return {
-          error: { operation: "github_callback", code: "oauth_not_configured" },
-        };
+        reply.redirect(redirectWithError(siteUrl, "oauth_not_configured"));
+        return;
       }
       const query = request.query as { code?: string; state?: string };
       const expectedState = request.cookies[STATE_COOKIE];
       reply.clearCookie(STATE_COOKIE, { path: "/" });
 
       if (!query.code || !query.state || query.state !== expectedState) {
-        reply.code(400);
-        return {
-          error: { operation: "github_callback", code: "invalid_oauth_state" },
-        };
+        reply.redirect(redirectWithError(siteUrl, "invalid_oauth_state"));
+        return;
       }
 
       const redirectUri = `${apiUrl}/api/auth/github/callback`;
@@ -98,13 +101,10 @@ export function registerGithubOAuthRoutes(
       });
       const tokenBody = (await tokenResponse.json()) as GithubTokenResponse;
       if (!tokenBody.access_token) {
-        reply.code(502);
-        return {
-          error: {
-            operation: "github_callback",
-            code: "oauth_token_exchange_failed",
-          },
-        };
+        reply.redirect(
+          redirectWithError(siteUrl, "oauth_token_exchange_failed"),
+        );
+        return;
       }
 
       const userResponse = await fetch(GITHUB_USER_URL, {
@@ -118,6 +118,8 @@ export function registerGithubOAuthRoutes(
 
       await upgradeToGithub(
         pool,
+        request,
+        reply,
         request.player.playerId,
         String(user.id),
         user.name ?? user.login,

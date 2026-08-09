@@ -198,6 +198,57 @@
   line-height: 1.6;
 }
 
+.account-panel {
+  border-top: 1px dashed var(--rule);
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+}
+
+.account-chip {
+  align-items: center;
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 0.875rem;
+  gap: 0.6rem;
+}
+
+.account-error {
+  color: var(--magenta);
+  font-size: 0.8125rem;
+  margin: 0;
+}
+
+.account-transfer {
+  align-items: flex-start;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.account-transfer-redeem {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.account-transfer-redeem label {
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+.account-transfer-redeem input {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  color: var(--ink);
+  font-family: inherit;
+  letter-spacing: 0.08em;
+  padding: 0.35rem 0.5rem;
+  text-transform: uppercase;
+}
+
 .eyebrow,
 .scene-kicker,
 .deck-label {
@@ -297,6 +348,12 @@
 .dossier-number {
   color: var(--amber);
   font-size: 0.8125rem;
+}
+
+.dossier-progress {
+  color: var(--text-faint);
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
 }
 
 .briefing-meta {

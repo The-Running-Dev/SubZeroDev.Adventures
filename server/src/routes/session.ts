@@ -12,7 +12,7 @@ import {
   type SessionStore,
 } from "@the-running-dev/game-engine";
 import type { ServerDemo } from "../composition.js";
-import { requirePlayer, logout } from "../auth.js";
+import { requirePlayer, resolvePlayer, logout } from "../auth.js";
 import { listSavesForPlayer, saveOwner, sessionOwner } from "../persistence.js";
 
 const ERROR_STATUS: Record<string, number> = {
@@ -62,6 +62,9 @@ export function registerSessionRoutes(
 ): void {
   const store: SessionStore = demo.store;
   const auth = requirePlayer(pool);
+  // Read-only: resolves an existing session but never mints a guest row, so a bare GET
+  // from a crawler or a logged-out browser doesn't grow the `players` table.
+  const resolve = resolvePlayer(pool);
 
   app.setErrorHandler((error, request, reply) => {
     if (error instanceof SessionStoreError) {
@@ -95,19 +98,28 @@ export function registerSessionRoutes(
     summaries: store.listCampaigns(),
   }));
 
-  app.get("/api/me", { preHandler: auth }, async (request) => ({
-    playerId: request.player.playerId,
-    kind: request.player.kind,
-    displayName: request.player.displayName,
-  }));
+  app.get("/api/me", { preHandler: resolve }, async (request) => {
+    const player = request.playerOrNull;
+    if (!player)
+      return { playerId: null, kind: "anonymous", displayName: null };
+    return {
+      playerId: player.playerId,
+      kind: player.kind,
+      displayName: player.displayName,
+    };
+  });
 
+  // Logout still needs `auth` (not `resolve`) -- there is nothing useful to log out of an
+  // anonymous request, and requiring a real cookie here keeps the route's contract simple.
   app.post("/api/auth/logout", { preHandler: auth }, async (request, reply) => {
     await logout(pool, request, reply);
     return { ok: true };
   });
 
-  app.get("/api/saves", { preHandler: auth }, async (request) => ({
-    saves: await listSavesForPlayer(pool, request.player.playerId),
+  app.get("/api/saves", { preHandler: resolve }, async (request) => ({
+    saves: request.playerOrNull
+      ? await listSavesForPlayer(pool, request.playerOrNull.playerId)
+      : [],
   }));
 
   app.post("/api/sessions", { preHandler: auth }, async (request) => {

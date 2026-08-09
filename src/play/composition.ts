@@ -127,6 +127,9 @@ export interface BrowserDemo {
   /** The saveId of the most recent local save for a campaign, if any. */
   findLocalSave(campaignId: string): string | undefined;
   readonly store: SessionStore;
+  /** Set only in remote mode -- gates the account chip and progress panel (PlayApp.tsx),
+   *  which have nothing to talk to against `createLocalBrowserDemo`'s in-browser store. */
+  readonly apiUrl?: string;
 }
 
 async function createLocalBrowserDemo(): Promise<BrowserDemo> {
@@ -199,6 +202,7 @@ async function createRemoteBrowserDemo(apiUrl: string): Promise<BrowserDemo> {
       all.find((campaign) => campaign.campaignId === campaignId),
     findLocalSave: (campaignId) => saveIndex.get(campaignId),
     store,
+    apiUrl,
   };
 }
 

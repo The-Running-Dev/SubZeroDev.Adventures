@@ -88,6 +88,18 @@ jobs:
       - name: Install server dependencies
         run: npm ci --prefix server
 
+      # `shared/campaign-registry.ts` imports `@the-running-dev/game-engine`. TypeScript
+      # and Node module resolution both walk up from a file's own directory through *its
+      # ancestors'* node_modules -- `shared/` and `server/` are siblings, not
+      # ancestor/descendant, so `server/node_modules` alone is never on that path (same
+      # issue, same fix, as `server/Dockerfile`'s `ln -s server/node_modules
+      # node_modules`). This job deliberately never runs a root `npm ci` (the whole point
+      # of `server/` being a separate project), so nothing else puts the package on that
+      # path here the way it accidentally does on a dev machine that also has the main
+      # site installed.
+      - name: Link shared/ module resolution
+        run: ln -s server/node_modules node_modules
+
       - name: Typecheck
         run: npm run typecheck --prefix server
 

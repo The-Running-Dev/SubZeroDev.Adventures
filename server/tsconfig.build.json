@@ -1,0 +1,34 @@
+// Emit config for the container image. `tsconfig.json` is typecheck-only (`noEmit`,
+// plus bundler-style resolution) and stays that way -- it is what `npm run typecheck`
+// and the editor use, and what CI runs.
+//
+// The two overrides that matter:
+//
+//   moduleResolution/module: nodenext -- `bundler` resolution permits extensionless
+//   specifiers that plain Node cannot resolve at runtime. Every import in server/src and
+//   shared/ already carries an explicit `.js`, so this changes no source; it just stops a
+//   future extensionless import from compiling clean and then failing on boot.
+//
+//   rootDir: ".." -- inputs span server/src and shared/, whose common ancestor is the
+//   repository root. That fixes the output layout at dist/server/src/** and
+//   dist/shared/**, which keeps composition.ts's `../../shared/campaign-registry.js`
+//   resolving after emit. Campaign JSON is NOT kept in that relative position; the image
+//   points CAMPAIGNS_DIR at an absolute path instead.
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    // Requires `noEmit` in the base config; must be off to emit at all. Nothing imports a
+    // `.ts` specifier today, so turning it off is not a source change.
+    "allowImportingTsExtensions": false,
+    "rootDir": "..",
+    "outDir": "dist",
+    "sourceMap": true,
+    "declaration": false
+  },
+  "include": ["src", "../shared"],
+  // Tests are typechecked by `npm run typecheck`, never shipped.
+  "exclude": ["src/**/*.test.ts"]
+}

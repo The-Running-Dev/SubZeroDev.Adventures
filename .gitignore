@@ -26,6 +26,9 @@ dist-ssr/
 # Env / secrets
 .env
 .env.*
+# ...except the committed template. `.env.*` above would otherwise swallow it, and a
+# .env.example that silently never gets committed is worse than none at all.
+!.env.example
 *.local
 
 # OS / editor cruft

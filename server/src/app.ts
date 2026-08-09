@@ -1,0 +1,49 @@
+import Fastify, { type FastifyInstance } from "fastify";
+import cookie from "@fastify/cookie";
+import cors from "@fastify/cors";
+import type { Pool } from "pg";
+import { createServerDemo } from "./composition.js";
+import { registerHealthRoute } from "./health.js";
+import { registerSessionRoutes } from "./routes/session.js";
+import { registerReplayRoutes } from "./routes/replay.js";
+import { registerGithubOAuthRoutes } from "./routes/github-oauth.js";
+
+/** Builds the wired Fastify instance without binding a port -- shared by `index.ts`
+ *  (which calls `listen`) and the test suite (which uses `app.inject()`). */
+export async function buildApp(
+  pool: Pool,
+  siteUrl: string,
+): Promise<FastifyInstance> {
+  const app = Fastify({ logger: process.env.NODE_ENV !== "test" });
+
+  // Fastify's built-in JSON parser rejects a declared `application/json` content-type on
+  // an empty body outright (FST_ERR_CTP_EMPTY_JSON_BODY) -- several of this API's own
+  // routes are legitimately bodyless POSTs (saveGame, resumeSession, loadGame), so a
+  // well-behaved client that always sets the header is enough to trip it. Tolerating an
+  // empty body here, rather than relying on every caller to omit the header exactly when
+  // there's nothing to send, is the more robust half of the fix.
+  app.addContentTypeParser(
+    "application/json",
+    { parseAs: "string" },
+    (_request, body, done) => {
+      if (body === "") return done(null, undefined);
+      try {
+        done(null, JSON.parse(body as string));
+      } catch (error) {
+        done(error as Error, undefined);
+      }
+    },
+  );
+
+  await app.register(cookie);
+  await app.register(cors, { origin: siteUrl, credentials: true });
+
+  registerHealthRoute(app, pool);
+
+  const demo = await createServerDemo(pool);
+  registerSessionRoutes(app, pool, demo);
+  registerReplayRoutes(app, pool, demo);
+  registerGithubOAuthRoutes(app, pool);
+
+  return app;
+}

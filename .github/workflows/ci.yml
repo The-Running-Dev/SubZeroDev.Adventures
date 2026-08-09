@@ -47,3 +47,64 @@ jobs:
         run: |
           npm run sync:campaigns
           git diff --exit-code -- public/campaigns
+
+  # The Node API (server/) -- a separate npm project, not part of the `ci` job above,
+  # which stays exactly as it was. Needs a real Postgres for the port-conformance and
+  # replay-verify tests in server/src/api.test.ts, provided as a service container rather
+  # than docker-compose so this job can run without privileged Docker-in-Docker.
+  server:
+    name: server
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: adventures
+          POSTGRES_PASSWORD: adventures
+          POSTGRES_DB: adventures
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U adventures"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgres://adventures:adventures@localhost:5432/adventures
+    steps:
+      - name: Checkout (with submodules)
+        uses: actions/checkout@v5
+        with:
+          submodules: true
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      - name: Build engine submodule
+        run: npm run setup
+
+      - name: Install server dependencies
+        run: npm ci --prefix server
+
+      # `shared/campaign-registry.ts` imports `@the-running-dev/game-engine`. TypeScript
+      # and Node module resolution both walk up from a file's own directory through *its
+      # ancestors'* node_modules -- `shared/` and `server/` are siblings, not
+      # ancestor/descendant, so `server/node_modules` alone is never on that path (same
+      # issue, same fix, as `server/Dockerfile`'s `ln -s server/node_modules
+      # node_modules`). This job deliberately never runs a root `npm ci` (the whole point
+      # of `server/` being a separate project), so nothing else puts the package on that
+      # path here the way it accidentally does on a dev machine that also has the main
+      # site installed.
+      - name: Link shared/ module resolution
+        run: ln -s server/node_modules node_modules
+
+      - name: Typecheck
+        run: npm run typecheck --prefix server
+
+      - name: Run migrations
+        run: npm run migrate --prefix server up
+
+      - name: Test
+        run: npm test --prefix server

@@ -1,0 +1,115 @@
+# The deployment artifact. Pulls the image `deploy-api.yml` already built and pushed to
+# GHCR -- it never builds. `server/docker-compose.yml` is the local-development
+# counterpart; it has `build:` and a deliberately different image name so that
+# `up --build` there can never tag something as the deployable image.
+#
+#   docker compose pull && docker compose up -d
+#
+# Deliberately not a Compose override layer over the dev file. Both files stand alone and
+# are read top-to-bottom on their own, rather than one being a diff against the other --
+# the previous compose.prod.yml needed `build: !reset null` to un-declare things it had
+# inherited, which meant neither file described a whole stack.
+#
+# TLS and public routing are not this file's to declare. `api` joins the pre-existing
+# `proxy-net` and nothing more; whatever terminates TLS on that network forwards to
+# `adventures-api:8787` by container name. That boundary moved out of this repo when the
+# bundled Caddy service and Caddyfile were dropped.
+#
+# Operator prerequisites, none of them handled here:
+#   - `proxy-net` must already exist (`docker network create proxy-net`). Declared
+#     `external: true`, so Compose fails fast rather than silently creating an isolated
+#     network the reverse proxy is not attached to.
+#   - A git-ignored `.env` next to this file. Copy `.env.example` and fill it in; the
+#     `:?` interpolations below name each variable that has no safe default.
+#   - The api.adventures.subzerodev.com DNS record.
+
+# Pinned rather than derived from the directory name, which is what names the
+# `adventures-db` volume. `deploy-api.yml` deploys into `~/subzerodev-adventures`, so this
+# is the name the existing deployment already has -- changing it would orphan the volume.
+name: subzerodev-adventures
+
+x-adventures-api-common: &adventures-api-common
+  # Overridable so a rollback can pin a specific SHA tag without editing this file --
+  # `deploy-api.yml` pushes both `:latest` and `:${{ github.sha }}`.
+  image: "${ADVENTURES_API_IMAGE:-ghcr.io/the-running-dev/adventures-api:latest}"
+  # `:latest` is a moving tag: without this, a redeploy would reuse whatever layer cache
+  # the host happens to hold and silently run the previous build.
+  pull_policy: always
+  restart: unless-stopped
+  env_file:
+    - .env
+  environment:
+    # `db` resolves on adventures-internal below. Assembled here rather than set whole in
+    # .env so the password stays the single secret and cannot drift from POSTGRES_PASSWORD.
+    DATABASE_URL: "postgres://adventures:${DB_PASSWORD:?Set DB_PASSWORD in .env}@db:5432/adventures"
+    NODE_ENV: production
+    PORT: "8787"
+    SITE_URL: "${SITE_URL:-https://adventures.subzerodev.com}"
+    API_URL: "${API_URL:-https://api.adventures.subzerodev.com}"
+    # Optional, unlike DB_PASSWORD above: server/src/routes/github-oauth.ts treats an unset
+    # clientId as a normal runtime state (503 oauth_not_configured on that one route), not a
+    # startup precondition, so deployment must not be blocked on the OAuth app existing yet.
+    GITHUB_CLIENT_ID: "${GITHUB_CLIENT_ID:-}"
+    GITHUB_CLIENT_SECRET: "${GITHUB_CLIENT_SECRET:-}"
+
+services:
+  db:
+    image: postgres:17
+    container_name: adventures-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: adventures
+      POSTGRES_PASSWORD: "${DB_PASSWORD:?Set DB_PASSWORD in .env}"
+      POSTGRES_DB: adventures
+    volumes:
+      - adventures-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U adventures"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+    # Only adventures-internal, deliberately. Nothing publishes a port for it either, so
+    # Postgres is reachable from `api`/`migrate` and nothing else -- putting it on the
+    # shared proxy-net would expose it to every unrelated container on that network.
+    networks:
+      - adventures-internal
+
+  migrate:
+    <<: *adventures-api-common
+    container_name: adventures-migrate
+    # `serve` and `migrate` are the image entrypoint's own vocabulary
+    # (server/docker-entrypoint.sh), not paths into it -- see server/Dockerfile.
+    command: migrate
+    # Overrides the anchor's `unless-stopped`. This is a one-shot that is *supposed* to
+    # exit 0; inheriting a restart policy would loop it forever after a clean run.
+    restart: "no"
+    networks:
+      - adventures-internal
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    <<: *adventures-api-common
+    container_name: adventures-api
+    command: serve
+    # Publishes no port: the reverse proxy reaches it over proxy-net. The service name
+    # `api` is too generic to rely on for resolution on a network shared with unrelated
+    # stacks, so the proxy should target the container name above.
+    networks:
+      - adventures-internal
+      - proxy-net
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  adventures-db:
+
+networks:
+  # Not created here -- see the operator prerequisites above.
+  proxy-net:
+    external: true
+  adventures-internal:

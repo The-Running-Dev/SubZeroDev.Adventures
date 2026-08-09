@@ -1,0 +1,53 @@
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: adventures
+      POSTGRES_PASSWORD: adventures
+      POSTGRES_DB: adventures
+    ports:
+      - "5432:5432"
+    volumes:
+      - adventures-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U adventures"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  migrate:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+      target: dev
+    command: npm run migrate up
+    environment:
+      DATABASE_URL: postgres://adventures:adventures@db:5432/adventures
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+      target: dev
+    command: npm run start
+    ports:
+      - "8787:8787"
+    environment:
+      DATABASE_URL: postgres://adventures:adventures@db:5432/adventures
+      PORT: "8787"
+      SITE_URL: http://localhost:5173
+      API_URL: http://localhost:8787
+      NODE_ENV: development
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  adventures-db:

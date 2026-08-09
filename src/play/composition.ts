@@ -1,80 +1,24 @@
 import {
-  buildValidatedContentRegistry,
   createEngine,
   createInMemorySessionStore,
-  fromPortable,
-  simulationKind,
-  storyGraphKind,
-  worldGraphKind,
+  type CampaignSummary,
   type PortableCampaign,
   type PortableManifest,
   type SessionPersistence,
   type StoredSaveRecord,
   type SessionStore,
 } from "@the-running-dev/game-engine";
+import {
+  buildCatalog,
+  KINDS,
+  type CatalogEntry,
+  type StatBounds,
+} from "../../shared/campaign-registry";
+import { createRemoteSessionStore, fetchSaveIndex } from "./remote-store";
 
-/** The declared clamp range of one visible int stat, for rendering it as a meter rather than a bare number. */
-export interface StatBounds {
-  readonly min?: number;
-  readonly max?: number;
-}
-
-export interface BrowserCampaign {
-  readonly campaignId: string;
-  readonly title: string;
-  readonly description: string;
-  readonly duration: string;
-  readonly contentNotice: string;
-  readonly featured: boolean;
-  /** Playable and registered, but omitted from the public dossier grid — reachable only by a direct `?campaign=` link. */
-  readonly hidden?: boolean;
-  readonly sources?: readonly { label: string; href: string }[];
-  /**
-   * Declared `min`/`max` for each visible int variable, keyed by variable name.
-   * Empty for a campaign whose stats are all unbounded, and for any kind that
-   * does not declare variables this way.
-   */
-  readonly statBounds: Readonly<Record<string, StatBounds>>;
-}
-
-/**
- * `Campaign.content` is deliberately `unknown` to the core — kind-specific and
- * opaque (registry/types.ts). The player projection carries a stat's *value* but
- * not its declared range (`VisibleStat`, story-graph/view.ts, which omits it to
- * avoid duplicating campaign content in the view), so rendering "3 / 26" instead
- * of a bare "3" means reading the range from the campaign this client already
- * fetched.
- *
- * That makes this a read across the same non-contract boundary `CLAUDE.md` flags
- * for `fromPortable`: a story-graph `VariableSchema` shape assumed structurally,
- * not imported. It is therefore written to degrade rather than throw — a kind
- * with no `variables` (simulation, world-graph), or a variable missing the
- * fields, simply yields no bounds and the stat renders as it does today.
- */
-function statBoundsOf(content: unknown): Record<string, StatBounds> {
-  const variables = (
-    content as {
-      variables?: Record<
-        string,
-        { type?: unknown; visible?: unknown; min?: unknown; max?: unknown }
-      >;
-    }
-  )?.variables;
-  if (typeof variables !== "object" || variables === null) return {};
-
-  const bounds: Record<string, StatBounds> = {};
-  for (const [name, decl] of Object.entries(variables)) {
-    if (decl?.type !== "int" || decl.visible !== true) continue;
-    const min = typeof decl.min === "number" ? decl.min : undefined;
-    const max = typeof decl.max === "number" ? decl.max : undefined;
-    if (min === undefined && max === undefined) continue;
-    bounds[name] = {
-      ...(min === undefined ? {} : { min }),
-      ...(max === undefined ? {} : { max }),
-    };
-  }
-  return bounds;
-}
+export type { StatBounds };
+/** Alias retained so nothing downstream of the browser composition needs to change name. */
+export type BrowserCampaign = CatalogEntry;
 
 // The `SaveRecordStore` contract keys every operation by `saveId` (types.ts): `get`/`put`/
 // `delete` must agree with each other, or a save written under one key is simply never
@@ -185,36 +129,9 @@ export interface BrowserDemo {
   readonly store: SessionStore;
 }
 
-export async function createBrowserDemo(): Promise<BrowserDemo> {
+async function createLocalBrowserDemo(): Promise<BrowserDemo> {
   const portables = await loadPortableCampaigns();
-  const hydrated = portables.map((portable) => fromPortable(portable));
-
-  const kinds = {
-    "story-graph": storyGraphKind,
-    simulation: simulationKind,
-    "world-graph": worldGraphKind,
-  } as const;
-  const registry = buildValidatedContentRegistry(
-    hydrated.map((h) => h.built),
-    kinds,
-  );
-  if (!registry.ok || !registry.value)
-    throw new Error(
-      `The playable catalog could not be validated: ${JSON.stringify(registry.errors)}`,
-    );
-
-  const all = hydrated.map(({ built, catalog }) => ({
-    campaignId: built.campaign.id,
-    title:
-      registry.value!.strings.get(built.campaign.titleKey) ?? catalog.title,
-    description: catalog.description,
-    duration: catalog.duration,
-    contentNotice: catalog.contentNotice,
-    featured: catalog.featured,
-    ...(catalog.hidden ? { hidden: true } : {}),
-    ...(catalog.sources ? { sources: catalog.sources } : {}),
-    statBounds: Object.freeze(statBoundsOf(built.campaign.content)),
-  }));
+  const { registry, all } = buildCatalog(portables);
 
   return {
     catalog: Object.freeze(all.filter((campaign) => !campaign.hidden)),
@@ -222,12 +139,70 @@ export async function createBrowserDemo(): Promise<BrowserDemo> {
       all.find((campaign) => campaign.campaignId === campaignId),
     findLocalSave,
     store: createInMemorySessionStore({
-      engine: createEngine({ kinds, registry: registry.value }),
-      registry: registry.value,
+      engine: createEngine({ kinds: KINDS, registry }),
+      registry,
       persistence:
         typeof localStorage === "undefined" || !browserStorageAvailable()
           ? undefined
           : localPersistence(),
     }),
   };
+}
+
+interface CampaignsResponse {
+  campaigns: readonly CatalogEntry[];
+  summaries: readonly CampaignSummary[];
+}
+
+/**
+ * `SessionStore.listCampaigns()` and `BrowserDemo.findLocalSave()` are both synchronous
+ * (04-core.md; `PlayApp.tsx` calls `findLocalSave` during render) and neither can become a
+ * network call, so both are resolved up front here: `/api/campaigns` carries the catalog
+ * projection *and* the raw `CampaignSummary[]` the store contract needs, and `/api/saves`
+ * seeds the save index. The index is a `let`, refreshed after every `saveGame` -- the one
+ * piece of remote state this composition owns rather than delegating to `remote-store.ts`.
+ */
+async function createRemoteBrowserDemo(apiUrl: string): Promise<BrowserDemo> {
+  const response = await fetch(`${apiUrl}/api/campaigns`, {
+    credentials: "include",
+  });
+  if (!response.ok)
+    throw new Error(`Failed to load the playable catalog: ${response.status}`);
+  const { campaigns: all, summaries } =
+    (await response.json()) as CampaignsResponse;
+
+  let saveIndex = new Map(
+    (await fetchSaveIndex(apiUrl)).map((save) => [
+      save.campaignId,
+      save.saveId,
+    ]),
+  );
+
+  const remoteStore = createRemoteSessionStore(apiUrl, summaries);
+  const store: SessionStore = {
+    ...remoteStore,
+    saveGame: async (sessionId) => {
+      const handle = await remoteStore.saveGame(sessionId);
+      saveIndex = new Map(
+        (await fetchSaveIndex(apiUrl)).map((save) => [
+          save.campaignId,
+          save.saveId,
+        ]),
+      );
+      return handle;
+    },
+  };
+
+  return {
+    catalog: Object.freeze(all.filter((campaign) => !campaign.hidden)),
+    findCampaign: (campaignId) =>
+      all.find((campaign) => campaign.campaignId === campaignId),
+    findLocalSave: (campaignId) => saveIndex.get(campaignId),
+    store,
+  };
+}
+
+export async function createBrowserDemo(): Promise<BrowserDemo> {
+  const apiUrl = import.meta.env.VITE_API_URL as string | undefined;
+  return apiUrl ? createRemoteBrowserDemo(apiUrl) : createLocalBrowserDemo();
 }

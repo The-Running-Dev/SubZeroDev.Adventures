@@ -16,7 +16,10 @@ name: Deploy API
 #   DEPLOY_USER      -- SSH user
 #   DEPLOY_SSH_KEY   -- private key with access to that user
 #   DB_PASSWORD      -- written into the VPS's .env as ${DB_PASSWORD}
-#   GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET -- written the same way, for the OAuth upgrade
+#   OAUTH_GITHUB_CLIENT_ID / OAUTH_GITHUB_CLIENT_SECRET -- written into the VPS's .env as
+#     GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET (the app's expected names), for the OAuth
+#     upgrade. Named with an OAUTH_ prefix here only because GitHub Actions rejects repo
+#     secret names starting with GITHUB_.
 #
 # Two things the VPS must already have, which this workflow deliberately does not create:
 # the `proxy-net` network (docker-compose.yml declares it `external: true`), and a
@@ -91,8 +94,8 @@ jobs:
         uses: appleboy/ssh-action@v1.2.0
         env:
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-          GITHUB_CLIENT_ID: ${{ secrets.GITHUB_CLIENT_ID }}
-          GITHUB_CLIENT_SECRET: ${{ secrets.GITHUB_CLIENT_SECRET }}
+          GITHUB_CLIENT_ID: ${{ secrets.OAUTH_GITHUB_CLIENT_ID }}
+          GITHUB_CLIENT_SECRET: ${{ secrets.OAUTH_GITHUB_CLIENT_SECRET }}
           # Pins the deployment to the exact image this run built. docker-compose.yml
           # defaults to `:latest`, which is fine by hand but would make a redeploy depend
           # on which push happened to tag it last.

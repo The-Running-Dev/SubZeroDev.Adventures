@@ -1,26 +1,20 @@
 name: Deploy API
 
-# Builds and publishes the API container to GHCR on every push to main, then (if the VPS
-# secrets below are configured) pulls and restarts it over SSH. The image build/push half
-# always runs; the deploy half is a no-op until DEPLOY_ENABLED is set, so this workflow is
-# safe to merge before the VPS exists.
+# Builds and publishes the API container to GHCR on every push to main, then (if
+# PORTAINER_REDEPLOY_WEBHOOK_URL is configured) triggers a Portainer stack webhook to
+# redeploy it -- the same mechanism SubZeroDev.com uses. The image build/push half always
+# runs; the deploy half is a no-op until DEPLOY_ENABLED is set, so this workflow is safe to
+# merge before the Portainer stack exists.
 #
-# The deploy half copies exactly one file -- the repository root's docker-compose.yml,
-# which is the whole deployment stack on its own. It used to copy compose.prod.yml and a
-# Caddyfile alongside it and stack them with `-f a -f b`; TLS now lives on the shared
-# proxy-net reverse proxy instead of in this repo.
+# This repo does not manage the VPS or SSH into it. The Portainer stack (pointed at this
+# repo's root docker-compose.yml) owns its own environment variables -- DB_PASSWORD,
+# GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, and the proxy-net network -- configured directly
+# in Portainer's UI, not written by this workflow. The webhook redeploy re-pulls whatever
+# image tag the stack is already configured for (docker-compose.yml defaults
+# ADVENTURES_API_IMAGE to :latest, which this workflow also pushes).
 #
-# Required repository secrets for the deploy half (none of these are set by this change --
-# provisioning the VPS, the SSH key, and the database password is the operator's job):
-#   DEPLOY_HOST      -- the VPS hostname or IP
-#   DEPLOY_USER      -- SSH user
-#   DEPLOY_SSH_KEY   -- private key with access to that user
-#   DB_PASSWORD      -- written into the VPS's .env as ${DB_PASSWORD}
-#   GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET -- written the same way, for the OAuth upgrade
-#
-# Two things the VPS must already have, which this workflow deliberately does not create:
-# the `proxy-net` network (docker-compose.yml declares it `external: true`), and a
-# `docker login ghcr.io` credential if the package is private.
+# Required repository secret for the deploy half:
+#   PORTAINER_REDEPLOY_WEBHOOK_URL -- the stack's webhook URL from Portainer
 
 on:
   push:
@@ -72,54 +66,18 @@ jobs:
     name: deploy
     needs: build-and-push
     runs-on: ubuntu-latest
-    # Skips cleanly, rather than failing, until the VPS secrets exist.
+    # Skips cleanly, rather than failing, until the Portainer stack exists.
     if: vars.DEPLOY_ENABLED == 'true'
     steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-
-      - name: Copy the deployment stack to the VPS
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
-          source: "docker-compose.yml"
-          target: "~/subzerodev-adventures"
-
-      - name: Write .env, pull, and restart
-        uses: appleboy/ssh-action@v1.2.0
+      # The redeploy trigger carries no contract surface -- no signature, no error code --
+      # beyond a successful HTTP response. Portainer re-pulls the stack's configured image
+      # (:latest) and restarts it; there is no read-back here of whether that succeeded.
+      - name: Trigger the Portainer stack redeploy
         env:
-          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-          GITHUB_CLIENT_ID: ${{ secrets.GITHUB_CLIENT_ID }}
-          GITHUB_CLIENT_SECRET: ${{ secrets.GITHUB_CLIENT_SECRET }}
-          # Pins the deployment to the exact image this run built. docker-compose.yml
-          # defaults to `:latest`, which is fine by hand but would make a redeploy depend
-          # on which push happened to tag it last.
-          ADVENTURES_API_IMAGE: ghcr.io/the-running-dev/adventures-api:${{ github.sha }}
-        with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
-          # Forwards the values above into the remote shell rather than interpolating them
-          # into the script text, so no secret is ever a literal in the command line.
-          envs: DB_PASSWORD,GITHUB_CLIENT_ID,GITHUB_CLIENT_SECRET,ADVENTURES_API_IMAGE
-          script: |
-            set -eu
-            cd ~/subzerodev-adventures
-            # Compose reads this file both for ${...} interpolation and for `env_file`.
-            # umask first: it is written before it exists, so the mode has to be right at
-            # creation, not fixed up afterwards.
-            umask 077
-            cat > .env <<EOF
-            DB_PASSWORD=${DB_PASSWORD}
-            GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID}
-            GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
-            ADVENTURES_API_IMAGE=${ADVENTURES_API_IMAGE}
-            EOF
-            docker compose pull
-            # Migrations are not run separately here. docker-compose.yml's `api` waits on
-            # `migrate` with `service_completed_successfully`, so `up -d` applies them and
-            # refuses to start the API if they fail. The previous `exec -T migrate` ran
-            # against a one-shot container that had already exited.
-            docker compose up -d
+          REDEPLOY_WEBHOOK_URL: ${{ secrets.PORTAINER_REDEPLOY_WEBHOOK_URL }}
+        run: |
+          if [ -z "$REDEPLOY_WEBHOOK_URL" ]; then
+            echo "PORTAINER_REDEPLOY_WEBHOOK_URL is not set -- cannot trigger the redeploy" >&2
+            exit 1
+          fi
+          curl -sf -X POST "$REDEPLOY_WEBHOOK_URL"

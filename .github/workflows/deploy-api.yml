@@ -2,16 +2,25 @@ name: Deploy API
 
 # Builds and publishes the API container to GHCR on every push to main, then (if the VPS
 # secrets below are configured) pulls and restarts it over SSH. The image build/push half
-# always runs; the deploy half is a no-op until DEPLOY_HOST is set, so this workflow is
+# always runs; the deploy half is a no-op until DEPLOY_ENABLED is set, so this workflow is
 # safe to merge before the VPS exists.
+#
+# The deploy half copies exactly one file -- the repository root's docker-compose.yml,
+# which is the whole deployment stack on its own. It used to copy compose.prod.yml and a
+# Caddyfile alongside it and stack them with `-f a -f b`; TLS now lives on the shared
+# proxy-net reverse proxy instead of in this repo.
 #
 # Required repository secrets for the deploy half (none of these are set by this change --
 # provisioning the VPS, the SSH key, and the database password is the operator's job):
 #   DEPLOY_HOST      -- the VPS hostname or IP
 #   DEPLOY_USER      -- SSH user
 #   DEPLOY_SSH_KEY   -- private key with access to that user
-#   DB_PASSWORD      -- forwarded to compose.prod.yml's ${DB_PASSWORD}
-#   GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET -- forwarded the same way, for the OAuth upgrade
+#   DB_PASSWORD      -- written into the VPS's .env as ${DB_PASSWORD}
+#   GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET -- written the same way, for the OAuth upgrade
+#
+# Two things the VPS must already have, which this workflow deliberately does not create:
+# the `proxy-net` network (docker-compose.yml declares it `external: true`), and a
+# `docker login ghcr.io` credential if the package is private.
 
 on:
   push:
@@ -26,8 +35,6 @@ jobs:
   build-and-push:
     name: build-and-push
     runs-on: ubuntu-latest
-    outputs:
-      image: ${{ steps.image.outputs.image }}
     steps:
       - name: Checkout (with submodules)
         uses: actions/checkout@v5
@@ -49,15 +56,17 @@ jobs:
         with:
           context: .
           file: server/Dockerfile
+          # The Dockerfile's last stage, named explicitly so that adding a stage after it
+          # cannot silently change what gets published.
+          target: runtime
           push: true
+          build-args: |
+            ADVENTURES_BUILD_REVISION=${{ github.sha }}
           tags: |
             ghcr.io/the-running-dev/adventures-api:${{ github.sha }}
             ghcr.io/the-running-dev/adventures-api:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-      - id: image
-        run: echo "image=ghcr.io/the-running-dev/adventures-api:${{ github.sha }}" >> "$GITHUB_OUTPUT"
 
   deploy:
     name: deploy
@@ -69,26 +78,48 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Copy compose files to the VPS
+      - name: Copy the deployment stack to the VPS
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          source: "docker-compose.yml,compose.prod.yml,Caddyfile"
+          source: "docker-compose.yml"
           target: "~/subzerodev-adventures"
 
-      - name: Pull and restart
+      - name: Write .env, pull, and restart
         uses: appleboy/ssh-action@v1.2.0
+        env:
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          GITHUB_CLIENT_ID: ${{ secrets.GITHUB_CLIENT_ID }}
+          GITHUB_CLIENT_SECRET: ${{ secrets.GITHUB_CLIENT_SECRET }}
+          # Pins the deployment to the exact image this run built. docker-compose.yml
+          # defaults to `:latest`, which is fine by hand but would make a redeploy depend
+          # on which push happened to tag it last.
+          ADVENTURES_API_IMAGE: ghcr.io/the-running-dev/adventures-api:${{ github.sha }}
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
+          # Forwards the values above into the remote shell rather than interpolating them
+          # into the script text, so no secret is ever a literal in the command line.
+          envs: DB_PASSWORD,GITHUB_CLIENT_ID,GITHUB_CLIENT_SECRET,ADVENTURES_API_IMAGE
           script: |
+            set -eu
             cd ~/subzerodev-adventures
-            export DB_PASSWORD="${{ secrets.DB_PASSWORD }}"
-            export GITHUB_CLIENT_ID="${{ secrets.GITHUB_CLIENT_ID }}"
-            export GITHUB_CLIENT_SECRET="${{ secrets.GITHUB_CLIENT_SECRET }}"
-            docker compose -f docker-compose.yml -f compose.prod.yml pull
-            docker compose -f docker-compose.yml -f compose.prod.yml up -d
-            docker compose -f docker-compose.yml -f compose.prod.yml exec -T migrate npm run migrate up
+            # Compose reads this file both for ${...} interpolation and for `env_file`.
+            # umask first: it is written before it exists, so the mode has to be right at
+            # creation, not fixed up afterwards.
+            umask 077
+            cat > .env <<EOF
+            DB_PASSWORD=${DB_PASSWORD}
+            GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID}
+            GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
+            ADVENTURES_API_IMAGE=${ADVENTURES_API_IMAGE}
+            EOF
+            docker compose pull
+            # Migrations are not run separately here. docker-compose.yml's `api` waits on
+            # `migrate` with `service_completed_successfully`, so `up -d` applies them and
+            # refuses to start the API if they fail. The previous `exec -T migrate` ran
+            # against a one-shot container that had already exited.
+            docker compose up -d

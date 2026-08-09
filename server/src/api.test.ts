@@ -1,6 +1,7 @@
 /**
  * Integration tests against a real Postgres -- `DATABASE_URL` must point at a running
- * instance with the migrations applied (the compose `db` service, locally; the
+ * instance with the migrations applied (server/docker-compose.yml's `db` service, which
+ * publishes 5432 to the host for exactly this reason, locally; the
  * `postgres:17` service container in CI's `server` job). Exercises the properties the
  * plan's Verification section names: port conformance (durability, not just the
  * in-memory cache), replay verify (byte-identical, and a genuine mismatch), and

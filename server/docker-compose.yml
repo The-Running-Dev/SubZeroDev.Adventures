@@ -1,0 +1,92 @@
+# Local-development Compose file: builds from source. The repository root's
+# docker-compose.yml is the deployment counterpart; it pulls the published GHCR image and
+# builds nothing.
+#
+#   docker compose -f server/docker-compose.yml up -d --build
+#
+# Lives next to the Dockerfile it builds, but its build context is the *repository root*
+# (`context: ..`) -- the image needs engine/, shared/, public/campaigns/, and server/, the
+# same four things server/src/composition.ts and shared/campaign-registry.ts reach across
+# at runtime. See server/Dockerfile's header.
+#
+# Credentials here are throwaway and deliberately hardcoded: this stack is disposable, and
+# a dev database that needs a secret to start is a dev database nobody starts. The
+# deployment file takes the opposite position -- every credential there is a `:?`-guarded
+# variable with no default.
+
+# Kept distinct from the deployment stack's `subzerodev-adventures` so a local
+# `up --build` can never adopt or clobber deployment containers and volumes.
+name: subzerodev-adventures-dev
+
+x-adventures-api-dev: &adventures-api-dev
+  build:
+    context: ..
+    dockerfile: server/Dockerfile
+    target: dev
+  # Deliberately not the ghcr.io/... name the deployment file pulls. A local build tagging
+  # that name would leave an untested image sitting under the deployable tag, and
+  # `pull_policy: always` there is the only thing that would eventually correct it.
+  image: subzerodev-adventures-api:dev
+  environment:
+    DATABASE_URL: postgres://adventures:adventures@db:5432/adventures
+    NODE_ENV: development
+    PORT: "8787"
+    SITE_URL: http://localhost:5173
+    API_URL: http://localhost:8787
+  # The repo-root .env, shared with the deployment file's own `env_file` -- one .env
+  # location, one .env.example describing it. Optional here (unlike the deployment file,
+  # where it is required) so a fresh clone can bring the stack up with no setup; only the
+  # OAuth upgrade path needs GITHUB_CLIENT_ID/SECRET, and the server treats both as absent
+  # when unset. CAMPAIGNS_DIR is deliberately left unset so this stack exercises
+  # composition.ts's default module-relative path, which is what `npm run start` uses too.
+  env_file:
+    - path: ../.env
+      required: false
+
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: adventures
+      POSTGRES_PASSWORD: adventures
+      POSTGRES_DB: adventures
+    # Published, unlike the deployment stack: `server/src/api.test.ts` connects to it from
+    # the host, so `npm test --prefix server` needs it reachable outside Docker. Both
+    # published ports are overridable because 5432 in particular collides with any local
+    # Postgres; only the host side moves, so DATABASE_URL above never changes.
+    ports:
+      - "${ADVENTURES_DB_PORT:-5432}:5432"
+    volumes:
+      - adventures-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U adventures"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  migrate:
+    <<: *adventures-api-dev
+    # The image entrypoint's own vocabulary, identical to the deployment file's -- the
+    # `dev` target reaches these through tsx rather than dist/, which is exactly what
+    # server/docker-entrypoint.sh exists to hide.
+    command: migrate
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    <<: *adventures-api-dev
+    # Plain `serve`, which this target runs as `tsx src/index.ts` -- not `tsx watch`.
+    # Nothing bind-mounts source into the container, so a watcher would have nothing to
+    # watch; source changes need `up --build`.
+    command: serve
+    ports:
+      - "${ADVENTURES_API_PORT:-8787}:8787"
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  adventures-db:

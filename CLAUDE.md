@@ -23,6 +23,9 @@ src/
   main.tsx, index.css, site.css, shared.tsx    app shell
   play/                  the game itself: PlayApp.tsx, composition.ts, browser-client.ts, play.css
   test/                  jsdom + real-browser test setup and shared assertion helpers
+shared/                 code both compositions import — environment-neutral, no DOM, no Node
+server/                 the hosted Node API: its own npm project, its own Dockerfile
+docker-compose.yml      the deployment stack — see "The Two Compose Files" below
 ```
 
 ## The Engine Submodule — What Not to Forget
@@ -61,6 +64,49 @@ itself marked a throwaway spike upstream) and copies its output here — see
 output path at this repo. CI runs this and fails the build if it produces a diff
 (`.github/workflows/ci.yml`, "Verify campaign content is not stale") — a silent content
 change shipping to players is exactly the failure mode that check exists to catch.
+
+## The Two Compose Files
+
+There are two, they are independent, and neither is an override layer over the other. This
+mirrors how `SubZeroDev.com` and `SubZeroDev.Blog/tools/blog-mcp` are laid out.
+
+- **`docker-compose.yml` (root) is the deployment stack.** It pulls
+  `ghcr.io/the-running-dev/adventures-api` and builds nothing. Requires a `.env` beside it
+  (copy `.env.example`) and a pre-existing external `proxy-net` network — TLS and public
+  routing belong to whatever reverse proxy already lives on that network, not to this repo.
+- **`server/docker-compose.yml` is the dev stack.** `build: context: ..` — the context is
+  the repo root, because the image needs `engine/`, `shared/`, `public/campaigns/`, and
+  `server/`. Its image is tagged `subzerodev-adventures-api:dev`, deliberately never the
+  GHCR name.
+
+```bash
+docker compose -f server/docker-compose.yml up -d --build
+```
+
+Both files say `command: serve` and `command: migrate`. Those are
+`server/docker-entrypoint.sh`'s vocabulary, not paths — the `dev` target reaches them via
+`tsx` from source and `runtime` via emitted JS in `dist/`, and neither compose file knows
+which. Set `ADVENTURES_DB_PORT` if 5432 is already taken locally.
+
+### What the Dockerfile's layout is actually protecting
+
+`server/Dockerfile` reproduces the repository's directory structure inside the image rather
+than flattening it, for two reasons that are easy to break and hard to diagnose:
+
+- **The engine dependency is a symlink.** npm stores `file:` dependencies as a symlink
+  whose target is relative to its own location. Moving either `server/node_modules` or
+  `engine/src/engine` breaks it. (`--install-links` avoids symlinks, but the committed
+  lockfile is a symlink-mode lockfile and `npm ci` rejects the mismatch.)
+- **`shared/` and `server/` are siblings.** Node and tsc both resolve dependencies by
+  walking `node_modules` up through a file's _ancestors_, so `server/node_modules` is never
+  on `shared/campaign-registry.ts`'s path. The `build` and `dev` targets add
+  `ln -s server/node_modules node_modules` for this; `.github/workflows/ci.yml` carries the
+  same line for the same reason. The `runtime` target needs no symlink only because it puts
+  `dist/` _under_ `server/`, making `server/node_modules` a genuine ancestor.
+
+Campaign JSON is the exception: `server/src/composition.ts` finds it module-relative by
+default, which stops being true once tsc moves the module, so the `runtime` target sets
+`CAMPAIGNS_DIR` to an absolute path instead of contorting its layout to match.
 
 ## Visual Baselines — The One Real Gotcha
 
@@ -110,6 +156,16 @@ npm run setup           # build the engine submodule (only needed after a fresh 
 npm run check            # format:check, lint, typecheck, test, test:browser, test:build
 npm run sync:campaigns && git diff --exit-code -- public/campaigns   # campaign drift
 ```
+
+`server/` is a separate npm project and `npm run check` does not reach into it — CI runs it
+as its own job. Validate it directly:
+
+```bash
+npm run typecheck --prefix server && npm run build --prefix server && npm test --prefix server
+```
+
+`npm test --prefix server` skips its integration suite unless `DATABASE_URL` is set; bring
+up `server/docker-compose.yml` first to have something for it to point at.
 
 `npm run test:browser` needs a real Chromium and a listenable local port; if your environment
 sandboxes local sockets, run it inside the Playwright Docker image instead (see "Visual

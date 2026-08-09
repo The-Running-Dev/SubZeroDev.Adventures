@@ -21,7 +21,10 @@ export async function loadIdentityProviders(): Promise<
   const githubClientId = process.env.GITHUB_CLIENT_ID;
   const githubClientSecret = process.env.GITHUB_CLIENT_SECRET;
   if (githubClientId && githubClientSecret) {
-    providers.set("github", createGithubProvider(githubClientId, githubClientSecret));
+    providers.set(
+      "github",
+      createGithubProvider(githubClientId, githubClientSecret),
+    );
   }
 
   const oidcIssuer = process.env.OIDC_ISSUER_URL;
@@ -33,7 +36,12 @@ export async function loadIdentityProviders(): Promise<
     const name = process.env.OIDC_PROVIDER_NAME || "oidc";
     providers.set(
       name,
-      await createOidcProvider(name, oidcIssuer, oidcClientId, oidcClientSecret),
+      await createOidcProvider(
+        name,
+        oidcIssuer,
+        oidcClientId,
+        oidcClientSecret,
+      ),
     );
   }
 

@@ -101,10 +101,7 @@ async function lookupPrincipal(
   return rows[0] ? toPrincipal(rows[0]) : undefined;
 }
 
-async function principalById(
-  pool: Pool,
-  playerId: string,
-): Promise<Principal> {
+async function principalById(pool: Pool, playerId: string): Promise<Principal> {
   const { rows } = await pool.query(
     `select player_id, kind, display_name from players where player_id = $1`,
     [playerId],
@@ -182,10 +179,10 @@ export async function mergePlayers(
       `update sessions set profile_id = $1 where profile_id = $2`,
       [toPlayerId, fromPlayerId],
     );
-    await client.query(`update saves set profile_id = $1 where profile_id = $2`, [
-      toPlayerId,
-      fromPlayerId,
-    ]);
+    await client.query(
+      `update saves set profile_id = $1 where profile_id = $2`,
+      [toPlayerId, fromPlayerId],
+    );
     await client.query(`delete from players where player_id = $1`, [
       fromPlayerId,
     ]);

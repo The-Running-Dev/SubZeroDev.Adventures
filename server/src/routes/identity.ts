@@ -78,7 +78,12 @@ export function registerIdentityRoutes(
         ? (JSON.parse(rawCookie) as StateCookiePayload)
         : undefined;
 
-      if (!query.code || !query.state || !saved || query.state !== saved.state) {
+      if (
+        !query.code ||
+        !query.state ||
+        !saved ||
+        query.state !== saved.state
+      ) {
         reply.redirect(redirectWithError(siteUrl, "invalid_oauth_state"));
         return;
       }
@@ -94,7 +99,9 @@ export function registerIdentityRoutes(
         });
       } catch (error) {
         request.log.error(error);
-        reply.redirect(redirectWithError(siteUrl, "oauth_token_exchange_failed"));
+        reply.redirect(
+          redirectWithError(siteUrl, "oauth_token_exchange_failed"),
+        );
         return;
       }
 

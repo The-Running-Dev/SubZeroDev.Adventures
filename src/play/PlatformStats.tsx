@@ -66,6 +66,9 @@ export function PlatformStats({
           <dd>{numberFormat.format(stats.badgesUnlocked)}</dd>
         </div>
       </dl>
+      <a className="cabinet-button quiet" href="/ranking">
+        Operator standings
+      </a>
     </section>
   );
 }

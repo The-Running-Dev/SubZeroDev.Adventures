@@ -10,6 +10,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Pool } from "pg";
 import { createServerDemo, type ServerDemo } from "./composition.js";
 import { evaluateBadges } from "./badges.js";
+import { CROWN_BADGE_ID } from "./ranking.js";
 
 const databaseUrl = process.env.DATABASE_URL;
 const describeIfDb = databaseUrl ? describe : describe.skip;
@@ -97,6 +98,13 @@ describeIfDb("badge evaluation", () => {
     await pool.query(
       `insert into achievements (player_id, campaign_id, achievement_id) values ($1, $2, $3)`,
       [playerId, campaignId, achievementId],
+    );
+  }
+
+  async function makePublic(playerId: string, slug: string): Promise<void> {
+    await pool.query(
+      `update players set profile_public = true, profile_slug = $2 where player_id = $1`,
+      [playerId, slug],
     );
   }
 
@@ -821,5 +829,92 @@ describeIfDb("badge evaluation", () => {
       attemptCounter: 500,
     });
     expect(await badgeIdsFor(subject)).not.toContain("top-1-percent");
+  });
+
+  it("awards the crown badge to whoever currently leads the public ranking", async () => {
+    const leader = await createPlayer();
+    const second = await createPlayer();
+    const third = await createPlayer();
+    await makePublic(leader, "leader");
+    await makePublic(second, "second");
+    await makePublic(third, "third");
+    await seedSession(leader, {
+      createdAt: new Date(),
+      stepCount: 1,
+      attemptCounter: 51,
+    });
+    await seedSession(second, {
+      createdAt: new Date(),
+      stepCount: 1,
+      attemptCounter: 11,
+    });
+    await seedSession(third, {
+      createdAt: new Date(),
+      stepCount: 1,
+      attemptCounter: 1,
+    });
+
+    expect(await badgeIdsFor(leader)).toContain(CROWN_BADGE_ID);
+    expect(await badgeIdsFor(second)).not.toContain(CROWN_BADGE_ID);
+  });
+
+  it("does not award the crown to a private profile, however strong its counters", async () => {
+    const secret = await createPlayer();
+    await seedSession(secret, {
+      createdAt: new Date(),
+      stepCount: 1,
+      attemptCounter: 999,
+    });
+    const b = await createPlayer();
+    const c = await createPlayer();
+    const d = await createPlayer();
+    await makePublic(b, "b");
+    await makePublic(c, "c");
+    await makePublic(d, "d");
+    await seedSession(b, {
+      createdAt: new Date(),
+      stepCount: 1,
+      attemptCounter: 11,
+    });
+
+    expect(await badgeIdsFor(secret)).not.toContain(CROWN_BADGE_ID);
+    expect(await badgeIdsFor(b)).toContain(CROWN_BADGE_ID);
+  });
+
+  it("awards the crown to nobody when fewer than 3 profiles are public", async () => {
+    const a = await createPlayer();
+    const b = await createPlayer();
+    await makePublic(a, "a");
+    await makePublic(b, "b");
+    await seedSession(a, {
+      createdAt: new Date(),
+      stepCount: 1,
+      attemptCounter: 51,
+    });
+
+    expect(await badgeIdsFor(a)).not.toContain(CROWN_BADGE_ID);
+  });
+
+  it("keeps the crown once awarded, even after a rival overtakes -- badges are never revoked", async () => {
+    const leader = await createPlayer();
+    const second = await createPlayer();
+    const third = await createPlayer();
+    await makePublic(leader, "leader");
+    await makePublic(second, "second");
+    await makePublic(third, "third");
+    await seedSession(leader, {
+      createdAt: new Date(),
+      stepCount: 1,
+      attemptCounter: 11,
+    });
+    expect(await badgeIdsFor(leader)).toContain(CROWN_BADGE_ID);
+
+    await seedSession(second, {
+      createdAt: new Date(),
+      stepCount: 1,
+      attemptCounter: 1000,
+    });
+    expect(await badgeIdsFor(second)).toContain(CROWN_BADGE_ID);
+    expect(await badgeIdsFor(leader)).toContain(CROWN_BADGE_ID);
   });
 });

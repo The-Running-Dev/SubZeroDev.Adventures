@@ -17,6 +17,7 @@ import type { FastifyInstance } from "fastify";
 import type { Pool } from "pg";
 import { requirePrincipal, resolvePrincipal } from "../principal.js";
 import { computeRecords } from "../records.js";
+import { maskDisplayName } from "../display-name.js";
 import type { ServerDemo } from "../composition.js";
 
 function mintSlug(): string {
@@ -132,13 +133,8 @@ export function registerProfileRoutes(
       ]);
     const stats = statsResult.rows[0]!;
 
-    const displayName =
-      player.display_name && !player.display_name.includes("@")
-        ? player.display_name
-        : "Anonymous Operator";
-
     return {
-      displayName,
+      displayName: maskDisplayName(player.display_name),
       joinedAt: player.created_at,
       sessionsStarted: stats.total,
       sessionsFinished: stats.finished,

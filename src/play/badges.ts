@@ -14,6 +14,12 @@ export interface BadgeDefinition {
   readonly description: string;
 }
 
+/** Mirrors `server/src/ranking.ts`'s `CROWN_BADGE_ID` -- the 40th badge, awarded to
+ *  whoever the ranking currently has at #1. Declared here, ahead of
+ *  `BADGE_DEFINITIONS`, so its entry below can key off the constant rather than a
+ *  second hardcoded string the two files could drift apart on. */
+export const CROWN_BADGE_ID = "interim-head-of-absurdity";
+
 export const BADGE_DEFINITIONS: Readonly<Record<string, BadgeDefinition>> = {
   "first-steps": {
     label: "First Steps",
@@ -192,10 +198,37 @@ export const BADGE_DEFINITIONS: Readonly<Record<string, BadgeDefinition>> = {
     description:
       "You have made more rejected moves than 99% of operators. This is not the percentile you wanted.",
   },
+
+  // -- Ranking crown (issue #19 follow-up) ---------------------------------------------
+
+  [CROWN_BADGE_ID]: {
+    label: "Interim Head of Absurdity",
+    description:
+      "Ranked first among every operator who made their record public. The post is interim. The record of it is not.",
+  },
 };
 
 /** Stable display order: earned-or-not, the grid always reads the same. */
 export const BADGE_ORDER: readonly string[] = Object.keys(BADGE_DEFINITIONS);
+
+/** Every badge in `BADGE_ORDER` except the crown -- the set a player can earn by
+ *  playing. The crown is awarded by *ranking first among other players*
+ *  (server/src/ranking.ts), not something a player can work toward alone, so both the
+ *  rank ladder below and the server's Absurdity Index key off this set rather than
+ *  `BADGE_ORDER`. `BADGE_ORDER` still carries all forty -- `BadgeGrid` renders the crown
+ *  as a locked tile like any other, which is the only advertisement this feature gets. */
+export const EARNABLE_BADGE_IDS: readonly string[] = BADGE_ORDER.filter(
+  (id) => id !== CROWN_BADGE_ID,
+);
+
+/** A badge count that excludes the crown -- the ceiling every "N / 39" readout (the
+ *  player's own record, a public profile) must use instead of `badges.length` directly,
+ *  or a crown holder would read "40 / 39". */
+export function playEarnedBadgeCount(
+  badges: readonly { readonly badgeId: string }[],
+): number {
+  return badges.filter((b) => b.badgeId !== CROWN_BADGE_ID).length;
+}
 
 export interface ProfileRank {
   readonly label: string;
@@ -204,9 +237,13 @@ export interface ProfileRank {
 
 /**
  * The "badge of a badge" -- a single rank derived from how many badges a player holds,
- * rather than stored anywhere. Re-spaced against `BADGE_ORDER.length` (39, up from the
- * 18 this ladder was originally tuned for) rather than hardcoded boundaries, so it stays
- * proportional if the badge count changes again.
+ * rather than stored anywhere. Re-spaced against `EARNABLE_BADGE_IDS.length` (39, up
+ * from the 18 this ladder was originally tuned for) rather than hardcoded boundaries, so
+ * it stays proportional if the badge count changes again -- `EARNABLE_BADGE_IDS`, not
+ * `BADGE_ORDER`, because the crown cannot be earned by playing alone (it's awarded by
+ * outranking every other public profile). Keying the top boundary off `BADGE_ORDER`
+ * instead would move it from 39 to 40 and silently demote a player who holds every
+ * badge the game can actually give them, just for not also being #1 on the leaderboard.
  */
 const PROFILE_RANKS: readonly {
   readonly min: number;
@@ -263,7 +300,7 @@ const PROFILE_RANKS: readonly {
     },
   },
   {
-    min: BADGE_ORDER.length,
+    min: EARNABLE_BADGE_IDS.length,
     rank: {
       label: "Ran Out Of Badges",
       description:

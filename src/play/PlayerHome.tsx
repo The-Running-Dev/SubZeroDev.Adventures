@@ -7,7 +7,7 @@ import type {
   PersonnelRecords,
   ProfileSettings,
 } from "./identity";
-import { BADGE_ORDER } from "./badges";
+import { EARNABLE_BADGE_IDS, playEarnedBadgeCount } from "./badges";
 import { ProfileRankBadge } from "./ProfileRankBadge";
 import { BadgeGrid } from "./BadgeGrid";
 import { PersonnelFile } from "./PersonnelFile";
@@ -55,8 +55,9 @@ export function PlayerHome({
     0,
   );
 
+  const earnedBadgeCount = playEarnedBadgeCount(badges);
   const finishedPct = fill(storiesFinished, catalog.length);
-  const badgePct = fill(badges.length, BADGE_ORDER.length);
+  const badgePct = fill(earnedBadgeCount, EARNABLE_BADGE_IDS.length);
 
   function findCampaignTitle(campaignId: string): string {
     return (
@@ -74,7 +75,7 @@ export function PlayerHome({
           browser.
         </p>
       )}
-      <ProfileRankBadge badgeCount={badges.length} />
+      <ProfileRankBadge badgeCount={earnedBadgeCount} />
       <dl className="home-summary">
         <div>
           <dt>Stories started</dt>
@@ -108,8 +109,8 @@ export function PlayerHome({
         >
           <dt>Badges</dt>
           <dd>
-            {numberFormat.format(badges.length)}
-            <span className="stat-ceiling"> / {BADGE_ORDER.length}</span>
+            {numberFormat.format(earnedBadgeCount)}
+            <span className="stat-ceiling"> / {EARNABLE_BADGE_IDS.length}</span>
           </dd>
         </div>
       </dl>

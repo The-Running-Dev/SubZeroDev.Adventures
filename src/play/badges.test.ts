@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { BADGE_DEFINITIONS, BADGE_ORDER, profileRankFor } from "./badges";
+import {
+  BADGE_DEFINITIONS,
+  BADGE_ORDER,
+  CROWN_BADGE_ID,
+  EARNABLE_BADGE_IDS,
+  playEarnedBadgeCount,
+  profileRankFor,
+} from "./badges";
 
 describe("client badge copy", () => {
   it("has a definition for every id, and no orphans", () => {
@@ -7,6 +14,30 @@ describe("client badge copy", () => {
     for (const id of BADGE_ORDER) {
       expect(BADGE_DEFINITIONS[id]).toBeDefined();
     }
+  });
+
+  it("carries the crown in BADGE_ORDER but excludes it from EARNABLE_BADGE_IDS", () => {
+    expect(BADGE_ORDER).toContain(CROWN_BADGE_ID);
+    expect(EARNABLE_BADGE_IDS).not.toContain(CROWN_BADGE_ID);
+    expect(EARNABLE_BADGE_IDS.length).toBe(BADGE_ORDER.length - 1);
+  });
+});
+
+describe("playEarnedBadgeCount", () => {
+  it("counts every held badge except the crown", () => {
+    expect(
+      playEarnedBadgeCount([
+        { badgeId: "first-steps" },
+        { badgeId: "marathoner" },
+      ]),
+    ).toBe(2);
+    expect(
+      playEarnedBadgeCount([
+        { badgeId: "first-steps" },
+        { badgeId: CROWN_BADGE_ID },
+      ]),
+    ).toBe(1);
+    expect(playEarnedBadgeCount([])).toBe(0);
   });
 });
 
@@ -30,9 +61,19 @@ describe("profileRankFor", () => {
     expect(profileRankFor(30).label).toBe("Terminal Legend");
   });
 
-  it("returns the top rank once every badge is earned, and stays there past it", () => {
-    expect(profileRankFor(BADGE_ORDER.length).label).toBe("Ran Out Of Badges");
-    expect(profileRankFor(BADGE_ORDER.length + 10).label).toBe(
+  it("returns the top rank once every earnable badge is held, and stays there past it", () => {
+    expect(profileRankFor(EARNABLE_BADGE_IDS.length).label).toBe(
+      "Ran Out Of Badges",
+    );
+    expect(profileRankFor(EARNABLE_BADGE_IDS.length + 10).label).toBe(
+      "Ran Out Of Badges",
+    );
+  });
+
+  it("does not demote a player holding every earnable badge just for lacking the crown", () => {
+    // The regression this guards: keying the top tier off BADGE_ORDER.length (40) instead
+    // of EARNABLE_BADGE_IDS.length (39) would move this boundary and fail this assertion.
+    expect(profileRankFor(EARNABLE_BADGE_IDS.length).label).toBe(
       "Ran Out Of Badges",
     );
   });

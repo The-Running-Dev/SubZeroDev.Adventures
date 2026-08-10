@@ -119,6 +119,24 @@ to sign in anywhere:
   minutes. The tradeoff mirrors the identity-upgrade merge case, without needing a
   provider.
 
+## The public ranking
+
+`GET /api/ranking` (`server/src/ranking.ts`, `server/src/platform-baselines.ts`'s
+`publicProfileTotals`) lists every player with `profile_public = true` and a minted
+`profile_slug`, ordered by a composite Absurdity Index. A private player is simply absent
+from the response — there's no "hidden" row, no rank held in reserve, nothing to un-hide
+later. Like `GET /api/profile/:slug`, it reads only `profile_slug`, never `player_id`;
+`player_id` stays opaque outside `/api/me` on this route too.
+
+One term of the index — rejected moves, `sum(greatest(attempt_counter - step_count, 0))`
+— reuses `attempt_counter`, which is dual-purposed as `sessions`' optimistic-lock version
+(bumped on every write, not just a rejected move) rather than a true rejected-move
+counter. Every badge that reads it (`server/src/badges.ts`) uses a deliberately loose
+threshold to absorb that noise; a ranking has no threshold to loosen, so two players can
+end up ordered partly by how often they saved and loaded, not just by what they did in
+the story. Weighted below badge count in the formula, shown as its own column rather than
+folded silently into the total, and disclosed on the page itself — accepted, not hidden.
+
 ## What's still open
 
 Unowned resources passing the ownership check

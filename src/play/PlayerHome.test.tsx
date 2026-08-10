@@ -2,7 +2,14 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { PlayerHome } from "./PlayerHome";
-import { BADGE_DEFINITIONS, BADGE_ORDER, profileRankFor } from "./badges";
+import {
+  BADGE_DEFINITIONS,
+  BADGE_ORDER,
+  CROWN_BADGE_ID,
+  EARNABLE_BADGE_IDS,
+  playEarnedBadgeCount,
+  profileRankFor,
+} from "./badges";
 import type {
   Badge,
   CampaignProgress,
@@ -135,6 +142,29 @@ describe("PlayerHome", () => {
     const rank = profileRankFor(badges.length);
     expect(screen.getByText(rank.label)).toBeVisible();
     expect(screen.getByText(rank.description)).toBeVisible();
+  });
+
+  it("excludes the crown from the badge count and ceiling, holding it or not", () => {
+    const withCrown: readonly Badge[] = [
+      { badgeId: "first-steps", unlockedAt: "2026-01-01T00:00:00.000Z" },
+      { badgeId: "collector", unlockedAt: "2026-01-02T00:00:00.000Z" },
+      { badgeId: CROWN_BADGE_ID, unlockedAt: "2026-01-03T00:00:00.000Z" },
+    ];
+    renderHome({ badges: withCrown });
+
+    const earnedCount = playEarnedBadgeCount(withCrown);
+    expect(earnedCount).toBe(2);
+    expect(screen.getByText(`/ ${EARNABLE_BADGE_IDS.length}`)).toBeVisible();
+
+    const rank = profileRankFor(earnedCount);
+    expect(screen.getByText(rank.label)).toBeVisible();
+
+    // The crown badge itself still renders as an earned tile in the grid -- only the
+    // ceiling/count readouts exclude it, not the grid.
+    const crownTile = [...document.querySelectorAll(".badge")].find((el) =>
+      el.textContent?.includes(BADGE_DEFINITIONS[CROWN_BADGE_ID]!.label),
+    )!;
+    expect(crownTile).not.toHaveClass("badge-locked");
   });
 
   it("shows 'Make profile public' when private, and calls setPublic(true) on click", async () => {

@@ -1,7 +1,11 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { PublicProfile } from "./PublicProfile";
-import { profileRankFor } from "../play/badges";
+import {
+  CROWN_BADGE_ID,
+  EARNABLE_BADGE_IDS,
+  profileRankFor,
+} from "../play/badges";
 import type { PublicProfileData } from "../play/identity";
 
 const emptyRecords: PublicProfileData["records"] = {
@@ -103,5 +107,26 @@ describe("PublicProfile", () => {
     // The known badge renders; the unrecognized id contributes no extra tile beyond
     // the fixed BADGE_ORDER set.
     expect(screen.getByText("First Steps")).toBeVisible();
+  });
+
+  it("still reads Ran Out Of Badges when a profile holds the crown plus every earnable badge", async () => {
+    // The regression test for keying PROFILE_RANKS' top tier off EARNABLE_BADGE_IDS
+    // rather than BADGE_ORDER -- a profile with the crown *and* all 39 play-earned
+    // badges must not read one tier below the top just for also holding the 40th.
+    const profileWithEverything: PublicProfileData = {
+      ...sampleProfile,
+      badges: [
+        ...EARNABLE_BADGE_IDS.map((badgeId) => ({
+          badgeId,
+          unlockedAt: "2026-01-01T00:00:00.000Z",
+        })),
+        { badgeId: CROWN_BADGE_ID, unlockedAt: "2026-01-02T00:00:00.000Z" },
+      ],
+    };
+    stubFetch(200, profileWithEverything);
+    render(<PublicProfile apiUrl="http://localhost:8787" slug="abc123" />);
+
+    await screen.findByText("Test Operator");
+    expect(screen.getByText("Ran Out Of Badges")).toBeVisible();
   });
 });

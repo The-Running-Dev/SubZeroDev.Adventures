@@ -89,6 +89,27 @@ export interface PublicProfileData {
   readonly records: PersonnelRecords;
 }
 
+/** One row of `GET /api/ranking` -- mirrors `server/src/ranking.ts`'s
+ *  `PublicLeaderboardEntry` exactly. `badgeCount` here is already the play-earned count
+ *  (the server excludes the crown before this ever leaves it), so it needs no
+ *  `playEarnedBadgeCount` pass on the client the way a raw `Badge[]` list would. */
+export interface RankingEntry {
+  readonly profileSlug: string;
+  readonly displayName: string;
+  readonly position: number;
+  readonly absurdityIndex: number;
+  readonly badgeCount: number;
+  readonly rejected: number;
+  readonly endings: number;
+  readonly moves: number;
+  readonly crowned: boolean;
+}
+
+export interface RankingData {
+  readonly entries: readonly RankingEntry[];
+  readonly totalRanked: number;
+}
+
 const anonymousIdentity: Identity = {
   playerId: null,
   kind: "anonymous",

@@ -242,4 +242,39 @@ describeIfDb("public/private profiles", () => {
     expect(emailBodyJson.displayName).toBe("Anonymous Operator");
     expect(JSON.stringify(emailBodyJson)).not.toContain("someone@example.com");
   });
+
+  it("masks a display name identically on /api/profile/:slug and its /api/ranking row", async () => {
+    const cookie = await guestCookie();
+    const { playerId } = await app
+      .inject({ method: "GET", url: "/api/me", headers: { cookie } })
+      .then((r) => r.json() as { playerId: string });
+    await pool.query(
+      `update players set display_name = $2 where player_id = $1`,
+      [playerId, "someone@example.com"],
+    );
+    const { slug } = await app
+      .inject({
+        method: "POST",
+        url: "/api/profile/visibility",
+        headers: { cookie },
+        payload: { public: true },
+      })
+      .then((r) => r.json() as { slug: string });
+
+    const profileBody = await app
+      .inject({ method: "GET", url: `/api/profile/${slug}` })
+      .then((r) => r.json() as { displayName: string });
+    const rankingBody = await app
+      .inject({ method: "GET", url: "/api/ranking" })
+      .then(
+        (r) =>
+          r.json() as {
+            entries: { profileSlug: string; displayName: string }[];
+          },
+      );
+    const rankingRow = rankingBody.entries.find((e) => e.profileSlug === slug);
+
+    expect(rankingRow?.displayName).toBe(profileBody.displayName);
+    expect(profileBody.displayName).toBe("Anonymous Operator");
+  });
 });

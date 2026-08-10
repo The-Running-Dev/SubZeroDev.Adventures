@@ -10,6 +10,7 @@
  */
 import { useEffect, useState, type CSSProperties } from "react";
 import type { PublicProfileData } from "../play/identity";
+import { playEarnedBadgeCount } from "../play/badges";
 import { ProfileRankBadge } from "../play/ProfileRankBadge";
 import { BadgeGrid } from "../play/BadgeGrid";
 import { PersonnelFile } from "../play/PersonnelFile";
@@ -112,7 +113,9 @@ export function PublicProfile({
         {stage.kind === "loaded" && (
           <>
             <h2>{stage.data.displayName}</h2>
-            <ProfileRankBadge badgeCount={stage.data.badges.length} />
+            <ProfileRankBadge
+              badgeCount={playEarnedBadgeCount(stage.data.badges)}
+            />
             <dl className="home-summary">
               <div>
                 <dt>Stories started</dt>

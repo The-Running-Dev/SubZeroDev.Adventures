@@ -12,6 +12,7 @@ import { registerTransferRoutes } from "./routes/transfer.js";
 import { registerBadgeRoutes } from "./routes/badges.js";
 import { registerStatsRoutes } from "./routes/stats.js";
 import { registerProfileRoutes } from "./routes/profile.js";
+import { registerRankingRoutes } from "./routes/ranking.js";
 import { loadIdentityProviders } from "./identity/registry.js";
 
 /** The one place this server reads deployment configuration from -- `index.ts` is the only
@@ -81,6 +82,7 @@ export async function buildApp(
   registerBadgeRoutes(app, pool, demo);
   registerStatsRoutes(app, pool);
   registerProfileRoutes(app, pool, demo);
+  registerRankingRoutes(app, pool);
 
   return app;
 }

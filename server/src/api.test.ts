@@ -514,6 +514,7 @@ describeIfDb("server API", () => {
         { method: "GET", url: "/api/campaigns" },
         { method: "GET", url: "/api/saves" },
         { method: "GET", url: "/api/profile/settings" },
+        { method: "GET", url: "/api/ranking" },
         { method: "POST", url: `/api/sessions/${sessionId}/resume` },
         { method: "GET", url: `/api/sessions/${sessionId}/scene` },
         { method: "GET", url: `/api/sessions/${sessionId}/view` },
@@ -654,5 +655,55 @@ describeIfDb("server API", () => {
       [mergedId],
     );
     expect(rows.map((row) => row.achievement_id)).toEqual(["chapter-one"]);
+  });
+
+  it("GET /api/ranking is public and never mints a player, cookie or not", async () => {
+    const before = await pool.query<{ n: number }>(
+      "select count(*)::int as n from players",
+    );
+    const response = await app.inject({ method: "GET", url: "/api/ranking" });
+    expect(response.statusCode).toBe(200);
+    const after = await pool.query<{ n: number }>(
+      "select count(*)::int as n from players",
+    );
+    expect(after.rows[0]!.n).toBe(before.rows[0]!.n);
+  });
+
+  it("masks an email-shaped display name on the ranking board", async () => {
+    const cookie = await guestCookie();
+    const { playerId } = await app
+      .inject({ method: "GET", url: "/api/me", headers: { cookie } })
+      .then((r) => r.json() as { playerId: string });
+    await pool.query(
+      `update players set display_name = 'someone@example.com' where player_id = $1`,
+      [playerId],
+    );
+    await app.inject({
+      method: "POST",
+      url: "/api/profile/visibility",
+      headers: { cookie },
+      payload: { public: true },
+    });
+    // Needs two more public profiles to clear the ranked-player floor for a crown, but
+    // the masking rule applies to every row regardless -- this just keeps the assertion
+    // from depending on that floor.
+    for (let i = 0; i < 2; i++) {
+      const filler = await guestCookie();
+      await app.inject({
+        method: "POST",
+        url: "/api/profile/visibility",
+        headers: { cookie: filler },
+        payload: { public: true },
+      });
+    }
+
+    const body = await app
+      .inject({ method: "GET", url: "/api/ranking" })
+      .then((r) => r.json());
+    expect(JSON.stringify(body)).not.toContain("someone@example.com");
+    const entries = (body as { entries: { displayName: string }[] }).entries;
+    expect(
+      entries.find((e) => e.displayName === "Anonymous Operator"),
+    ).toBeTruthy();
   });
 });

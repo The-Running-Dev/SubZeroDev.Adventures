@@ -23,6 +23,7 @@ import {
   rejectedPercentileFor,
   totalPlayerCount,
 } from "./platform-baselines.js";
+import { CROWN_BADGE_ID, currentLeaderPlayerId } from "./ranking.js";
 
 export interface BadgeRow {
   readonly badgeId: string;
@@ -70,6 +71,11 @@ interface BadgeData {
   /** Total registered players -- gates `top-1-percent` so it isn't trivially true on a
    *  tiny userbase. */
   readonly totalPlayers: number;
+  /** Whether this player currently holds the ranking's #1 spot (`ranking.ts`'s crown
+   *  predicate). Cross-player, same fetch scope as the other three above -- and, unlike
+   *  them, only public profiles can ever be true here, since the ranking only ranks
+   *  `profile_public = true` players in the first place. */
+  readonly isCurrentLeader: boolean;
 }
 
 interface BadgeDefinition {
@@ -584,6 +590,13 @@ export const BADGES: readonly BadgeDefinition[] = [
       d.totalPlayers >= TOP_PERCENT_MIN_PLAYERS &&
       d.rejectedPercentile >= TOP_PERCENT_THRESHOLD,
   },
+
+  // -- Ranking crown (issue #19 follow-up) ---------------------------------------------
+
+  {
+    id: CROWN_BADGE_ID,
+    test: (d) => d.isCurrentLeader,
+  },
 ];
 
 interface SessionRow {
@@ -636,6 +649,7 @@ export async function evaluateBadges(
     medians,
     percentile,
     playerCount,
+    leaderId,
   ] = await Promise.all([
     pool.query<SessionRow>(
       `select campaign_id, status, ending_id, step_count, attempt_counter,
@@ -654,6 +668,7 @@ export async function evaluateBadges(
     endingMedianSteps(pool),
     rejectedPercentileFor(pool, playerId),
     totalPlayerCount(pool),
+    currentLeaderPlayerId(pool),
   ]);
 
   const data: BadgeData = {
@@ -684,6 +699,7 @@ export async function evaluateBadges(
     endingMedianSteps: medians,
     rejectedPercentile: percentile,
     totalPlayers: playerCount,
+    isCurrentLeader: leaderId === playerId,
   };
 
   const earned = BADGES.filter((b) => b.test(data)).map((b) => b.id);

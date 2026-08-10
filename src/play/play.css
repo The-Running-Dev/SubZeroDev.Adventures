@@ -634,6 +634,70 @@
   margin: 0;
 }
 
+/* A horizontally scrollable region needs to be reachable by keyboard on its own --
+   without `tabIndex`/`role` here this trips axe's scrollable-region-focusable, and
+   `accessibility.browser.test.tsx` fails the build on that violation. */
+.standings-scroll {
+  margin-top: 1.5rem;
+  overflow-x: auto;
+}
+
+.standings-scroll:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.standings-table {
+  border-collapse: collapse;
+  min-width: 46rem;
+  width: 100%;
+}
+
+.standings-table th,
+.standings-table td {
+  border-bottom: 1px solid var(--rule-soft);
+  padding: 0.6rem 0.75rem;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.standings-table th {
+  color: var(--text-dim);
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.standings-table td {
+  color: var(--ink);
+  font-size: 0.9rem;
+}
+
+.standings-position {
+  color: var(--cyan);
+  font-weight: 700;
+}
+
+.standings-operator a {
+  color: var(--cyan);
+}
+
+.standings-crown-row {
+  background: var(--surface-featured);
+}
+
+/* Same idiom as `.profile-rank`'s "badge of a badge", reused verbatim for the current
+   #1's title block above the table. */
+.standings-crown {
+  margin-bottom: 1.5rem;
+}
+
+.standings-footnote {
+  color: var(--text-faint);
+  font-size: 0.75rem;
+  margin: 0.75rem 0 0;
+}
+
 .cabinet-marquee {
   align-items: center;
   background: var(--surface-raised);
@@ -1967,7 +2031,9 @@
   .platform-stats,
   .badge,
   .profile-rank,
-  .personnel-file {
+  .personnel-file,
+  .standings-table,
+  .standings-crown {
     border: 2px solid CanvasText;
     box-shadow: none;
   }

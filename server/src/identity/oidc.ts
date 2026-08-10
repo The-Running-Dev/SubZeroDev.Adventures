@@ -36,46 +36,48 @@ async function withProviderDetail<T>(
   }
 }
 
-export async function createOidcProvider(
-  name: string,
-  issuerUrl: string,
-  clientId: string,
-  clientSecret: string,
-): Promise<IdentityProvider> {
-  // HTTP Basic client auth, spelled out twice over rather than using
-  // `oidc.ClientSecretBasic`, because both halves are load-bearing against Supabase:
-  //
-  // 1. It must be Basic at all. `discovery()` defaults to `ClientSecretPost` when handed a
-  //    bare secret string, and Supabase registers its OAuth clients for
-  //    `client_secret_basic`, rejecting the mismatch outright ("client is registered for
-  //    'client_secret_basic' but 'client_secret_post' was used").
-  // 2. The credentials must go in *raw*. `oidc.ClientSecretBasic` form-url-encodes them
-  //    first, which RFC 6749 section 2.3.1 does call for, but Supabase never decodes them
-  //    again -- and since that encoding percent-escapes `-`, a UUID client id arrives
-  //    with every hyphen as `%2D` and is rejected as "Invalid client_id format". Verified
-  //    against the live token endpoint: raw credentials authenticate, encoded ones 400.
-  //
-  // The cost of the workaround is a client id or secret containing `:` or non-ASCII would
-  // be ambiguous here, where the RFC encoding would have escaped it. Supabase mints both,
-  // as a UUID and a base64url-ish string, so neither can occur.
-  const clientSecretBasicRaw: oidc.ClientAuth = (
-    _as,
-    client,
-    _body,
-    headers,
-  ) => {
+/**
+ * HTTP Basic client auth, spelled out here rather than using `oidc.ClientSecretBasic`,
+ * because both halves are load-bearing against Supabase:
+ *
+ * 1. It must be Basic at all. `discovery()` defaults to `ClientSecretPost` when handed a
+ *    bare secret string, and Supabase registers its OAuth clients for
+ *    `client_secret_basic`, rejecting the mismatch outright ("client is registered for
+ *    'client_secret_basic' but 'client_secret_post' was used").
+ * 2. The credentials must go in *raw*. `oidc.ClientSecretBasic` form-url-encodes them
+ *    first, which RFC 6749 section 2.3.1 does call for, but Supabase never decodes them
+ *    again -- and since that encoding percent-escapes `-`, a UUID client id arrives with
+ *    every hyphen as `%2D` and is rejected as "Invalid client_id format". Verified against
+ *    the live token endpoint: raw credentials authenticate, encoded ones 400.
+ *
+ * The cost of the workaround is that a client id or secret containing `:` or non-ASCII
+ * would be ambiguous here, where the RFC encoding would have escaped it. Supabase mints
+ * both, as a UUID and a base64url-ish string, so neither can occur.
+ *
+ * Exported for `oidc.test.ts`, which pins the encoding -- swapping this back to the
+ * library's own `ClientSecretBasic` is the regression it exists to catch.
+ */
+export function clientSecretBasicRaw(clientSecret: string): oidc.ClientAuth {
+  return (_as, client, _body, headers) => {
     const credentials = Buffer.from(
       `${client.client_id}:${clientSecret}`,
       "utf8",
     ).toString("base64");
     headers.set("authorization", `Basic ${credentials}`);
   };
+}
 
+export async function createOidcProvider(
+  name: string,
+  issuerUrl: string,
+  clientId: string,
+  clientSecret: string,
+): Promise<IdentityProvider> {
   const config = await oidc.discovery(
     new URL(issuerUrl),
     clientId,
     clientSecret,
-    clientSecretBasicRaw,
+    clientSecretBasicRaw(clientSecret),
   );
 
   return {

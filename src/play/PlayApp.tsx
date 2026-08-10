@@ -474,12 +474,13 @@ function PlayAppReady({ demo }: { demo: BrowserDemo }) {
    * whatever scroll position clicking "Load"/"Resume" (now inside a folded-open dossier
    * tile, possibly off the first screen) left behind -- the phone reading model's
    * promise that the scene and its choices need no scroll (14 §8.2) only holds if the
-   * cabinet actually opens at the top. `behavior: "auto"`, not the page's default smooth
-   * scroll, since this is a state transition, not a scroll the player asked for. Keyed
-   * on `campaignId`, which is set once per run, not once per turn.
+   * cabinet actually opens at the top. `behavior: "instant"`, not `"auto"` -- `"auto"`
+   * defers to `html`'s `scroll-behavior: smooth` (index.css), animating the jump instead
+   * of cutting to it, which is the page's default scroll and not this state transition.
+   * Keyed on `campaignId`, which is set once per run, not once per turn.
    */
   useEffect(() => {
-    if (campaignId) window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    if (campaignId) window.scrollTo({ top: 0, left: 0, behavior: "instant" });
   }, [campaignId]);
 
   useEffect(() => {

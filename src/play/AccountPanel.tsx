@@ -188,44 +188,61 @@ export function AccountPanel({
                 className="cabinet-button"
                 onClick={() => setTransferOpen((isOpen) => !isOpen)}
               >
-                Move to another device
+                Transfer progress
               </button>
             </>
           )}
           {transferOpen && (
             <div className="account-transfer">
-              {issuedCode ? (
-                <p>
-                  Enter <strong>{issuedCode}</strong> on the other device within
-                  15 minutes.
+              <p className="account-transfer-intro">
+                Playing on a second device without signing in? A code moves this
+                browser's progress there, or the reverse.
+              </p>
+
+              <div className="account-transfer-section">
+                <p className="account-transfer-label">
+                  Send this device's progress elsewhere
                 </p>
-              ) : (
-                <button
-                  className="cabinet-button"
-                  disabled={busy}
-                  onClick={() => void createTransferCode()}
-                >
-                  Get a code for this device's progress
-                </button>
-              )}
-              <div className="account-transfer-redeem">
-                <label htmlFor="transfer-code-input">
-                  Have a code from another device?
-                </label>
-                <input
-                  id="transfer-code-input"
-                  value={redeemInput}
-                  onChange={(event) => setRedeemInput(event.target.value)}
-                  placeholder="XXXX-XXXX"
-                />
-                <button
-                  className="cabinet-button"
-                  disabled={busy || !redeemInput.trim()}
-                  onClick={() => void redeemTransferCode()}
-                >
-                  Redeem
-                </button>
+                {issuedCode ? (
+                  <p className="account-transfer-code">
+                    Enter <strong>{issuedCode}</strong> on the other device
+                    within 15 minutes.
+                  </p>
+                ) : (
+                  <button
+                    className="cabinet-button"
+                    disabled={busy}
+                    onClick={() => void createTransferCode()}
+                  >
+                    Get a code
+                  </button>
+                )}
               </div>
+
+              <div className="account-transfer-section">
+                <label
+                  className="account-transfer-label"
+                  htmlFor="transfer-code-input"
+                >
+                  Bring another device's progress here
+                </label>
+                <div className="account-transfer-redeem">
+                  <input
+                    id="transfer-code-input"
+                    value={redeemInput}
+                    onChange={(event) => setRedeemInput(event.target.value)}
+                    placeholder="XXXX-XXXX"
+                  />
+                  <button
+                    className="cabinet-button"
+                    disabled={busy || !redeemInput.trim()}
+                    onClick={() => void redeemTransferCode()}
+                  >
+                    Redeem
+                  </button>
+                </div>
+              </div>
+
               {transferMessage && (
                 <p className="account-error">{transferMessage}</p>
               )}

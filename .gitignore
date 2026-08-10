@@ -22,6 +22,11 @@ dist-ssr/
 
 # npm pack output
 *.tgz
+# ...except a genuinely vendored package (server/vendor/ -- CLAUDE.md, "Nothing checks that
+# the server still matches the engine's contract"). The bare pattern above would otherwise
+# swallow it, and a vendored artifact that silently never gets committed defeats the point
+# of vendoring it.
+!server/vendor/*.tgz
 
 # Env / secrets
 .env

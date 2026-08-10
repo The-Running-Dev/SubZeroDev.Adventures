@@ -100,6 +100,9 @@ jobs:
       - name: Link shared/ module resolution
         run: ln -s server/node_modules node_modules
 
+      - name: Verify vendored contract artifact matches Platform's
+        run: npm run verify:contract --prefix server
+
       - name: Typecheck
         run: npm run typecheck --prefix server
 

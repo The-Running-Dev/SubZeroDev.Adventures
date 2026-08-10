@@ -9,7 +9,8 @@
     "build": "tsc -p tsconfig.build.json",
     "migrate": "node-pg-migrate",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "verify:contract": "node scripts/verify-contract-artifact.mjs"
   },
   "dependencies": {
     "@fastify/cookie": "^11.0.2",
@@ -21,6 +22,7 @@
     "pg": "^8.13.1"
   },
   "devDependencies": {
+    "@subzerodev/service-contract": "file:./vendor/subzerodev-service-contract-0.2.0.tgz",
     "@types/node": "^24.13.3",
     "@types/pg": "^8.11.10",
     "jose": "^5.10.0",

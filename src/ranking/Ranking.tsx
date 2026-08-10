@@ -6,8 +6,16 @@
  * same bare unauthenticated `fetch`.
  */
 import { useEffect, useState } from "react";
+import { Header } from "../Header";
 import type { RankingData, RankingEntry } from "../play/identity";
 import { positionTitleFor } from "../play/ranking";
+import {
+  applyTheme,
+  DEFAULT_THEME,
+  readStoredTheme,
+  storeTheme,
+  type ThemeId,
+} from "../theme";
 
 const numberFormat = new Intl.NumberFormat();
 
@@ -21,6 +29,20 @@ export function Ranking({ apiUrl }: { apiUrl?: string }) {
   const [stage, setStage] = useState<Stage>(
     apiUrl ? { kind: "loading" } : { kind: "unavailable" },
   );
+  /* index.html's pre-paint script already applies the stored theme (or the default) to
+     <html> before this ever renders, so there is no flash to guard against here -- this
+     state exists only so the header's ThemeSelector has something to control. */
+  const [theme, setTheme] = useState<ThemeId>(DEFAULT_THEME);
+
+  useEffect(() => {
+    setTheme(readStoredTheme());
+  }, []);
+
+  function changeTheme(id: ThemeId): void {
+    setTheme(id);
+    applyTheme(id);
+    storeTheme(id);
+  }
 
   useEffect(() => {
     if (!apiUrl) {
@@ -51,6 +73,7 @@ export function Ranking({ apiUrl }: { apiUrl?: string }) {
 
   return (
     <main className="play-main">
+      <Header current="standings" theme={theme} onThemeChange={changeTheme} />
       <section className="archive" aria-labelledby="ranking-title">
         <div className="archive-heading">
           <p className="eyebrow">SUBZERO STORY SYSTEM // STANDINGS</p>

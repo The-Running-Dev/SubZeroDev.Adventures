@@ -5,19 +5,22 @@ import "./index.css";
 import "./play/play.css";
 import PlayApp from "./play/PlayApp";
 import { OAuthConsent } from "./oauth/OAuthConsent";
+import { OwnProfile } from "./profile/OwnProfile";
 import { PublicProfile } from "./profile/PublicProfile";
 import { Ranking } from "./ranking/Ranking";
 
-// No router in this app -- `/oauth/consent`, `/ranking`, and `/u/<slug>` are the other
-// paths it knows about: `/oauth/consent` is the authorization UI a configured Supabase
-// project's OAuth 2.1 Server redirects to (OAuthConsent.tsx); `/ranking` is the public
-// leaderboard (src/ranking/Ranking.tsx); `/u/<slug>` is a player's public profile
+// No router in this app -- `/oauth/consent`, `/ranking`, `/profile`, and `/u/<slug>` are
+// the other paths it knows about: `/oauth/consent` is the authorization UI a configured
+// Supabase project's OAuth 2.1 Server redirects to (OAuthConsent.tsx); `/ranking` is the
+// public leaderboard (src/ranking/Ranking.tsx); `/profile` is the signed-in player's own
+// profile (src/profile/OwnProfile.tsx); `/u/<slug>` is a player's public profile
 // (src/profile/PublicProfile.tsx). index.html's inline script restores the real
 // pathname before this file runs, undoing the GitHub Pages 404 detour (public/404.html)
 // for a direct navigation to any of them.
 const path = window.location.pathname;
 const isOAuthConsent = path === "/oauth/consent";
 const isRanking = path === "/ranking";
+const isOwnProfile = path === "/profile";
 const profileSlug = path.match(/^\/u\/([^/]+)$/)?.[1];
 
 // Read once, here, and passed down as a prop -- not read again inside PublicProfile or
@@ -32,6 +35,8 @@ createRoot(document.getElementById("root")!).render(
       <OAuthConsent />
     ) : isRanking ? (
       <Ranking apiUrl={apiUrl} />
+    ) : isOwnProfile ? (
+      <OwnProfile apiUrl={apiUrl} />
     ) : profileSlug ? (
       <PublicProfile apiUrl={apiUrl} slug={profileSlug} />
     ) : (

@@ -7,7 +7,7 @@ import {
   type CSSProperties,
   type RefObject,
 } from "react";
-import { ThemeSelector } from "../ThemeSelector";
+import { Header } from "../Header";
 import {
   applyTheme,
   DEFAULT_THEME,
@@ -26,16 +26,13 @@ import {
 } from "./composition";
 import {
   consumeAuthError,
-  useBadges,
   useIdentity,
   usePlatformStats,
-  useProfileSettings,
   useProgress,
   type CampaignProgress,
 } from "./identity";
 import { MatrixRain } from "./MatrixRain";
 import { PlatformStats } from "./PlatformStats";
-import { PlayerHome } from "./PlayerHome";
 
 /**
  * Every registered campaign has an entry, hidden ones included -- a direct
@@ -427,21 +424,12 @@ function PlayAppReady({ demo }: { demo: BrowserDemo }) {
     identityRefreshToken,
   );
   const progress = useProgress(demo.apiUrl, identity.playerId);
-  const { badges, records } = useBadges(demo.apiUrl, identity.playerId);
-  const { settings: profileSettings, setPublic: setProfilePublic } =
-    useProfileSettings(demo.apiUrl, identity.playerId, identityRefreshToken);
   const platformStats = usePlatformStats(demo.apiUrl);
   const [authError] = useState(() => consumeAuthError());
-  /** Which shelf face is showing. Only meaningful while `!state` -- loading a game
-   *  replaces the whole archive section, and returning to the shelf lands on the library. */
-  const [shelfView, setShelfView] = useState<"library" | "home">("library");
-  /** The record view needs a signed-in (or guest) player to have anything to show, and a
-   *  backend to fetch it from -- local mode has neither. Derived rather than corrected
-   *  with an effect, so there's no render-then-flip-back flash if identity drops to
-   *  anonymous (sign-out, expired cookie) while the record view is showing. */
-  const homeAvailable = Boolean(demo.apiUrl) && identity.kind !== "anonymous";
-  const effectiveShelfView =
-    shelfView === "home" && homeAvailable ? "home" : "library";
+  /** The profile page needs a signed-in (or guest) player to have anything to show, and a
+   *  backend to fetch it from -- local mode has neither. */
+  const profileAvailable =
+    Boolean(demo.apiUrl) && identity.kind !== "anonymous";
   const sceneRegion = useRef<HTMLElement>(null);
   const isPhone = useIsPhone();
   /**
@@ -609,7 +597,6 @@ function PlayAppReady({ demo }: { demo: BrowserDemo }) {
     setJourney([]);
     setBusy(false);
     setBbsResetToken((token) => token + 1);
-    setShelfView("library");
   }
 
   /**
@@ -627,26 +614,19 @@ function PlayAppReady({ demo }: { demo: BrowserDemo }) {
 
     if (upper === "HELP" || upper === "?") {
       if (!state)
-        return homeAvailable
-          ? "Commands: [number] select a disk, LOAD, RESUME, HOME, LIBRARY, HELP."
+        return profileAvailable
+          ? "Commands: [number] select a disk, LOAD, RESUME, PROFILE, HELP."
           : "Commands: [number] select a disk, LOAD, RESUME, HELP.";
       if (ended) return "Commands: AGAIN (or RESTART), QUIT, HELP.";
       return "Commands: [number] take that action, QUIT, HELP.";
     }
 
     if (!state) {
-      if (upper === "HOME" && homeAvailable) {
-        setShelfView("home");
-        return "Showing your record.";
-      }
-      if (upper === "LIBRARY" || upper === "LIB") {
-        setShelfView("library");
-        return "Showing the disk library.";
+      if (upper === "PROFILE" && profileAvailable) {
+        window.location.assign("/profile");
+        return undefined;
       }
       if (index !== undefined) {
-        // A number typed from the record view means "back to the library, then select" --
-        // the numbering only ever refers to the dossier grid.
-        if (effectiveShelfView === "home") setShelfView("library");
         if (index >= 1 && index <= demo.catalog.length) {
           const campaign = demo.catalog[index - 1]!;
           setSelectedId(campaign.campaignId);
@@ -719,7 +699,23 @@ function PlayAppReady({ demo }: { demo: BrowserDemo }) {
       {displayTheme === "matrix" && <MatrixRain />}
       <main className="play-main">
         <div className="boot-flash" key={displayTheme} aria-hidden="true" />
-        <ThemeSelector theme={displayTheme} onChange={changeTheme} />
+        <Header
+          current="shelf"
+          onSelectShelf={returnToShelf}
+          theme={displayTheme}
+          onThemeChange={changeTheme}
+        >
+          {demo.apiUrl && (
+            <AccountPanel
+              apiUrl={demo.apiUrl}
+              identity={identity}
+              loading={identityLoading}
+              authError={authError}
+              onChanged={() => setIdentityRefreshToken((token) => token + 1)}
+              profileAvailable={profileAvailable}
+            />
+          )}
+        </Header>
         {!state ? (
           <section className="archive" aria-labelledby="shelf-title">
             <div className="archive-heading">
@@ -735,132 +731,86 @@ function PlayAppReady({ demo }: { demo: BrowserDemo }) {
                 Select a program. Your choices, bad luck, and improbable
                 consequences run entirely on this machine.
               </p>
-              {demo.apiUrl && (
-                <AccountPanel
-                  apiUrl={demo.apiUrl}
-                  identity={identity}
-                  loading={identityLoading}
-                  authError={authError}
-                  onChanged={() =>
-                    setIdentityRefreshToken((token) => token + 1)
-                  }
-                />
-              )}
-              {homeAvailable && (
-                <nav className="shelf-nav" aria-label="Shelf view">
-                  <button
-                    className={`cabinet-button ${effectiveShelfView === "library" ? "primary" : "quiet"}`}
-                    aria-pressed={effectiveShelfView === "library"}
-                    onClick={() => setShelfView("library")}
-                  >
-                    Disk library
-                  </button>
-                  <button
-                    className={`cabinet-button ${effectiveShelfView === "home" ? "primary" : "quiet"}`}
-                    aria-pressed={effectiveShelfView === "home"}
-                    onClick={() => setShelfView("home")}
-                  >
-                    Your record
-                  </button>
-                </nav>
-              )}
             </div>
-            {effectiveShelfView === "home" ? (
-              <PlayerHome
-                identity={identity}
-                progress={progress}
-                badges={badges}
-                records={records}
-                catalog={demo.catalog}
-                settings={profileSettings}
-                setPublic={setProfilePublic}
-              />
-            ) : (
-              <>
-                <div className="dossier-grid" aria-label="Story dossiers">
-                  {demo.catalog.map((campaign, index) => (
-                    <button
-                      className={`dossier ${campaign.featured ? "dossier-featured" : ""} ${selectedId === campaign.campaignId ? "is-selected" : ""}`}
-                      key={campaign.campaignId}
-                      onClick={() => setSelectedId(campaign.campaignId)}
-                      aria-pressed={selectedId === campaign.campaignId}
-                    >
-                      <span className="dossier-number">
-                        DISK {String(index + 1).padStart(2, "0")} //{" "}
-                        {campaign.featured ? "FEATURED" : "READY"}
-                      </span>
-                      <strong>{campaign.title}</strong>
-                      <span>{campaign.duration}</span>
-                      {progress.get(campaign.campaignId) && (
-                        <span className="dossier-progress">
-                          {progressLabel(
-                            campaign,
-                            progress.get(campaign.campaignId)!,
-                          )}
-                        </span>
+            <div className="dossier-grid" aria-label="Story dossiers">
+              {demo.catalog.map((campaign, index) => (
+                <button
+                  className={`dossier ${campaign.featured ? "dossier-featured" : ""} ${selectedId === campaign.campaignId ? "is-selected" : ""}`}
+                  key={campaign.campaignId}
+                  onClick={() => setSelectedId(campaign.campaignId)}
+                  aria-pressed={selectedId === campaign.campaignId}
+                >
+                  <span className="dossier-number">
+                    DISK {String(index + 1).padStart(2, "0")} //{" "}
+                    {campaign.featured ? "FEATURED" : "READY"}
+                  </span>
+                  <strong>{campaign.title}</strong>
+                  <span>{campaign.duration}</span>
+                  {progress.get(campaign.campaignId) && (
+                    <span className="dossier-progress">
+                      {progressLabel(
+                        campaign,
+                        progress.get(campaign.campaignId)!,
                       )}
-                    </button>
-                  ))}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+            {selected && (
+              <section className="briefing" aria-labelledby="briefing-title">
+                <div
+                  className={`briefing-emblem accent-${cabinetThemes[selected.campaignId]?.accent ?? "default"}`}
+                  aria-hidden="true"
+                >
+                  ⌘
                 </div>
-                {selected && (
-                  <section
-                    className="briefing"
-                    aria-labelledby="briefing-title"
-                  >
-                    <div
-                      className={`briefing-emblem accent-${cabinetThemes[selected.campaignId]?.accent ?? "default"}`}
-                      aria-hidden="true"
+                <div>
+                  <p className="eyebrow">
+                    {cabinetThemes[selected.campaignId]?.eyebrow ??
+                      "UNCLASSIFIED STORY"}
+                  </p>
+                  <h2 id="briefing-title">{selected.title}</h2>
+                  <p>{selected.description}</p>
+                  <p className="briefing-meta">
+                    Estimated duration: {selected.duration}
+                  </p>
+                  {selected.contentNotice && (
+                    <p className="briefing-advisory">
+                      {selected.contentNotice}
+                    </p>
+                  )}
+                  <div className="briefing-actions">
+                    <button
+                      className="cabinet-button primary"
+                      disabled={busy}
+                      onClick={() => void start(selected.campaignId)}
                     >
-                      ⌘
-                    </div>
-                    <div>
-                      <p className="eyebrow">
-                        {cabinetThemes[selected.campaignId]?.eyebrow ??
-                          "UNCLASSIFIED STORY"}
-                      </p>
-                      <h2 id="briefing-title">{selected.title}</h2>
-                      <p>{selected.description}</p>
-                      <p className="briefing-meta">
-                        Estimated duration: {selected.duration}
-                      </p>
-                      {selected.contentNotice && (
-                        <p className="briefing-advisory">
-                          {selected.contentNotice}
-                        </p>
-                      )}
-                      <div className="briefing-actions">
-                        <button
-                          className="cabinet-button primary"
-                          disabled={busy}
-                          onClick={() => void start(selected.campaignId)}
-                        >
-                          Load selected adventure
-                        </button>
-                        {demo.findLocalSave(selected.campaignId) && (
-                          <button
-                            className="cabinet-button"
-                            disabled={busy}
-                            onClick={() =>
-                              void resume(
-                                selected.campaignId,
-                                demo.findLocalSave(selected.campaignId)!,
-                              )
-                            }
-                          >
-                            Resume saved run
-                          </button>
-                        )}
-                      </div>
-                      <p className="briefing-permalink">
-                        Permanent link:{" "}
-                        <a href={permalinkFor(selected.campaignId)}>
-                          {permalinkFor(selected.campaignId)}
-                        </a>
-                      </p>
-                    </div>
-                  </section>
-                )}
-              </>
+                      Load selected adventure
+                    </button>
+                    {demo.findLocalSave(selected.campaignId) && (
+                      <button
+                        className="cabinet-button"
+                        disabled={busy}
+                        onClick={() =>
+                          void resume(
+                            selected.campaignId,
+                            demo.findLocalSave(selected.campaignId)!,
+                          )
+                        }
+                      >
+                        Resume saved run
+                      </button>
+                    )}
+                  </div>
+                  <p className="briefing-permalink">
+                    Permanent link:{" "}
+                    <a href={permalinkFor(selected.campaignId)}>
+                      {permalinkFor(selected.campaignId)}
+                    </a>
+                  </p>
+                </div>
+              </section>
             )}
           </section>
         ) : (

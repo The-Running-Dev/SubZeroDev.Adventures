@@ -13,6 +13,10 @@ function fill(part: number, whole: number): number {
  * ask). The two ratios that have an honest denominator (runs finished / started, stories
  * touched / cataloged) reuse `.stat-metered`, the same meter idiom `StatReadouts` drives
  * during play -- the bare counts have no ceiling, so they render as plain numbers instead.
+ *
+ * The standings link that used to close this panel now lives in the global header
+ * (`.system-bar`, PlayApp.tsx), reachable from the shelf and mid-run alike rather than
+ * only from the one panel that happens to sit above the disk grid.
  */
 export function PlatformStats({
   stats,
@@ -66,9 +70,6 @@ export function PlatformStats({
           <dd>{numberFormat.format(stats.badgesUnlocked)}</dd>
         </div>
       </dl>
-      <a className="cabinet-button quiet" href="/ranking">
-        Operator standings
-      </a>
     </section>
   );
 }

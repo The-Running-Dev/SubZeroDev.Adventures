@@ -21,6 +21,16 @@
   z-index: 0;
 }
 
+/*
+ * The global header: standings, the account menu, and the display-mode select.
+ * `position: relative` + `z-index` makes this its own stacking context, which is load-
+ * bearing: `.archive > *`/`.cabinet > *` below stack their own children at `z-index: 2`
+ * (to clear each panel's scanline overlay), and a child's `z-index` only ever competes
+ * within its parent's stacking context -- so without a context of its own, this bar's
+ * `z-index: 6` account dropdown (below) would still lose to that `2` outside it. `4` sits
+ * above that `2` and below `.boot-flash`'s `5`, matching where this bar already painted
+ * before the account dropdown existed.
+ */
 .system-bar {
   align-items: center;
   display: flex;
@@ -28,7 +38,58 @@
   justify-content: flex-end;
   margin-bottom: 1rem;
   position: relative;
-  z-index: 1;
+  z-index: 4;
+}
+
+.system-bar-group {
+  align-items: center;
+  display: flex;
+  gap: 0.6rem;
+}
+
+/* "Disk library" and "Standings" -- pushed to the far left of the bar, opposite the
+   account menu and display-mode select. */
+.system-bar-nav {
+  align-items: center;
+  display: flex;
+  gap: 0.6rem;
+  margin-right: auto;
+}
+
+/* Styled as a button, matching the account sigil and theme select they sit beside,
+   rather than as inline body text. Shared by both an `<a>` (a real page, /ranking or /)
+   and a `<button>` (a same-page view switch) -- `border: 0` and `cursor: pointer` here
+   only matter for the button, undoing the browser's own button chrome. */
+.system-bar-link {
+  align-items: center;
+  background: var(--surface-sunken);
+  border: 2px solid var(--cyan);
+  color: var(--cyan);
+  cursor: pointer;
+  display: flex;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  min-height: 44px;
+  padding: 0.5rem 0.75rem;
+  text-transform: uppercase;
+}
+
+.system-bar-link:hover,
+.system-bar-link:focus-visible {
+  background: var(--cyan);
+  color: var(--screen);
+}
+
+.system-bar-link:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+/* The current page/view -- filled, like the account sigil while its menu is open. */
+.system-bar-link[aria-current="page"] {
+  background: var(--cyan);
+  color: var(--screen);
 }
 
 .system-bar-label {
@@ -196,6 +257,75 @@
 .archive-heading > p:last-child {
   color: var(--muted);
   line-height: 1.6;
+}
+
+/*
+ * The header account control (AccountPanel.tsx). `.account-panel`/`.account-chip` below
+ * are the flat, in-body arrangement the OAuth consent screen still uses
+ * (src/oauth/OAuthConsent.tsx) -- that page has no header and no menu to open.
+ */
+.account-menu {
+  position: relative;
+}
+
+.account-sigil {
+  align-items: center;
+  background: var(--surface-sunken);
+  border: 2px solid var(--cyan);
+  color: var(--cyan);
+  cursor: pointer;
+  display: flex;
+  font-size: 1rem;
+  font-weight: 700;
+  justify-content: center;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0;
+}
+
+.account-sigil:hover,
+.account-sigil.is-open {
+  background: var(--cyan);
+  color: var(--screen);
+}
+
+.account-sigil:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.account-dropdown {
+  background: var(--surface-raised);
+  border: 2px solid var(--rule-strong);
+  box-shadow: 6px 6px 0 var(--shadow);
+  display: grid;
+  gap: 0.5rem;
+  justify-items: stretch;
+  min-width: min(22rem, calc(100vw - 2 * var(--page-inline)));
+  padding: 0.9rem;
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.4rem);
+  z-index: 6;
+}
+
+.account-dropdown-name {
+  color: var(--muted);
+  font-size: 0.8125rem;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.account-note {
+  color: var(--muted);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.account-dropdown .cabinet-button {
+  text-align: center;
+  width: 100%;
 }
 
 .account-panel {
@@ -436,13 +566,7 @@
   color: var(--cyan);
 }
 
-/* -- Platform stats, shelf nav, and the signed-in record view -------------------- */
-
-.shelf-nav {
-  display: flex;
-  gap: 0.75rem;
-  margin: 0.5rem 0 1rem;
-}
+/* -- Platform stats and the signed-in record view -------------------------------- */
 
 .platform-stats {
   background: var(--surface-raised);
@@ -1345,14 +1469,11 @@
  */
 [data-theme="bbs"] .play-main {
   /*
-   * `ch` is font-dependent -- it's the width of "0" in whatever font
-   * actually renders (the stack's later fallbacks vary by OS/browser), so
-   * 80ch is not a guaranteed a pixel value. `min(..., 100%)` keeps it from
-   * ever exceeding the viewport if some fallback's "0" is wider than
-   * expected, which no environment used to build this can independently
-   * verify against every reader's actual font stack.
+   * The full page width, same as every other theme. This used to clamp to 80ch --
+   * a real terminal's column count -- but a narrow centered strip inside a wide dark
+   * page reads as a broken layout rather than as a modem-era screen, and the theme
+   * already carries its own identity through type, color, and stripped chrome.
    */
-  max-width: min(80ch, 100%);
   /* Must clear the fixed `.bbs-prompt` below, including its own safe-area padding, or the last line of content sits behind it. */
   padding-bottom: calc(6rem + env(safe-area-inset-bottom));
 }
@@ -1837,9 +1958,20 @@
     padding-inline: 0;
   }
 
+  /* Three groups -- nav, account menu, theme select -- routinely add up to wider than a
+     320px screen; `nowrap` (the desktop default) would push the earliest one off-canvas
+     to the left instead of showing a scrollbar, since a flex-end row overflows its start
+     edge invisibly. Wrapping is the fix, not squeezing type or hit areas below their §8.1
+     floors. */
   .system-bar {
+    flex-wrap: wrap;
+    justify-content: center;
     margin-bottom: 0.75rem;
     padding-inline: var(--page-inline);
+  }
+
+  .system-bar-nav {
+    margin-right: 0;
   }
 
   .archive,
@@ -1929,14 +2061,6 @@
   [data-theme="bbs"] .play-main {
     padding-bottom: calc(1.5rem + env(safe-area-inset-bottom));
     padding-inline: var(--page-inline);
-  }
-
-  .shelf-nav {
-    flex-direction: column;
-  }
-
-  .shelf-nav .cabinet-button {
-    width: 100%;
   }
 
   .platform-stats dl,

@@ -29,6 +29,7 @@ import {
   useBadges,
   useIdentity,
   usePlatformStats,
+  useProfileSettings,
   useProgress,
   type CampaignProgress,
 } from "./identity";
@@ -426,7 +427,9 @@ function PlayAppReady({ demo }: { demo: BrowserDemo }) {
     identityRefreshToken,
   );
   const progress = useProgress(demo.apiUrl, identity.playerId);
-  const badges = useBadges(demo.apiUrl, identity.playerId);
+  const { badges, records } = useBadges(demo.apiUrl, identity.playerId);
+  const { settings: profileSettings, setPublic: setProfilePublic } =
+    useProfileSettings(demo.apiUrl, identity.playerId, identityRefreshToken);
   const platformStats = usePlatformStats(demo.apiUrl);
   const [authError] = useState(() => consumeAuthError());
   /** Which shelf face is showing. Only meaningful while `!state` -- loading a game
@@ -767,7 +770,10 @@ function PlayAppReady({ demo }: { demo: BrowserDemo }) {
                 identity={identity}
                 progress={progress}
                 badges={badges}
+                records={records}
                 catalog={demo.catalog}
+                settings={profileSettings}
+                setPublic={setProfilePublic}
               />
             ) : (
               <>

@@ -110,7 +110,7 @@ describeIfDb("server API", () => {
   it("evaluates badges for a guest and returns an empty list for an anonymous request", async () => {
     const anonymous = await app.inject({ method: "GET", url: "/api/badges" });
     expect(anonymous.headers["set-cookie"]).toBeUndefined();
-    expect(anonymous.json()).toEqual({ badges: [] });
+    expect(anonymous.json()).toEqual({ badges: [], records: null });
 
     const cookie = await guestCookie();
     const first = await app.inject({
@@ -513,6 +513,7 @@ describeIfDb("server API", () => {
       [
         { method: "GET", url: "/api/campaigns" },
         { method: "GET", url: "/api/saves" },
+        { method: "GET", url: "/api/profile/settings" },
         { method: "POST", url: `/api/sessions/${sessionId}/resume` },
         { method: "GET", url: `/api/sessions/${sessionId}/scene` },
         { method: "GET", url: `/api/sessions/${sessionId}/view` },
@@ -576,6 +577,24 @@ describeIfDb("server API", () => {
       payload: { code: transferCreated.code },
     });
     assertOpaque("POST /api/transfer/redeem", redeemed.json());
+
+    // The one route this feature adds a *second* public identifier specifically to keep
+    // this invariant true for: a public profile is reached by `profile_slug`, and its
+    // response must still never contain the internal `player_id`.
+    const visibility = await app
+      .inject({
+        method: "POST",
+        url: "/api/profile/visibility",
+        headers: { cookie },
+        payload: { public: true },
+      })
+      .then((r) => r.json() as { slug: string });
+    const publicProfile = await app.inject({
+      method: "GET",
+      url: `/api/profile/${visibility.slug}`,
+    });
+    assertOpaque("GET /api/profile/:slug", publicProfile.json());
+    expect(visibility.slug).not.toContain(playerId);
   });
 
   // Regression for issue #14: mergePlayers used to repoint sessions and saves but not

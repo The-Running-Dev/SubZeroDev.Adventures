@@ -1,7 +1,16 @@
-import type { CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
 import type { BrowserCampaign } from "./composition";
-import type { Badge, CampaignProgress, Identity } from "./identity";
-import { BADGE_DEFINITIONS, BADGE_ORDER } from "./badges";
+import type {
+  Badge,
+  CampaignProgress,
+  Identity,
+  PersonnelRecords,
+  ProfileSettings,
+} from "./identity";
+import { BADGE_ORDER } from "./badges";
+import { ProfileRankBadge } from "./ProfileRankBadge";
+import { BadgeGrid } from "./BadgeGrid";
+import { PersonnelFile } from "./PersonnelFile";
 
 const numberFormat = new Intl.NumberFormat();
 
@@ -11,22 +20,28 @@ function fill(part: number, whole: number): number {
 
 /**
  * The signed-in (or guest) player's own record: a summary derived entirely from the
- * `progress` map PlayApp.tsx already holds (no extra fetch), and a grid of every badge --
- * earned or not. Locked badges stay in the grid, dimmed rather than removed, with an
- * explicit `LOCKED` text stamp: the description is the aspiration, and the stamp is what
- * keeps locked/unlocked distinguishable once opacity is stripped out under
- * `forced-colors` or for a screen reader.
+ * `progress` map PlayApp.tsx already holds (no extra fetch), a grid of every badge --
+ * earned or not -- and the public-profile toggle. Locked badges stay in the grid, dimmed
+ * rather than removed, with an explicit `LOCKED` text stamp: the description is the
+ * aspiration, and the stamp is what keeps locked/unlocked distinguishable once opacity is
+ * stripped out under `forced-colors` or for a screen reader.
  */
 export function PlayerHome({
   identity,
   progress,
   badges,
+  records,
   catalog,
+  settings,
+  setPublic,
 }: {
   identity: Identity;
   progress: ReadonlyMap<string, CampaignProgress>;
   badges: readonly Badge[];
+  records: PersonnelRecords | null;
   catalog: readonly BrowserCampaign[];
+  settings: ProfileSettings;
+  setPublic: (next: boolean) => Promise<void>;
 }) {
   const entries = [...progress.values()];
   const storiesFinished = entries.filter((e) => e.status === "ended").length;
@@ -39,10 +54,15 @@ export function PlayerHome({
     (sum, e) => sum + e.achievements.length,
     0,
   );
-  const unlockedByBadge = new Map(badges.map((b) => [b.badgeId, b]));
 
   const finishedPct = fill(storiesFinished, catalog.length);
-  const badgePct = fill(unlockedByBadge.size, BADGE_ORDER.length);
+  const badgePct = fill(badges.length, BADGE_ORDER.length);
+
+  function findCampaignTitle(campaignId: string): string {
+    return (
+      catalog.find((c) => c.campaignId === campaignId)?.title ?? campaignId
+    );
+  }
 
   return (
     <section className="player-home" aria-labelledby="home-title">
@@ -54,6 +74,7 @@ export function PlayerHome({
           browser.
         </p>
       )}
+      <ProfileRankBadge badgeCount={badges.length} />
       <dl className="home-summary">
         <div>
           <dt>Stories started</dt>
@@ -87,31 +108,88 @@ export function PlayerHome({
         >
           <dt>Badges</dt>
           <dd>
-            {numberFormat.format(unlockedByBadge.size)}
+            {numberFormat.format(badges.length)}
             <span className="stat-ceiling"> / {BADGE_ORDER.length}</span>
           </dd>
         </div>
       </dl>
-      <ul className="badge-grid" aria-label="Badges">
-        {BADGE_ORDER.map((id) => {
-          const def = BADGE_DEFINITIONS[id]!;
-          const earned = unlockedByBadge.get(id);
-          return (
-            <li key={id} className={earned ? "badge" : "badge badge-locked"}>
-              <span className="badge-emblem" aria-hidden="true">
-                {earned ? "◆" : "◇"}
-              </span>
-              <strong>{def.label}</strong>
-              <span>{def.description}</span>
-              <span className="badge-stamp">
-                {earned
-                  ? `UNLOCKED ${earned.unlockedAt.slice(0, 10)}`
-                  : "LOCKED"}
-              </span>
-            </li>
-          );
-        })}
-      </ul>
+      <ProfileShare settings={settings} setPublic={setPublic} />
+      <BadgeGrid badges={badges} />
+      <PersonnelFile records={records} findCampaignTitle={findCampaignTitle} />
     </section>
+  );
+}
+
+/**
+ * The public/private toggle plus, once public, a copyable `/u/<slug>` link.
+ * `navigator.clipboard.writeText` is new to this codebase -- no existing precedent to
+ * reuse (`AccountPanel.tsx`'s transfer-code UI shows/types codes manually, never
+ * copies) -- so it gets its own try/catch-and-message handling here, matching that
+ * component's `transferMessage` pattern in shape only.
+ */
+function ProfileShare({
+  settings,
+  setPublic,
+}: {
+  settings: ProfileSettings;
+  setPublic: (next: boolean) => Promise<void>;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+
+  async function toggle(): Promise<void> {
+    setBusy(true);
+    setMessage(null);
+    try {
+      await setPublic(!settings.public);
+    } catch {
+      setMessage("Couldn't update profile visibility. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const shareUrl = settings.slug
+    ? `${window.location.origin}/u/${settings.slug}`
+    : null;
+
+  async function copyLink(): Promise<void> {
+    if (!shareUrl) return;
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setMessage("Link copied.");
+    } catch {
+      setMessage("Couldn't copy the link. Select and copy it manually.");
+    }
+  }
+
+  return (
+    <div className="profile-share">
+      <button
+        className="cabinet-button"
+        disabled={busy}
+        onClick={() => void toggle()}
+      >
+        {settings.public ? "Make profile private" : "Make profile public"}
+      </button>
+      {settings.public && shareUrl && (
+        <>
+          <input
+            type="text"
+            readOnly
+            value={shareUrl}
+            aria-label="Public profile link"
+            onFocus={(event) => event.currentTarget.select()}
+          />
+          <button
+            className="cabinet-button quiet"
+            onClick={() => void copyLink()}
+          >
+            Copy link
+          </button>
+        </>
+      )}
+      {message && <p className="account-error">{message}</p>}
+    </div>
   );
 }

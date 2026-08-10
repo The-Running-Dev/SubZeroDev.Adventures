@@ -52,9 +52,23 @@ function installMatchMedia(): void {
     }) as MediaQueryList;
 }
 
+/**
+ * jsdom implements no Clipboard API at all. `PlayerHome`'s "Copy link" button
+ * (`navigator.clipboard.writeText`) is this codebase's first use of it -- a stub that
+ * resolves is enough for a test to assert the button called it, without asserting
+ * anything ever actually reaches a real system clipboard.
+ */
+function installClipboard(): void {
+  Object.defineProperty(navigator, "clipboard", {
+    value: { writeText: () => Promise.resolve() },
+    configurable: true,
+  });
+}
+
 beforeEach(() => {
   installLocalStorage();
   installMatchMedia();
+  installClipboard();
 });
 
 afterEach(() => {

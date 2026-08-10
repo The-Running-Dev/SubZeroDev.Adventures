@@ -26,6 +26,11 @@ import {
 
 export interface ServerDemo {
   readonly all: readonly CatalogEntry[];
+  /** `all`, hidden campaigns filtered out -- the listing surface, matching
+   *  `BrowserDemo.catalog`'s convention (src/play/composition.ts). Read by
+   *  badges.ts/routes/profile.ts as the "cataloged" denominator for badges and public
+   *  profile stats, so it agrees with what a player actually sees on the shelf. */
+  readonly catalog: readonly CatalogEntry[];
   findCampaign(campaignId: string): CatalogEntry | undefined;
   readonly store: SessionStore;
   /** The raw `Engine`, exposed for `replay.ts` -- it drives `deserialize`/`submitAction`/
@@ -65,6 +70,7 @@ export async function createServerDemo(
 
   return {
     all,
+    catalog: all.filter((campaign) => !campaign.hidden),
     findCampaign: (campaignId) =>
       all.find((campaign) => campaign.campaignId === campaignId),
     engine,

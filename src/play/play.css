@@ -547,6 +547,93 @@
   color: var(--text-faint);
 }
 
+/* The "badge of a badge" -- a bigger, magenta-bordered sibling of `.badge` so it reads
+   as the one special tile, not just another entry in the grid. */
+.profile-rank {
+  align-items: center;
+  background: var(--surface-featured);
+  border: 2px solid var(--magenta);
+  box-shadow: 4px 4px 0 var(--shadow-emblem);
+  display: flex;
+  gap: 1rem;
+  margin: 1rem 0;
+  padding: 1rem 1.25rem;
+}
+
+.profile-rank .badge-emblem {
+  color: var(--magenta);
+  font-size: 1.75rem;
+}
+
+.profile-rank strong {
+  color: var(--ink);
+  display: block;
+  font-size: 1.1rem;
+  text-transform: uppercase;
+}
+
+.profile-rank span {
+  color: var(--text-dim);
+  font-size: 0.875rem;
+}
+
+.profile-share {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+
+.profile-share input {
+  background: var(--surface-sunken);
+  border: 2px solid var(--rule-strong);
+  color: var(--text-body);
+  flex: 1 1 16rem;
+  font-family: inherit;
+  font-size: 0.8125rem;
+  padding: 0.5rem 0.6rem;
+}
+
+.profile-share .account-error {
+  flex-basis: 100%;
+}
+
+.profile-unavailable {
+  color: var(--text-dim);
+}
+
+.personnel-file {
+  margin-top: 1.5rem;
+}
+
+.personnel-file dl {
+  display: grid;
+  gap: 0;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  margin: 0.75rem 0 0;
+}
+
+.personnel-file dl > div {
+  border-bottom: 1px solid var(--rule-soft);
+  padding: 0.6rem 0.75rem 0.6rem 0;
+}
+
+.personnel-file dt {
+  color: var(--text-dim);
+  font-size: 0.8125rem;
+  letter-spacing: 0.04em;
+  margin: 0 0 0.2rem;
+  text-transform: uppercase;
+}
+
+.personnel-file dd {
+  color: var(--ink);
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 0;
+}
+
 .cabinet-marquee {
   align-items: center;
   background: var(--surface-raised);
@@ -1391,12 +1478,13 @@
 }
 
 [data-theme="bbs"] .platform-stats,
-[data-theme="bbs"] .player-home .badge {
+[data-theme="bbs"] .badge-grid .badge {
   background: none;
   border: 0;
 }
 
-[data-theme="bbs"] .platform-stats {
+[data-theme="bbs"] .platform-stats,
+[data-theme="bbs"] .personnel-file {
   border-top: 1px dashed var(--rule);
   border-bottom: 1px dashed var(--rule);
   padding: 0.75rem 0;
@@ -1407,7 +1495,7 @@
   grid-template-columns: 1fr;
 }
 
-[data-theme="bbs"] .player-home .badge {
+[data-theme="bbs"] .badge-grid .badge {
   border-bottom: 1px dashed var(--rule);
   padding: 0.5rem 0;
 }
@@ -1418,6 +1506,29 @@
 
 [data-theme="bbs"] .badge strong::after {
   content: " ]";
+}
+
+[data-theme="bbs"] .profile-rank {
+  background: none;
+  border: 0;
+  border-top: 1px dashed var(--rule);
+  border-bottom: 1px dashed var(--rule);
+  box-shadow: none;
+  padding: 0.75rem 0;
+}
+
+[data-theme="bbs"] .profile-rank strong::before {
+  content: "[ ";
+}
+
+[data-theme="bbs"] .profile-rank strong::after {
+  content: " ]";
+}
+
+[data-theme="bbs"] .profile-share input {
+  background: none;
+  border: 0;
+  border-bottom: 1px dashed var(--rule);
 }
 
 [data-theme="bbs"] .action-deck,
@@ -1765,12 +1876,22 @@
   }
 
   .platform-stats dl,
-  .home-summary {
+  .home-summary,
+  .personnel-file dl {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .badge-grid {
     grid-template-columns: 1fr;
+  }
+
+  .profile-rank {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .profile-share input {
+    flex-basis: 100%;
   }
 }
 
@@ -1803,7 +1924,8 @@
   }
 
   .platform-stats dl,
-  .home-summary {
+  .home-summary,
+  .personnel-file dl {
     grid-template-columns: 1fr;
   }
 
@@ -1843,7 +1965,9 @@
   .briefing,
   .action-card button,
   .platform-stats,
-  .badge {
+  .badge,
+  .profile-rank,
+  .personnel-file {
     border: 2px solid CanvasText;
     box-shadow: none;
   }

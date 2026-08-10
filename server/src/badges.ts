@@ -4,10 +4,12 @@
  * call, so `unlocked_at` records the first request after a badge was actually earned, not
  * some later moment it happened to be displayed.
  *
- * Deliberately three queries and eighteen in-memory predicates rather than eighteen SQL
- * predicates -- a player's whole session history is a few dozen rows at most, and keeping
- * every rule as a readable JS function next to the assumption it depends on matters more
- * here than SQL purity.
+ * Deliberately three-to-six queries and thirty-nine in-memory predicates rather than
+ * thirty-nine SQL predicates -- a player's whole session history is a few dozen rows at
+ * most, and keeping every rule as a readable JS function next to the assumption it
+ * depends on matters more here than SQL purity. The three cross-player queries
+ * (`platform-baselines.ts`) are the exception to "a few dozen rows" -- see their own
+ * header comment.
  *
  * Time handling is UTC-only, on purpose. `sessions.created_at`/`updated_at` are ISO-8601
  * strings written by JS `Date.toISOString()` (server/src/persistence.ts) -- there is no
@@ -16,13 +18,18 @@
  */
 import type { Pool } from "pg";
 import type { ServerDemo } from "./composition.js";
+import {
+  endingMedianSteps,
+  rejectedPercentileFor,
+  totalPlayerCount,
+} from "./platform-baselines.js";
 
 export interface BadgeRow {
   readonly badgeId: string;
   readonly unlockedAt: string;
 }
 
-interface SessionFacts {
+export interface SessionFacts {
   readonly campaignId: string;
   readonly status: string;
   readonly endingId: string | null;
@@ -35,6 +42,10 @@ interface SessionFacts {
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly kindId: string | null;
+  /** `actionLog[].actionId`, in order -- only `muscle-memory`/`the-long-way-around` read
+   *  this. Extracted in JS from the full `blob`, not a SQL projection: `kindId` alone is
+   *  cheap to pull with `->>`, but the action log needs the whole JSON parsed anyway. */
+  readonly actionIds: readonly string[];
 }
 
 interface BadgeData {
@@ -45,8 +56,20 @@ interface BadgeData {
   }[];
   readonly mergeCount: number;
   readonly catalogKindIds: ReadonlySet<string>;
+  /** Hidden-filtered catalog size -- `demo.catalog.length`, matching the denominator
+   *  `PlayerHome`/`PlatformStats` already use, not `demo.all.length`. */
+  readonly catalogSize: number;
   endingTotalOf(campaignId: string): number;
   readonly now: number;
+  /** key: `${campaignId}:${endingId}`. Cross-player (platform-baselines.ts) -- only
+   *  fetched when evaluateBadges runs for the owner; never for a public profile view. */
+  readonly endingMedianSteps: ReadonlyMap<string, number>;
+  /** This player's percent_rank (0-1) among every player's summed rejected-move proxy.
+   *  Cross-player, same fetch scope as endingMedianSteps. */
+  readonly rejectedPercentile: number;
+  /** Total registered players -- gates `top-1-percent` so it isn't trivially true on a
+   *  tiny userbase. */
+  readonly totalPlayers: number;
 }
 
 interface BadgeDefinition {
@@ -59,11 +82,30 @@ const CENTURY_STEPS = 1000;
 const GHOSTED_DAYS = 30;
 const SLOW_BURN_DAYS = 90;
 const STREAK_DAYS = 7;
+const PERFECT_ATTENDANCE_DAYS = 30;
 const DAY_MS = 86_400_000;
+const FIVE_MINUTES_MS = 5 * 60_000;
 const SEASONED_CAMPAIGNS = 5;
 const COLLECTOR_CAMPAIGNS = 3;
 const ONE_JOB_SESSIONS = 10;
 const BLACKOUT_CAMPAIGNS = 3;
+const GROUNDHOG_SESSIONS = 10;
+const SPECIALIST_MIN_ENDED = 5;
+const SPECIALIST_SHARE = 0.9;
+const TOURIST_MAX_FINISH_RATE = 0.5;
+const EMPLOYEE_OF_THE_MONTH_STEPS = 2000;
+const PRODUCTIVE_SUNDAY_STEPS = 300;
+const MEDICAL_ADVICE_STEPS = 800;
+const UNREASONABLY_EFFICIENT_CAMPAIGNS = 3;
+const PERSISTENCE_FAILED_SESSIONS = 5;
+const CREATURE_OF_HABIT_DAYS = 7;
+const DISK_JOCKEY_CAMPAIGNS = 5;
+const MUSCLE_MEMORY_SESSIONS = 3;
+const MUSCLE_MEMORY_PREFIX = 3;
+const SCENIC_ROUTE_MULTIPLIER = 2;
+const SEQUENCE_BREAKER_DIVISOR = 2;
+const TOP_PERCENT_THRESHOLD = 0.99;
+const TOP_PERCENT_MIN_PLAYERS = 20;
 
 function hourUtc(iso: string): number {
   return new Date(iso).getUTCHours();
@@ -73,21 +115,67 @@ function dayUtc(iso: string): string {
   return iso.slice(0, 10);
 }
 
+function monthUtc(iso: string): string {
+  return iso.slice(0, 7);
+}
+
+/** UTC day-of-week for an ISO string, 0 = Sunday. */
+function isUtcSunday(iso: string): boolean {
+  return new Date(iso).getUTCDay() === 0;
+}
+
 function distinct<T>(values: Iterable<T>): Set<T> {
   return new Set(values);
 }
 
-/** True when some run of `days` consecutive calendar dates (UTC, `YYYY-MM-DD` strings)
- *  all appear in `dates`. */
-function hasConsecutiveRun(dates: ReadonlySet<string>, days: number): boolean {
+/** The length of the longest run of consecutive calendar dates (UTC, `YYYY-MM-DD`
+ *  strings) in `dates`. Shared by the `streak`/`perfect-attendance` badge predicates
+ *  and `records.ts`'s `longestStreak` field -- one gaps-and-islands implementation. */
+export function longestConsecutiveRun(dates: ReadonlySet<string>): number {
   const sorted = [...dates].sort();
+  if (sorted.length === 0) return 0;
   let run = 1;
+  let best = 1;
   for (let i = 1; i < sorted.length; i++) {
     const gap = Date.parse(sorted[i]) - Date.parse(sorted[i - 1]);
     run = gap === DAY_MS ? run + 1 : 1;
-    if (run >= days) return true;
+    best = Math.max(best, run);
   }
-  return days <= 1 && sorted.length >= 1;
+  return best;
+}
+
+function hasConsecutiveRun(dates: ReadonlySet<string>, days: number): boolean {
+  return longestConsecutiveRun(dates) >= days;
+}
+
+/** Every date (UTC) either timestamp of a session touches. */
+function touchDates(sessions: readonly SessionFacts[]): Set<string> {
+  const dates = new Set<string>();
+  for (const s of sessions) {
+    dates.add(dayUtc(s.createdAt));
+    dates.add(dayUtc(s.updatedAt));
+  }
+  return dates;
+}
+
+/** Sums `stepCount` per UTC calendar date across both `createdAt` and `updatedAt` would
+ *  double count -- a session's steps are attributed to the date it was *last* touched
+ *  (`updatedAt`), which is the date the moves actually happened by, since `createdAt`
+ *  for a still-open session is just when it started. */
+function stepsByUtcDate(
+  sessions: readonly SessionFacts[],
+): Map<string, number> {
+  const byDate = new Map<string, number>();
+  for (const s of sessions) {
+    const date = dayUtc(s.updatedAt);
+    byDate.set(date, (byDate.get(date) ?? 0) + s.stepCount);
+  }
+  return byDate;
+}
+
+function actionIdsEqual(a: readonly string[], b: readonly string[]): boolean {
+  if (a.length !== b.length) return false;
+  return a.every((id, i) => id === b[i]);
 }
 
 export const BADGES: readonly BadgeDefinition[] = [
@@ -186,14 +274,7 @@ export const BADGES: readonly BadgeDefinition[] = [
   },
   {
     id: "streak",
-    test: (d) => {
-      const dates = new Set<string>();
-      for (const s of d.sessions) {
-        dates.add(dayUtc(s.createdAt));
-        dates.add(dayUtc(s.updatedAt));
-      }
-      return hasConsecutiveRun(dates, STREAK_DAYS);
-    },
+    test: (d) => hasConsecutiveRun(touchDates(d.sessions), STREAK_DAYS),
   },
   {
     id: "century-club",
@@ -235,6 +316,274 @@ export const BADGES: readonly BadgeDefinition[] = [
     id: "math-is-hard",
     test: (d) => d.sessions.some((s) => s.attemptCounter < s.stepCount),
   },
+
+  // -- Codewars-inspired expansion (issue #19 follow-up) -------------------------------
+
+  {
+    id: "brute-force",
+    test: (d) =>
+      d.sessions.some(
+        (s) => s.status === "ended" && s.attemptCounter > s.stepCount * 5 + 10,
+      ),
+  },
+  {
+    id: "speedrun-technically",
+    test: (d) =>
+      d.sessions.some((s) => s.status === "ended" && s.stepCount <= 5),
+  },
+  {
+    id: "groundhog-day",
+    test: (d) => {
+      const counts = new Map<string, number>();
+      for (const s of d.sessions) {
+        if (s.status !== "ended") continue;
+        counts.set(s.campaignId, (counts.get(s.campaignId) ?? 0) + 1);
+      }
+      return [...counts.values()].some((n) => n >= GROUNDHOG_SESSIONS);
+    },
+  },
+  {
+    id: "specialist",
+    test: (d) => {
+      const ended = d.sessions.filter((s) => s.status === "ended");
+      if (ended.length < SPECIALIST_MIN_ENDED) return false;
+      const counts = new Map<string, number>();
+      for (const s of ended) {
+        counts.set(s.campaignId, (counts.get(s.campaignId) ?? 0) + 1);
+      }
+      const max = Math.max(...counts.values());
+      return max / ended.length >= SPECIALIST_SHARE;
+    },
+  },
+  {
+    id: "generalist",
+    test: (d) => {
+      if (d.catalogKindIds.size === 0) return false;
+      const finishedKinds = distinct(
+        d.sessions
+          .filter((s) => s.status === "ended")
+          .map((s) => s.kindId)
+          .filter((k): k is string => k !== null),
+      );
+      for (const kind of d.catalogKindIds) {
+        if (!finishedKinds.has(kind)) return false;
+      }
+      return true;
+    },
+  },
+  {
+    id: "tourist",
+    test: (d) => {
+      const touched = distinct(d.sessions.map((s) => s.campaignId));
+      if (touched.size === 0 || touched.size !== d.catalogSize) return false;
+      const finished = distinct(
+        d.sessions.filter((s) => s.status === "ended").map((s) => s.campaignId),
+      );
+      return finished.size / touched.size < TOURIST_MAX_FINISH_RATE;
+    },
+  },
+  {
+    id: "perfect-attendance",
+    test: (d) =>
+      hasConsecutiveRun(touchDates(d.sessions), PERFECT_ATTENDANCE_DAYS),
+  },
+  {
+    id: "employee-of-the-month",
+    test: (d) => {
+      const byMonth = new Map<string, number>();
+      for (const s of d.sessions) {
+        const month = monthUtc(s.updatedAt);
+        byMonth.set(month, (byMonth.get(month) ?? 0) + s.stepCount);
+      }
+      return [...byMonth.values()].some(
+        (n) => n >= EMPLOYEE_OF_THE_MONTH_STEPS,
+      );
+    },
+  },
+  {
+    id: "productive-sunday",
+    test: (d) => {
+      const byDate = stepsByUtcDate(
+        d.sessions.filter((s) => isUtcSunday(s.updatedAt)),
+      );
+      return [...byDate.values()].some((n) => n >= PRODUCTIVE_SUNDAY_STEPS);
+    },
+  },
+  {
+    id: "against-medical-advice",
+    test: (d) => {
+      const byDate = stepsByUtcDate(d.sessions);
+      return [...byDate.values()].some((n) => n >= MEDICAL_ADVICE_STEPS);
+    },
+  },
+  {
+    id: "unreasonably-efficient",
+    test: (d) => {
+      const efficient = distinct(
+        d.sessions
+          .filter(
+            (s) => s.status === "ended" && s.attemptCounter - s.stepCount <= 1,
+          )
+          .map((s) => s.campaignId),
+      );
+      return efficient.size >= UNREASONABLY_EFFICIENT_CAMPAIGNS;
+    },
+  },
+  {
+    id: "persistence-is-a-character-flaw",
+    test: (d) => {
+      const failed = new Map<string, number>();
+      const ended = new Set<string>();
+      for (const s of d.sessions) {
+        if (s.status === "ended") ended.add(s.campaignId);
+        else failed.set(s.campaignId, (failed.get(s.campaignId) ?? 0) + 1);
+      }
+      for (const [campaignId, count] of failed) {
+        if (count >= PERSISTENCE_FAILED_SESSIONS && ended.has(campaignId))
+          return true;
+      }
+      return false;
+    },
+  },
+  {
+    id: "one-more-turn",
+    test: (d) => {
+      const sorted = [...d.sessions].sort(
+        (a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt),
+      );
+      for (const finished of d.sessions) {
+        if (finished.status !== "ended") continue;
+        const finishedAt = Date.parse(finished.updatedAt);
+        for (const next of sorted) {
+          if (next === finished) continue;
+          const gap = Date.parse(next.createdAt) - finishedAt;
+          if (gap >= 0 && gap <= FIVE_MINUTES_MS) return true;
+        }
+      }
+      return false;
+    },
+  },
+  {
+    id: "immediate-regret",
+    test: (d) => {
+      for (const finished of d.sessions) {
+        if (finished.status !== "ended") continue;
+        const finishedAt = Date.parse(finished.updatedAt);
+        for (const next of d.sessions) {
+          if (next === finished || next.campaignId !== finished.campaignId)
+            continue;
+          const gap = Date.parse(next.createdAt) - finishedAt;
+          if (gap >= 0 && gap <= FIVE_MINUTES_MS) return true;
+        }
+      }
+      return false;
+    },
+  },
+  {
+    id: "creature-of-habit",
+    test: (d) => {
+      const byCampaignHour = new Map<string, Set<string>>();
+      for (const s of d.sessions) {
+        const key = `${s.campaignId}:${hourUtc(s.updatedAt)}`;
+        const dates = byCampaignHour.get(key) ?? new Set<string>();
+        dates.add(dayUtc(s.updatedAt));
+        byCampaignHour.set(key, dates);
+      }
+      return [...byCampaignHour.values()].some(
+        (dates) => dates.size >= CREATURE_OF_HABIT_DAYS,
+      );
+    },
+  },
+  {
+    id: "disk-jockey",
+    test: (d) => {
+      const byDate = new Map<string, Set<string>>();
+      for (const s of d.sessions) {
+        const date = dayUtc(s.updatedAt);
+        const campaigns = byDate.get(date) ?? new Set<string>();
+        campaigns.add(s.campaignId);
+        byDate.set(date, campaigns);
+      }
+      return [...byDate.values()].some(
+        (campaigns) => campaigns.size >= DISK_JOCKEY_CAMPAIGNS,
+      );
+    },
+  },
+  {
+    id: "muscle-memory",
+    test: (d) => {
+      const byCampaign = new Map<string, string[][]>();
+      for (const s of d.sessions) {
+        if (s.actionIds.length < MUSCLE_MEMORY_PREFIX) continue;
+        const prefixes = byCampaign.get(s.campaignId) ?? [];
+        prefixes.push(s.actionIds.slice(0, MUSCLE_MEMORY_PREFIX));
+        byCampaign.set(s.campaignId, prefixes);
+      }
+      for (const prefixes of byCampaign.values()) {
+        if (prefixes.length < MUSCLE_MEMORY_SESSIONS) continue;
+        for (let i = 0; i < prefixes.length; i++) {
+          const matches = prefixes.filter((p) =>
+            actionIdsEqual(p, prefixes[i]!),
+          );
+          if (matches.length >= MUSCLE_MEMORY_SESSIONS) return true;
+        }
+      }
+      return false;
+    },
+  },
+  {
+    id: "the-long-way-around",
+    test: (d) => {
+      const byEnding = new Map<string, string[][]>();
+      for (const s of d.sessions) {
+        if (!s.endingId) continue;
+        const key = `${s.campaignId}:${s.endingId}`;
+        const seqs = byEnding.get(key) ?? [];
+        seqs.push([...s.actionIds]);
+        byEnding.set(key, seqs);
+      }
+      for (const seqs of byEnding.values()) {
+        for (let i = 0; i < seqs.length; i++) {
+          for (let j = i + 1; j < seqs.length; j++) {
+            if (!actionIdsEqual(seqs[i]!, seqs[j]!)) return true;
+          }
+        }
+      }
+      return false;
+    },
+  },
+  {
+    id: "scenic-route",
+    test: (d) =>
+      d.sessions.some((s) => {
+        if (s.status !== "ended" || !s.endingId) return false;
+        const median = d.endingMedianSteps.get(`${s.campaignId}:${s.endingId}`);
+        return (
+          median !== undefined &&
+          median > 0 &&
+          s.stepCount >= median * SCENIC_ROUTE_MULTIPLIER
+        );
+      }),
+  },
+  {
+    id: "sequence-breaker",
+    test: (d) =>
+      d.sessions.some((s) => {
+        if (s.status !== "ended" || !s.endingId) return false;
+        const median = d.endingMedianSteps.get(`${s.campaignId}:${s.endingId}`);
+        return (
+          median !== undefined &&
+          median > 0 &&
+          s.stepCount <= median / SEQUENCE_BREAKER_DIVISOR
+        );
+      }),
+  },
+  {
+    id: "top-1-percent",
+    test: (d) =>
+      d.totalPlayers >= TOP_PERCENT_MIN_PLAYERS &&
+      d.rejectedPercentile >= TOP_PERCENT_THRESHOLD,
+  },
 ];
 
 interface SessionRow {
@@ -245,7 +594,7 @@ interface SessionRow {
   attempt_counter: number;
   created_at: string;
   updated_at: string;
-  kind_id: string | null;
+  blob: string;
 }
 
 interface AchievementRow {
@@ -253,15 +602,44 @@ interface AchievementRow {
   achievement_id: string;
 }
 
+interface ParsedBlob {
+  readonly kindId?: string;
+  readonly actionLog?: readonly { readonly actionId?: string }[];
+}
+
+function parseSessionBlob(blob: string): {
+  kindId: string | null;
+  actionIds: readonly string[];
+} {
+  try {
+    const parsed = JSON.parse(blob) as ParsedBlob;
+    return {
+      kindId: typeof parsed.kindId === "string" ? parsed.kindId : null,
+      actionIds: (parsed.actionLog ?? [])
+        .map((a) => a.actionId)
+        .filter((id): id is string => typeof id === "string"),
+    };
+  } catch {
+    return { kindId: null, actionIds: [] };
+  }
+}
+
 export async function evaluateBadges(
   pool: Pool,
   demo: ServerDemo,
   playerId: string,
 ): Promise<BadgeRow[]> {
-  const [sessionsResult, achievementsResult, playerResult] = await Promise.all([
+  const [
+    sessionsResult,
+    achievementsResult,
+    playerResult,
+    medians,
+    percentile,
+    playerCount,
+  ] = await Promise.all([
     pool.query<SessionRow>(
       `select campaign_id, status, ending_id, step_count, attempt_counter,
-              created_at, updated_at, blob::jsonb ->> 'kindId' as kind_id
+              created_at, updated_at, blob
          from sessions where profile_id = $1`,
       [playerId],
     ),
@@ -273,28 +651,39 @@ export async function evaluateBadges(
       `select merge_count from players where player_id = $1`,
       [playerId],
     ),
+    endingMedianSteps(pool),
+    rejectedPercentileFor(pool, playerId),
+    totalPlayerCount(pool),
   ]);
 
   const data: BadgeData = {
-    sessions: sessionsResult.rows.map((row) => ({
-      campaignId: row.campaign_id,
-      status: row.status,
-      endingId: row.ending_id,
-      stepCount: row.step_count,
-      attemptCounter: row.attempt_counter,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-      kindId: row.kind_id,
-    })),
+    sessions: sessionsResult.rows.map((row) => {
+      const { kindId, actionIds } = parseSessionBlob(row.blob);
+      return {
+        campaignId: row.campaign_id,
+        status: row.status,
+        endingId: row.ending_id,
+        stepCount: row.step_count,
+        attemptCounter: row.attempt_counter,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+        kindId,
+        actionIds,
+      };
+    }),
     achievements: achievementsResult.rows.map((row) => ({
       campaignId: row.campaign_id,
       achievementId: row.achievement_id,
     })),
     mergeCount: playerResult.rows[0]?.merge_count ?? 0,
     catalogKindIds: new Set(demo.all.map((c) => c.kindId)),
+    catalogSize: demo.catalog.length,
     endingTotalOf: (campaignId) =>
       demo.findCampaign(campaignId)?.endingCount ?? 0,
     now: Date.now(),
+    endingMedianSteps: medians,
+    rejectedPercentile: percentile,
+    totalPlayers: playerCount,
   };
 
   const earned = BADGES.filter((b) => b.test(data)).map((b) => b.id);

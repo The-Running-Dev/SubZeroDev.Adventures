@@ -47,6 +47,48 @@ export interface PlatformStats {
   readonly badgesUnlocked: number;
 }
 
+/** "Personnel File" -- pure aggregates over a player's own session history, plus one
+ *  cross-player field (`rarestEnding`). Mirrors server/src/records.ts's shape exactly. */
+export interface PersonnelRecords {
+  readonly longestRun: number;
+  readonly longestStreak: number;
+  readonly mostMovesInADay: number;
+  readonly favoriteDisk: {
+    readonly campaignId: string;
+    readonly sessions: number;
+  } | null;
+  readonly mostRejectedMoves: number;
+  readonly fastestEnding: number | null;
+  readonly rarestEnding: {
+    readonly campaignId: string;
+    readonly endingId: string;
+    readonly discoverers: number;
+  } | null;
+  readonly completionRate: number;
+  readonly attemptEfficiency: number;
+}
+
+export interface ProfileSettings {
+  readonly public: boolean;
+  readonly slug: string | null;
+}
+
+// Named PublicProfileData, not PublicProfile -- src/profile/PublicProfile.tsx's
+// component export would otherwise collide with this type's name.
+export interface PublicProfileData {
+  readonly displayName: string;
+  readonly joinedAt: string;
+  readonly sessionsStarted: number;
+  readonly sessionsFinished: number;
+  readonly campaignsPlayed: number;
+  readonly campaignsTotal: number;
+  readonly stepsTaken: number;
+  readonly endingsFound: number;
+  readonly achievementsUnlocked: number;
+  readonly badges: readonly Badge[];
+  readonly records: PersonnelRecords;
+}
+
 const anonymousIdentity: Identity = {
   playerId: null,
   kind: "anonymous",
@@ -122,34 +164,45 @@ export function useProgress(
 }
 
 /** Mirrors `useProgress`'s shape exactly: keyed off `playerId` so it re-fetches after a
- *  sign-in or transfer merges in a new set, and a no-op returning `[]` in local mode
- *  where `apiUrl` is undefined -- there is no server to evaluate badges against. */
+ *  sign-in or transfer merges in a new set, and a no-op returning `[]`/`null` in local
+ *  mode where `apiUrl` is undefined -- there is no server to evaluate badges or compute
+ *  records against. `records` is `null` before the fetch resolves and in local mode,
+ *  same absent-state convention `usePlatformStats` already uses. */
 export function useBadges(
   apiUrl: string | undefined,
   playerId: string | null,
-): readonly Badge[] {
+): { badges: readonly Badge[]; records: PersonnelRecords | null } {
   const [badges, setBadges] = useState<readonly Badge[]>([]);
+  const [records, setRecords] = useState<PersonnelRecords | null>(null);
 
   useEffect(() => {
     if (!apiUrl || !playerId) {
       setBadges([]);
+      setRecords(null);
       return;
     }
     let cancelled = false;
     fetch(`${apiUrl}/api/badges`, { credentials: "include" })
-      .then((response) => (response.ok ? response.json() : { badges: [] }))
-      .then((body: { badges: Badge[] }) => {
-        if (!cancelled) setBadges(body.badges);
+      .then((response) =>
+        response.ok ? response.json() : { badges: [], records: null },
+      )
+      .then((body: { badges: Badge[]; records: PersonnelRecords | null }) => {
+        if (cancelled) return;
+        setBadges(body.badges);
+        setRecords(body.records);
       })
       .catch(() => {
-        if (!cancelled) setBadges([]);
+        if (!cancelled) {
+          setBadges([]);
+          setRecords(null);
+        }
       });
     return () => {
       cancelled = true;
     };
   }, [apiUrl, playerId]);
 
-  return badges;
+  return { badges, records };
 }
 
 /** The one public read in this module -- `/api/stats` needs no cookie and no player, so
@@ -181,6 +234,67 @@ export function usePlatformStats(
   }, [apiUrl]);
 
   return stats;
+}
+
+const anonymousProfileSettings: ProfileSettings = { public: false, slug: null };
+
+/** Mirrors `useIdentity`'s fetch-on-mount shape (GET `/api/profile/settings`, a no-op
+ *  when `apiUrl`/`playerId` is absent), plus a `setPublic` action that POSTs
+ *  `/api/profile/visibility` and updates local state from the response directly --
+ *  no full-page refetch needed to see the new slug/flag. */
+export function useProfileSettings(
+  apiUrl: string | undefined,
+  playerId: string | null,
+  refreshToken: number,
+): {
+  settings: ProfileSettings;
+  loading: boolean;
+  setPublic: (next: boolean) => Promise<void>;
+} {
+  const [settings, setSettings] = useState<ProfileSettings>(
+    anonymousProfileSettings,
+  );
+  const [loading, setLoading] = useState(Boolean(apiUrl && playerId));
+
+  useEffect(() => {
+    if (!apiUrl || !playerId) {
+      setSettings(anonymousProfileSettings);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    fetch(`${apiUrl}/api/profile/settings`, { credentials: "include" })
+      .then((response) =>
+        response.ok ? response.json() : anonymousProfileSettings,
+      )
+      .then((body: ProfileSettings) => {
+        if (!cancelled) setSettings(body);
+      })
+      .catch(() => {
+        if (!cancelled) setSettings(anonymousProfileSettings);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [apiUrl, playerId, refreshToken]);
+
+  async function setPublic(next: boolean): Promise<void> {
+    if (!apiUrl) return;
+    const response = await fetch(`${apiUrl}/api/profile/visibility`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ public: next }),
+    });
+    if (!response.ok) throw new Error("Couldn't update profile visibility.");
+    const body = (await response.json()) as ProfileSettings;
+    setSettings(body);
+  }
+
+  return { settings, loading, setPublic };
 }
 
 /** Builds the sign-in link for whichever provider `/api/me` reported as configured

@@ -53,6 +53,7 @@ describeIfDb("badge evaluation", () => {
     createdAt: Date;
     updatedAt?: Date;
     kindId?: string;
+    actionIds?: string[];
   }
 
   async function seedSession(
@@ -61,7 +62,13 @@ describeIfDb("badge evaluation", () => {
   ): Promise<void> {
     const createdAt = seed.createdAt.toISOString();
     const updatedAt = (seed.updatedAt ?? seed.createdAt).toISOString();
-    const blob = JSON.stringify({ kindId: seed.kindId ?? "story-graph" });
+    const blob = JSON.stringify({
+      kindId: seed.kindId ?? "story-graph",
+      actionLog: (seed.actionIds ?? []).map((actionId, seq) => ({
+        seq,
+        actionId,
+      })),
+    });
     await pool.query(
       `insert into sessions
          (session_id, blob, audience, attempt_counter, replay_compatible, profile_id,
@@ -354,5 +361,465 @@ describeIfDb("badge evaluation", () => {
     const second = await evaluateBadges(pool, demo, player);
     const secondFirstSteps = second.find((b) => b.badgeId === "first-steps");
     expect(secondFirstSteps?.unlockedAt).toBe(firstSteps?.unlockedAt);
+  });
+
+  // -- Codewars-inspired expansion (issue #19 follow-up) -------------------------------
+
+  it("brute-force fires past the ended threshold, not at it", async () => {
+    // Threshold: attemptCounter > stepCount * 5 + 10. At stepCount=10, that's 60.
+    const over = await createPlayer();
+    await seedSession(over, {
+      createdAt: new Date(),
+      status: "ended",
+      stepCount: 10,
+      attemptCounter: 61,
+    });
+    expect(await badgeIdsFor(over)).toContain("brute-force");
+
+    const atLimit = await createPlayer();
+    await seedSession(atLimit, {
+      createdAt: new Date(),
+      status: "ended",
+      stepCount: 10,
+      attemptCounter: 60,
+    });
+    expect(await badgeIdsFor(atLimit)).not.toContain("brute-force");
+  });
+
+  it("speedrun-technically requires an ended session at or under 5 steps", async () => {
+    const fast = await createPlayer();
+    await seedSession(fast, {
+      createdAt: new Date(),
+      status: "ended",
+      stepCount: 5,
+    });
+    expect(await badgeIdsFor(fast)).toContain("speedrun-technically");
+
+    const notQuite = await createPlayer();
+    await seedSession(notQuite, {
+      createdAt: new Date(),
+      status: "ended",
+      stepCount: 6,
+    });
+    expect(await badgeIdsFor(notQuite)).not.toContain("speedrun-technically");
+  });
+
+  it("groundhog-day needs 10+ ended sessions of one campaign", async () => {
+    const player = await createPlayer();
+    for (let i = 0; i < 10; i++) {
+      await seedSession(player, {
+        createdAt: new Date(),
+        status: "ended",
+        campaignId: "loop",
+      });
+    }
+    expect(await badgeIdsFor(player)).toContain("groundhog-day");
+
+    const short = await createPlayer();
+    for (let i = 0; i < 9; i++) {
+      await seedSession(short, {
+        createdAt: new Date(),
+        status: "ended",
+        campaignId: "loop",
+      });
+    }
+    expect(await badgeIdsFor(short)).not.toContain("groundhog-day");
+  });
+
+  it("specialist needs 90%+ of 5+ ended sessions in one campaign", async () => {
+    const player = await createPlayer();
+    for (let i = 0; i < 5; i++) {
+      await seedSession(player, {
+        createdAt: new Date(),
+        status: "ended",
+        campaignId: "main",
+      });
+    }
+    expect(await badgeIdsFor(player)).toContain("specialist");
+
+    const split = await createPlayer();
+    for (let i = 0; i < 3; i++) {
+      await seedSession(split, {
+        createdAt: new Date(),
+        status: "ended",
+        campaignId: "a",
+      });
+    }
+    for (let i = 0; i < 2; i++) {
+      await seedSession(split, {
+        createdAt: new Date(),
+        status: "ended",
+        campaignId: "b",
+      });
+    }
+    expect(await badgeIdsFor(split)).not.toContain("specialist");
+  });
+
+  it("generalist fires once every catalog kind has a finished session (currently just story-graph)", async () => {
+    const player = await createPlayer();
+    await seedSession(player, {
+      createdAt: new Date(),
+      status: "ended",
+      kindId: "story-graph",
+    });
+    expect(await badgeIdsFor(player)).toContain("generalist");
+
+    const unfinished = await createPlayer();
+    await seedSession(unfinished, {
+      createdAt: new Date(),
+      status: "active",
+      kindId: "story-graph",
+    });
+    expect(await badgeIdsFor(unfinished)).not.toContain("generalist");
+  });
+
+  it("tourist needs every catalog campaign touched with a low finish rate", async () => {
+    const player = await createPlayer();
+    for (const campaign of demo.catalog) {
+      await seedSession(player, {
+        createdAt: new Date(),
+        status: "active",
+        campaignId: campaign.campaignId,
+      });
+    }
+    expect(await badgeIdsFor(player)).toContain("tourist");
+  });
+
+  it("perfect-attendance needs 30 consecutive UTC days", async () => {
+    const player = await createPlayer();
+    for (let i = 0; i < 30; i++) {
+      await seedSession(player, {
+        createdAt: new Date(Date.UTC(2026, 0, 1 + i, 12)),
+      });
+    }
+    expect(await badgeIdsFor(player)).toContain("perfect-attendance");
+
+    const short = await createPlayer();
+    for (let i = 0; i < 29; i++) {
+      await seedSession(short, {
+        createdAt: new Date(Date.UTC(2026, 0, 1 + i, 12)),
+      });
+    }
+    expect(await badgeIdsFor(short)).not.toContain("perfect-attendance");
+  });
+
+  it("employee-of-the-month needs 2000+ steps in one UTC calendar month", async () => {
+    const player = await createPlayer();
+    await seedSession(player, {
+      createdAt: new Date(Date.UTC(2026, 2, 5, 12)),
+      stepCount: 1200,
+    });
+    await seedSession(player, {
+      createdAt: new Date(Date.UTC(2026, 2, 20, 12)),
+      stepCount: 900,
+    });
+    expect(await badgeIdsFor(player)).toContain("employee-of-the-month");
+  });
+
+  it("productive-sunday needs 300+ steps on a single UTC Sunday", async () => {
+    // 2026-01-04 is a Sunday.
+    const player = await createPlayer();
+    await seedSession(player, {
+      createdAt: new Date(Date.UTC(2026, 0, 4, 12)),
+      stepCount: 300,
+    });
+    expect(await badgeIdsFor(player)).toContain("productive-sunday");
+
+    const weekday = await createPlayer();
+    await seedSession(weekday, {
+      createdAt: new Date(Date.UTC(2026, 0, 5, 12)),
+      stepCount: 300,
+    });
+    expect(await badgeIdsFor(weekday)).not.toContain("productive-sunday");
+  });
+
+  it("against-medical-advice needs 800+ steps in one UTC calendar day", async () => {
+    const player = await createPlayer();
+    await seedSession(player, { createdAt: new Date(), stepCount: 800 });
+    expect(await badgeIdsFor(player)).toContain("against-medical-advice");
+  });
+
+  it("unreasonably-efficient needs 3+ campaigns each finished near-perfectly", async () => {
+    const player = await createPlayer();
+    for (const campaignId of ["a", "b", "c"]) {
+      await seedSession(player, {
+        createdAt: new Date(),
+        status: "ended",
+        campaignId,
+        stepCount: 10,
+        attemptCounter: 11,
+      });
+    }
+    expect(await badgeIdsFor(player)).toContain("unreasonably-efficient");
+
+    const two = await createPlayer();
+    for (const campaignId of ["a", "b"]) {
+      await seedSession(two, {
+        createdAt: new Date(),
+        status: "ended",
+        campaignId,
+        stepCount: 10,
+        attemptCounter: 11,
+      });
+    }
+    expect(await badgeIdsFor(two)).not.toContain("unreasonably-efficient");
+  });
+
+  it("persistence-is-a-character-flaw needs 5+ failures then a finish, same campaign", async () => {
+    const player = await createPlayer();
+    for (let i = 0; i < 5; i++) {
+      await seedSession(player, {
+        createdAt: new Date(),
+        status: "active",
+        campaignId: "grind",
+      });
+    }
+    await seedSession(player, {
+      createdAt: new Date(),
+      status: "ended",
+      campaignId: "grind",
+    });
+    expect(await badgeIdsFor(player)).toContain(
+      "persistence-is-a-character-flaw",
+    );
+
+    const gaveUp = await createPlayer();
+    for (let i = 0; i < 5; i++) {
+      await seedSession(gaveUp, {
+        createdAt: new Date(),
+        status: "active",
+        campaignId: "grind",
+      });
+    }
+    expect(await badgeIdsFor(gaveUp)).not.toContain(
+      "persistence-is-a-character-flaw",
+    );
+  });
+
+  it("one-more-turn fires when a new session starts within 5 minutes of a finish", async () => {
+    const finishedAt = new Date("2026-01-01T00:00:00.000Z");
+    const player = await createPlayer();
+    await seedSession(player, {
+      createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      updatedAt: finishedAt,
+      status: "ended",
+      campaignId: "a",
+    });
+    await seedSession(player, {
+      createdAt: new Date(finishedAt.getTime() + 2 * 60_000),
+      campaignId: "b",
+    });
+    expect(await badgeIdsFor(player)).toContain("one-more-turn");
+
+    const waited = await createPlayer();
+    await seedSession(waited, {
+      createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      updatedAt: finishedAt,
+      status: "ended",
+      campaignId: "a",
+    });
+    await seedSession(waited, {
+      createdAt: new Date(finishedAt.getTime() + 10 * 60_000),
+      campaignId: "b",
+    });
+    expect(await badgeIdsFor(waited)).not.toContain("one-more-turn");
+  });
+
+  it("immediate-regret needs the restart to be the same campaign", async () => {
+    const finishedAt = new Date("2026-01-01T00:00:00.000Z");
+    const player = await createPlayer();
+    await seedSession(player, {
+      createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      updatedAt: finishedAt,
+      status: "ended",
+      campaignId: "a",
+    });
+    await seedSession(player, {
+      createdAt: new Date(finishedAt.getTime() + 2 * 60_000),
+      campaignId: "a",
+    });
+    expect(await badgeIdsFor(player)).toContain("immediate-regret");
+
+    const differentCampaign = await createPlayer();
+    await seedSession(differentCampaign, {
+      createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      updatedAt: finishedAt,
+      status: "ended",
+      campaignId: "a",
+    });
+    await seedSession(differentCampaign, {
+      createdAt: new Date(finishedAt.getTime() + 2 * 60_000),
+      campaignId: "b",
+    });
+    expect(await badgeIdsFor(differentCampaign)).not.toContain(
+      "immediate-regret",
+    );
+  });
+
+  it("creature-of-habit needs one campaign touched at the same hour across 7 days", async () => {
+    const player = await createPlayer();
+    for (let i = 0; i < 7; i++) {
+      await seedSession(player, {
+        createdAt: new Date(Date.UTC(2026, 0, 1 + i, 9)),
+        campaignId: "routine",
+      });
+    }
+    expect(await badgeIdsFor(player)).toContain("creature-of-habit");
+  });
+
+  it("disk-jockey needs 5+ distinct campaigns touched on one UTC day", async () => {
+    const player = await createPlayer();
+    for (const campaignId of ["a", "b", "c", "d", "e"]) {
+      await seedSession(player, {
+        createdAt: new Date(Date.UTC(2026, 0, 1, 12)),
+        campaignId,
+      });
+    }
+    expect(await badgeIdsFor(player)).toContain("disk-jockey");
+
+    const four = await createPlayer();
+    for (const campaignId of ["a", "b", "c", "d"]) {
+      await seedSession(four, {
+        createdAt: new Date(Date.UTC(2026, 0, 1, 12)),
+        campaignId,
+      });
+    }
+    expect(await badgeIdsFor(four)).not.toContain("disk-jockey");
+  });
+
+  it("muscle-memory fires when 3+ sessions of one campaign share their opening moves", async () => {
+    const player = await createPlayer();
+    for (let i = 0; i < 3; i++) {
+      await seedSession(player, {
+        createdAt: new Date(),
+        campaignId: "ritual",
+        actionIds: ["look", "open-door", "enter", "unique-" + i],
+      });
+    }
+    expect(await badgeIdsFor(player)).toContain("muscle-memory");
+
+    const varied = await createPlayer();
+    await seedSession(varied, {
+      createdAt: new Date(),
+      campaignId: "ritual",
+      actionIds: ["look", "open-door", "enter"],
+    });
+    await seedSession(varied, {
+      createdAt: new Date(),
+      campaignId: "ritual",
+      actionIds: ["run", "hide", "wait"],
+    });
+    expect(await badgeIdsFor(varied)).not.toContain("muscle-memory");
+  });
+
+  it("the-long-way-around fires when the same ending is reached via different paths", async () => {
+    const player = await createPlayer();
+    await seedSession(player, {
+      createdAt: new Date(),
+      status: "ended",
+      campaignId: "maze",
+      endingId: "escaped",
+      actionIds: ["north", "east"],
+    });
+    await seedSession(player, {
+      createdAt: new Date(),
+      status: "ended",
+      campaignId: "maze",
+      endingId: "escaped",
+      actionIds: ["south", "south", "west"],
+    });
+    expect(await badgeIdsFor(player)).toContain("the-long-way-around");
+
+    const sameRoute = await createPlayer();
+    await seedSession(sameRoute, {
+      createdAt: new Date(),
+      status: "ended",
+      campaignId: "maze",
+      endingId: "escaped",
+      actionIds: ["north", "east"],
+    });
+    await seedSession(sameRoute, {
+      createdAt: new Date(),
+      status: "ended",
+      campaignId: "maze",
+      endingId: "escaped",
+      actionIds: ["north", "east"],
+    });
+    expect(await badgeIdsFor(sameRoute)).not.toContain("the-long-way-around");
+  });
+
+  it("scenic-route and sequence-breaker read a real cross-player median", async () => {
+    // Five baseline players establish the (campaign, ending) median -- enough that each
+    // subsequent subject's own session (which the median query can't help but include,
+    // since it aggregates every ended session for this pair) doesn't swing the median
+    // itself past the threshold being tested.
+    for (const steps of [10, 15, 20, 25, 30]) {
+      const baseline = await createPlayer();
+      await seedSession(baseline, {
+        createdAt: new Date(),
+        status: "ended",
+        campaignId: "median-campaign",
+        endingId: "the-end",
+        stepCount: steps,
+      });
+    }
+
+    const long = await createPlayer();
+    await seedSession(long, {
+      createdAt: new Date(),
+      status: "ended",
+      campaignId: "median-campaign",
+      endingId: "the-end",
+      stepCount: 50,
+    });
+    expect(await badgeIdsFor(long)).toContain("scenic-route");
+
+    const short = await createPlayer();
+    await seedSession(short, {
+      createdAt: new Date(),
+      status: "ended",
+      campaignId: "median-campaign",
+      endingId: "the-end",
+      stepCount: 8,
+    });
+    expect(await badgeIdsFor(short)).toContain("sequence-breaker");
+  });
+
+  it("top-1-percent needs 20+ total players and a top-percentile rejected-move total", async () => {
+    // 19 players with a small rejected total, then the subject with a huge one --
+    // 20 total players, subject sits at the top of the distribution.
+    for (let i = 0; i < 19; i++) {
+      const filler = await createPlayer();
+      await seedSession(filler, {
+        createdAt: new Date(),
+        stepCount: 10,
+        attemptCounter: 11,
+      });
+    }
+    const subject = await createPlayer();
+    await seedSession(subject, {
+      createdAt: new Date(),
+      stepCount: 10,
+      attemptCounter: 500,
+    });
+    expect(await badgeIdsFor(subject)).toContain("top-1-percent");
+  });
+
+  it("top-1-percent does not fire below the 20-player floor", async () => {
+    for (let i = 0; i < 3; i++) {
+      const filler = await createPlayer();
+      await seedSession(filler, {
+        createdAt: new Date(),
+        stepCount: 10,
+        attemptCounter: 11,
+      });
+    }
+    const subject = await createPlayer();
+    await seedSession(subject, {
+      createdAt: new Date(),
+      stepCount: 10,
+      attemptCounter: 500,
+    });
+    expect(await badgeIdsFor(subject)).not.toContain("top-1-percent");
   });
 });

@@ -8,11 +8,15 @@
  * achievements), so `unlocked_at` is durable and survives a player merge -- and this route
  * is the only place they're ever evaluated, rather than a trigger wired into every
  * gameplay write path.
+ *
+ * Also carries the "Personnel File" (records.ts) alongside the badges -- unlike badges,
+ * records need no storage/staleness handling, so they're just recomputed on every call.
  */
 import type { FastifyInstance } from "fastify";
 import type { Pool } from "pg";
 import { resolvePrincipal } from "../principal.js";
 import { evaluateBadges } from "../badges.js";
+import { computeRecords } from "../records.js";
 import type { ServerDemo } from "../composition.js";
 
 export function registerBadgeRoutes(
@@ -24,7 +28,11 @@ export function registerBadgeRoutes(
 
   app.get("/api/badges", { preHandler: resolve }, async (request) => {
     const principal = request.principalOrNull;
-    if (!principal) return { badges: [] };
-    return { badges: await evaluateBadges(pool, demo, principal.playerId) };
+    if (!principal) return { badges: [], records: null };
+    const [badges, records] = await Promise.all([
+      evaluateBadges(pool, demo, principal.playerId),
+      computeRecords(pool, principal.playerId),
+    ]);
+    return { badges, records };
   });
 }

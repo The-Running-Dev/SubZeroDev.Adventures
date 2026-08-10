@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>SubZeroDev Adventures</title>
+    <script>
+      // GitHub Pages has no server-side routing -- a direct navigation to any path other
+      // than / (e.g. Supabase's OAuth redirect to /oauth/consent, main.tsx's client-side
+      // dispatch) serves this 404 instead of index.html. Encode the real path/query/hash
+      // into a single query param on a redirect to /, which index.html's inline script
+      // reverses via history.replaceState before React mounts -- the app never sees this
+      // detour.
+      var l = window.location;
+      l.replace(
+        l.protocol +
+          "//" +
+          l.host +
+          "/?spa_redirect=" +
+          encodeURIComponent(l.pathname + l.search + l.hash),
+      );
+    </script>
+  </head>
+  <body></body>
+</html>

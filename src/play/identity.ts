@@ -103,6 +103,14 @@ export function githubSignInUrl(apiUrl: string): string {
   return `${apiUrl}/api/auth/github/start`;
 }
 
+/** The generic OIDC provider slot (server/src/identity/oidc.ts), named "supabase" by this
+ *  deployment's `OIDC_PROVIDER_NAME` -- see server/src/routes/identity.ts's
+ *  `/api/auth/:provider/start`. Unconfigured is a runtime state the route itself answers
+ *  (`oauth_not_configured`), not something this link needs to check for. */
+export function supabaseSignInUrl(apiUrl: string): string {
+  return `${apiUrl}/api/auth/supabase/start`;
+}
+
 export async function signOut(apiUrl: string): Promise<void> {
   await fetch(`${apiUrl}/api/auth/logout`, {
     method: "POST",

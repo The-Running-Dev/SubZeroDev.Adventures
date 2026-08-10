@@ -41,6 +41,13 @@ jobs:
       - name: Build
         env:
           VITE_API_URL: https://adventures-api.subzerodev.com
+          # Repo variables (Settings > Secrets and variables > Actions > Variables), not
+          # secrets -- Supabase's anon key is meant to be public, it ends up embedded in
+          # this static bundle either way. Unset resolves to "", and supabaseClient.ts's
+          # truthy check treats that the same as unconfigured (OAuthConsent.tsx renders a
+          # "not configured" state) rather than crashing the build.
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
         run: npm run build
 
       - name: Setup Pages

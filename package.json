@@ -21,6 +21,7 @@
     "sync:campaigns": "node scripts/sync-campaigns.mjs"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.112.2",
     "@the-running-dev/game-engine": "file:./engine/src/engine",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"

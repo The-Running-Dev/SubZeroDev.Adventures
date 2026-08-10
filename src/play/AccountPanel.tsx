@@ -1,5 +1,10 @@
 import { useState } from "react";
-import { githubSignInUrl, signOut, type Identity } from "./identity";
+import {
+  githubSignInUrl,
+  supabaseSignInUrl,
+  signOut,
+  type Identity,
+} from "./identity";
 
 const AUTH_ERROR_MESSAGES: Readonly<Record<string, string>> = {
   oauth_not_configured: "GitHub sign-in isn't set up on this deployment yet.",
@@ -21,10 +26,11 @@ interface AccountPanelProps {
  * (server/src/routes/transfer.ts). Signed in -> name and sign out. This is the one piece
  * of the guest-first design (server/src/principal.ts) that previously had no UI at all --
  * the OAuth routes and transfer codes existed and worked, but nothing on the page ever
- * told a player they were playing as an anonymous cookie. GitHub is the only provider with
- * a sign-in entry point here so far, even though the server (server/src/identity/) can
- * carry more -- a signed-in player is generically `identity.kind === "member"` regardless
- * of which provider they linked.
+ * told a player they were playing as an anonymous cookie. "Sign In" is the generic OIDC
+ * slot (identity.ts's `supabaseSignInUrl`, server/src/identity/oidc.ts) -- deliberately not
+ * labeled with a provider name since which one it is is a deployment config choice, not
+ * something a player needs to know. A signed-in player is generically
+ * `identity.kind === "member"` regardless of which provider they linked.
  */
 export function AccountPanel({
   apiUrl,
@@ -122,6 +128,9 @@ export function AccountPanel({
           </span>
           <a className="cabinet-button" href={githubSignInUrl(apiUrl)}>
             Sign in with GitHub
+          </a>
+          <a className="cabinet-button" href={supabaseSignInUrl(apiUrl)}>
+            Sign In
           </a>
           <button
             className="cabinet-button"

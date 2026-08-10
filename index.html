@@ -41,6 +41,18 @@
         }
       })();
     </script>
+    <script>
+      // Reverses public/404.html's redirect before React mounts, so main.tsx's
+      // `location.pathname` check sees the path the visitor actually navigated to (e.g.
+      // /oauth/consent) instead of /.
+      (function () {
+        var params = new URLSearchParams(window.location.search);
+        var redirect = params.get("spa_redirect");
+        if (redirect) {
+          window.history.replaceState(null, "", redirect);
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

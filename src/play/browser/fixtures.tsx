@@ -31,9 +31,7 @@ async function mountAndOpen(campaignPattern: RegExp): Promise<Reached> {
   await user.click(
     await screen.findByRole("button", { name: campaignPattern }),
   );
-  await user.click(
-    screen.getByRole("button", { name: "Load selected adventure" }),
-  );
+  await user.click(screen.getByRole("button", { name: "Load" }));
   await screen.findByRole("heading", { level: 1 });
   return { container, unmount, user };
 }

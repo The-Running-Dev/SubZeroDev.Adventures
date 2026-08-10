@@ -47,11 +47,13 @@
   gap: 0.6rem;
 }
 
-/* "Disk library" and "Standings" -- pushed to the far left of the bar, opposite the
-   account menu and display-mode select. */
+/* "Disk library", the loaded story's title while playing, and "Standings" -- pushed to
+   the far left of the bar, opposite the account menu and display-mode select. Wraps: a
+   long story title is the one item here without a fixed short label. */
 .system-bar-nav {
   align-items: center;
   display: flex;
+  flex-wrap: wrap;
   gap: 0.6rem;
   margin-right: auto;
 }
@@ -90,6 +92,12 @@
 .system-bar-link[aria-current="page"] {
   background: var(--cyan);
   color: var(--screen);
+}
+
+/* The loaded story's own nav item (Header.tsx, while playing) is a `<span>`, not a
+   real control -- nothing to click there, since it already is the current page. */
+.system-bar-link:not(a, button) {
+  cursor: default;
 }
 
 .system-bar-label {
@@ -237,7 +245,6 @@
 
 .archive h1,
 .cabinet h1,
-.dossier-brief h2,
 .status-console h2 {
   font-family: inherit;
   font-weight: 700;
@@ -432,27 +439,22 @@
   margin: 2rem 0 1.25rem;
 }
 
-.dossier {
-  align-content: start;
-  background: var(--surface);
-  border: 0;
+/*
+ * The grid item (PlayApp.tsx wraps each `.dossier` button in one of these): carries the
+ * tile's outer border and, when selected, the folded-open `.dossier-brief` stacked below
+ * the button inside the same cell -- not a separate row spanning the whole grid.
+ */
+.dossier-tile {
   border-bottom: 1px solid var(--rule);
-  color: var(--muted);
-  cursor: pointer;
-  display: grid;
-  gap: 0.4rem;
-  min-height: 6rem;
-  padding: 0.85rem 1rem 0.85rem 2.2rem;
-  position: relative;
-  text-align: left;
+  display: flex;
+  flex-direction: column;
 }
 
 /*
- * Column and span are computed in PlayApp.tsx (`index % 2`), not read off DOM position
- * with `:nth-child` -- the selected tile's folded-open brief (`.dossier-brief`, below) is
- * inserted as a sibling grid item right after it, which would otherwise shift every
- * later tile's odd/even parity and flip its border every time a different disk is
- * selected.
+ * Column is computed in PlayApp.tsx (`index % 2`), not read off DOM position with
+ * `:nth-child` -- the selected tile's brief adds a child to *that* tile only, so it
+ * never shifts sibling tiles' DOM position or their odd/even parity the way inserting a
+ * new sibling row would.
  */
 .dossier-col-left {
   border-right: 1px solid var(--rule);
@@ -465,6 +467,21 @@
 .dossier-span-full {
   border-right: 0;
   grid-column: 1 / -1;
+}
+
+.dossier {
+  align-content: start;
+  background: var(--surface);
+  border: 0;
+  color: var(--muted);
+  cursor: pointer;
+  display: grid;
+  gap: 0.4rem;
+  min-height: 6rem;
+  padding: 0.85rem 1rem 0.85rem 2.2rem;
+  position: relative;
+  text-align: left;
+  width: 100%;
 }
 
 .dossier::before {
@@ -498,25 +515,17 @@
   box-shadow: inset 5px 0 0 var(--magenta);
 }
 
-.dossier-number,
-.briefing-meta {
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
 .dossier-number {
   color: var(--amber);
   font-size: 0.8125rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .dossier-progress {
   color: var(--text-faint);
   font-size: 0.75rem;
   letter-spacing: 0.04em;
-}
-
-.briefing-meta {
-  font-size: 0.875rem;
 }
 
 .dossier:hover .dossier-number,
@@ -537,44 +546,40 @@
 }
 
 /*
- * The selected dossier's briefing, folded open inside the shelf grid instead of as a
- * separate panel below it -- inserted as a sibling grid item right after the selected
- * `.dossier` button (PlayApp.tsx) and spanning both columns with `.dossier-span-full`'s
- * `grid-column: 1 / -1`, so it reads as that tile opening up in place. Deliberately
- * smaller than the panel it replaces: no emblem, tighter type, an accent-colored rule
- * standing in for the square badge.
+ * The selected dossier's briefing, folded open beneath its title inside the same tile
+ * (PlayApp.tsx wraps button + brief in one `.dossier-tile`) -- not a separate panel, and
+ * not repeating what the tile above it already says: no title, no eyebrow, no duration.
+ * Just the description, the load/resume actions, and the permanent link. Half the grid's
+ * width rather than the old panel's full bleed, so it stays genuinely small -- the
+ * permalink truncates to one line rather than wrapping the whole tile taller.
  */
 .dossier-brief {
-  background: var(--surface-raised);
   border-left: 3px solid var(--magenta);
   color: var(--muted);
   display: grid;
-  gap: 0.6rem;
-  grid-column: 1 / -1;
-  padding: 0.85rem 1rem;
-}
-
-.dossier-brief h2 {
-  color: var(--ink);
-  font-size: 1.1rem;
-  margin: 0;
+  gap: 0.5rem;
+  margin: 0 1rem 0.85rem 2.2rem;
+  padding-left: 0.75rem;
 }
 
 .dossier-brief p {
-  font-size: 0.875rem;
-  line-height: 1.5;
+  font-size: 0.8125rem;
+  line-height: 1.45;
   margin: 0;
 }
 
 .briefing-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.75rem;
+  gap: 0.6rem;
 }
 
 .briefing-permalink {
-  font-size: 0.8125rem;
-  overflow-wrap: anywhere;
+  display: block;
+  font-size: 0.75rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .briefing-permalink a {
@@ -1935,6 +1940,18 @@
  * have floors in §8.1 that `phone-layout.browser.test.tsx` measures.
  */
 @media (max-width: 767px) {
+  /*
+   * The header's third nav item costs a whole extra row here (`.system-bar-nav` wraps),
+   * pushing the cabinet marquee -- and with it the phone reading model's "no scroll
+   * needed" scene+choices viewport (14 §8.2, `phone-layout.browser.test.tsx`) -- down by
+   * however tall that row is. The marquee's own `<h1>` already names the loaded story
+   * right below, so this is a repeat here, not new information -- unlike "Disk library"
+   * and "Standings", which are the only way to leave the cabinet at all on a phone.
+   */
+  .system-bar-current-story {
+    display: none;
+  }
+
   .dossier-grid,
   .cabinet-layout {
     grid-template-columns: 1fr;

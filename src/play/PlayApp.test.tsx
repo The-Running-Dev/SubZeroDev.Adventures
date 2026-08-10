@@ -85,24 +85,23 @@ describe("PlayApp cabinet presentation", () => {
     localStorage.setItem(THEME_STORAGE_KEY, "dos");
   });
 
-  it("renders a selectable dossier shelf and opens a plain-language briefing", async () => {
+  it("renders a selectable dossier shelf and folds open a plain-language briefing", async () => {
     const user = userEvent.setup();
     render(<PlayApp />);
 
     expect(
       await screen.findByRole("heading", { name: "Adventure disk library" }),
     ).toBeVisible();
-    await user.click(screen.getByRole("button", { name: /The Bureaucracy/i }));
+    const dossier = screen.getByRole("button", { name: /The Bureaucracy/i });
+    await user.click(dossier);
 
+    expect(dossier).toHaveAttribute("aria-expanded", "true");
     expect(
-      screen.getByRole("heading", { name: "The Bureaucracy" }),
+      screen.getByText(
+        "Municipal, cadastral, archive, notary, and translation routes through one determined folder.",
+      ),
     ).toBeVisible();
-    expect(
-      screen.getByText("Estimated duration: 10–15 min per route"),
-    ).toBeVisible();
-    expect(
-      screen.getByRole("button", { name: "Load selected adventure" }),
-    ).toBeVisible();
+    expect(screen.getByRole("button", { name: "Load" })).toBeVisible();
   });
 
   it("loads the adventure directly, with no interstitial notice to click through", async () => {
@@ -111,9 +110,7 @@ describe("PlayApp cabinet presentation", () => {
     await screen.findByRole("heading", { name: "Adventure disk library" });
 
     await user.click(screen.getByRole("button", { name: /The Bureaucracy/i }));
-    await user.click(
-      screen.getByRole("button", { name: "Load selected adventure" }),
-    );
+    await user.click(screen.getByRole("button", { name: "Load" }));
 
     expect(await findSceneBody(/handwritten/i)).toBeVisible();
     expect(
@@ -155,9 +152,7 @@ describe("PlayApp cabinet presentation", () => {
     await screen.findByRole("heading", { name: "Adventure disk library" });
 
     await user.click(screen.getByRole("button", { name: /The Bureaucracy/i }));
-    await user.click(
-      screen.getByRole("button", { name: "Load selected adventure" }),
-    );
+    await user.click(screen.getByRole("button", { name: "Load" }));
     await user.click(
       await screen.findByRole("button", {
         name: /Wait for the municipal registry/i,
@@ -192,9 +187,7 @@ describe("PlayApp cabinet presentation", () => {
     await screen.findByRole("heading", { name: "Adventure disk library" });
 
     await user.click(screen.getByRole("button", { name: /The Bureaucracy/i }));
-    await user.click(
-      screen.getByRole("button", { name: "Load selected adventure" }),
-    );
+    await user.click(screen.getByRole("button", { name: "Load" }));
 
     const action = await screen.findByRole("button", {
       name: /Wait for the municipal registry/i,
@@ -219,9 +212,7 @@ describe("PlayApp cabinet presentation", () => {
     await screen.findByRole("heading", { name: "Adventure disk library" });
 
     await user.click(screen.getByRole("button", { name: /The Bureaucracy/i }));
-    await user.click(
-      screen.getByRole("button", { name: "Load selected adventure" }),
-    );
+    await user.click(screen.getByRole("button", { name: "Load" }));
 
     expect(await findSceneBody(/handwritten/i)).toBeVisible();
     expect(
@@ -242,9 +233,7 @@ describe("PlayApp cabinet presentation", () => {
     await screen.findByRole("heading", { name: "Adventure disk library" });
 
     await user.click(screen.getByRole("button", { name: /The Bureaucracy/i }));
-    await user.click(
-      screen.getByRole("button", { name: "Load selected adventure" }),
-    );
+    await user.click(screen.getByRole("button", { name: "Load" }));
     await findSceneBody(/handwritten/i);
 
     const region = screen.getByRole("region", { name: "Scene" });
@@ -260,9 +249,7 @@ describe("PlayApp cabinet presentation", () => {
     await screen.findByRole("heading", { name: "Adventure disk library" });
 
     await user.click(screen.getByRole("button", { name: /Enterprise/i }));
-    await user.click(
-      screen.getByRole("button", { name: "Load selected adventure" }),
-    );
+    await user.click(screen.getByRole("button", { name: "Load" }));
     const deck = await waitFor(() => {
       const el = document.querySelector(".action-deck");
       expect(el?.querySelectorAll(".action-card").length ?? 0).toBeGreaterThan(
@@ -282,9 +269,7 @@ describe("PlayApp cabinet presentation", () => {
     await screen.findByRole("heading", { name: "Adventure disk library" });
 
     await user.click(screen.getByRole("button", { name: /The Bureaucracy/i }));
-    await user.click(
-      screen.getByRole("button", { name: "Load selected adventure" }),
-    );
+    await user.click(screen.getByRole("button", { name: "Load" }));
     await user.click(
       await screen.findByRole("button", {
         name: /Wait for the municipal registry/i,
@@ -302,7 +287,7 @@ describe("PlayApp cabinet presentation", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("gives the featured campaign its own cabinet identity, not the unclassified fallback", async () => {
+  it("gives the featured campaign its own cabinet identity, not the generic fallback", async () => {
     const user = userEvent.setup();
     render(<PlayApp />);
     await screen.findByRole("heading", { name: "Adventure disk library" });
@@ -310,9 +295,10 @@ describe("PlayApp cabinet presentation", () => {
     await user.click(
       screen.getByRole("button", { name: /What Would Lucifer Do\?/i }),
     );
+    await user.click(screen.getByRole("button", { name: "Load" }));
 
     expect(screen.getByText("PREDICTION LOG")).toBeVisible();
-    expect(screen.queryByText("UNCLASSIFIED STORY")).not.toBeInTheDocument();
+    expect(screen.queryByText("STORY IN PROGRESS")).not.toBeInTheDocument();
   });
 
   it("hides platform stats and the record toggle in local mode (no backend to ask)", async () => {
@@ -333,9 +319,7 @@ describe("PlayApp cabinet presentation", () => {
     await screen.findByRole("heading", { name: "Adventure disk library" });
 
     await user.click(screen.getByRole("button", { name: /The Bureaucracy/i }));
-    await user.click(
-      screen.getByRole("button", { name: "Load selected adventure" }),
-    );
+    await user.click(screen.getByRole("button", { name: "Load" }));
     await user.click(
       await screen.findByRole("button", {
         name: /Wait for the municipal registry/i,
@@ -345,7 +329,7 @@ describe("PlayApp cabinet presentation", () => {
     await user.click(screen.getByRole("button", { name: "Quit to library" }));
     await user.click(screen.getByRole("button", { name: /The Bureaucracy/i }));
     const resumeButton = await screen.findByRole("button", {
-      name: "Resume saved run",
+      name: "Resume",
     });
     await user.click(resumeButton);
 
@@ -370,9 +354,7 @@ describe("PlayApp status console", () => {
     await user.click(
       screen.getByRole("button", { name: /What Would Lucifer Do\?/i }),
     );
-    await user.click(
-      screen.getByRole("button", { name: "Load selected adventure" }),
-    );
+    await user.click(screen.getByRole("button", { name: "Load" }));
     await screen.findByRole("heading", { name: "Player status" });
   }
 

@@ -1,5 +1,4 @@
 import {
-  Fragment,
   useEffect,
   useMemo,
   useRef,
@@ -38,8 +37,8 @@ import { PlatformStats } from "./PlatformStats";
 /**
  * Every registered campaign has an entry, hidden ones included -- a direct
  * `?campaign=` link is a hidden campaign's only door in, and a campaign with no
- * entry here falls back to "UNCLASSIFIED STORY" and the house accent, which is
- * a visible identity gap rather than a neutral default.
+ * entry here falls back to "STORY IN PROGRESS" and the house accent (the cabinet
+ * marquee, once loaded) rather than a neutral default.
  *
  * Accents are skins, not ids, so sharing one is fine: the two Lucifer
  * prediction campaigns share `cobalt` because they are one family, and Saki
@@ -458,10 +457,30 @@ function PlayAppReady({ demo }: { demo: BrowserDemo }) {
    * prompt actually being rendered, not on the theme: with no prompt on a
    * phone, nothing is competing and the scene should take focus as it does
    * everywhere else.
+   *
+   * `preventScroll: true` because this is an accessibility handoff, not a
+   * navigation -- the phone reading model (14 §8.2) already puts the scene
+   * and its choices in the first viewport with nothing to scroll past, and
+   * the browser's default scroll-into-view on focus was nudging the page a
+   * few pixels regardless, which is a scroll this handoff never intended.
    */
   useEffect(() => {
-    if (sceneText && !showBbsPrompt) sceneRegion.current?.focus();
+    if (sceneText && !showBbsPrompt)
+      sceneRegion.current?.focus({ preventScroll: true });
   }, [sceneText, showBbsPrompt]);
+
+  /**
+   * Starting or resuming a run replaces the whole shelf with the cabinet, but leaves
+   * whatever scroll position clicking "Load"/"Resume" (now inside a folded-open dossier
+   * tile, possibly off the first screen) left behind -- the phone reading model's
+   * promise that the scene and its choices need no scroll (14 §8.2) only holds if the
+   * cabinet actually opens at the top. `behavior: "auto"`, not the page's default smooth
+   * scroll, since this is a state transition, not a scroll the player asked for. Keyed
+   * on `campaignId`, which is set once per run, not once per turn.
+   */
+  useEffect(() => {
+    if (campaignId) window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, [campaignId]);
 
   useEffect(() => {
     const stored = readStoredTheme();
@@ -701,7 +720,8 @@ function PlayAppReady({ demo }: { demo: BrowserDemo }) {
       <main className="play-main">
         <div className="boot-flash" key={displayTheme} aria-hidden="true" />
         <Header
-          current="shelf"
+          current={state ? "playing" : "shelf"}
+          playingTitle={selected?.title}
           onSelectShelf={returnToShelf}
           theme={displayTheme}
           onThemeChange={changeTheme}
@@ -743,17 +763,24 @@ function PlayAppReady({ demo }: { demo: BrowserDemo }) {
                   index === demo.catalog.length - 1 &&
                   demo.catalog.length % 2 === 1;
                 return (
-                  <Fragment key={campaign.campaignId}>
+                  <div
+                    key={campaign.campaignId}
+                    className={[
+                      "dossier-tile",
+                      isLastOdd
+                        ? "dossier-span-full"
+                        : index % 2 === 0
+                          ? "dossier-col-left"
+                          : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                  >
                     <button
                       className={[
                         "dossier",
                         campaign.featured ? "dossier-featured" : "",
                         isSelected ? "is-selected" : "",
-                        isLastOdd
-                          ? "dossier-span-full"
-                          : index % 2 === 0
-                            ? "dossier-col-left"
-                            : "",
                       ]
                         .filter(Boolean)
                         .join(" ")}
@@ -777,28 +804,15 @@ function PlayAppReady({ demo }: { demo: BrowserDemo }) {
                       )}
                     </button>
                     {isSelected && (
-                      <div
-                        className="dossier-brief"
-                        aria-labelledby={`dossier-brief-title-${campaign.campaignId}`}
-                      >
-                        <p className="eyebrow">
-                          {cabinetThemes[campaign.campaignId]?.eyebrow ??
-                            "UNCLASSIFIED STORY"}
-                        </p>
-                        <h2 id={`dossier-brief-title-${campaign.campaignId}`}>
-                          {campaign.title}
-                        </h2>
+                      <div className="dossier-brief">
                         <p>{campaign.description}</p>
-                        <p className="briefing-meta">
-                          Estimated duration: {campaign.duration}
-                        </p>
                         <div className="briefing-actions">
                           <button
                             className="cabinet-button primary"
                             disabled={busy}
                             onClick={() => void start(campaign.campaignId)}
                           >
-                            Load selected adventure
+                            Load
                           </button>
                           {demo.findLocalSave(campaign.campaignId) && (
                             <button
@@ -811,19 +825,18 @@ function PlayAppReady({ demo }: { demo: BrowserDemo }) {
                                 )
                               }
                             >
-                              Resume saved run
+                              Resume
                             </button>
                           )}
                         </div>
                         <p className="briefing-permalink">
-                          Permanent link:{" "}
                           <a href={permalinkFor(campaign.campaignId)}>
                             {permalinkFor(campaign.campaignId)}
                           </a>
                         </p>
                       </div>
                     )}
-                  </Fragment>
+                  </div>
                 );
               })}
             </div>

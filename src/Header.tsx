@@ -4,11 +4,15 @@ import type { ThemeId } from "./theme";
 
 interface HeaderProps {
   /**
-   * Which top-level nav item the current page is: the single-page app at `"/"`
-   * (`"shelf"`), or one of the standalone pages reached by a real navigation
-   * (`"standings"`, `"profile"`).
+   * Which top-level nav item the current page is: the disk shelf at `"/"`
+   * (`"shelf"`), a story actually loaded and in progress there (`"playing"`), or one
+   * of the standalone pages reached by a real navigation (`"standings"`, `"profile"`).
    */
-  current: "shelf" | "standings" | "profile";
+  current: "shelf" | "playing" | "standings" | "profile";
+  /** The loaded story's title -- required, and only ever shown, while `current` is
+   *  `"playing"`. A third nav item next to "Standings", marking that specific story
+   *  current instead of "Disk library" while it's the thing actually on screen. */
+  playingTitle?: string;
   /**
    * Only supplied by the single-page app (PlayApp.tsx): lets "Disk library" return to
    * the shelf in place (abandoning an in-progress run first, if any) instead of a full
@@ -31,6 +35,7 @@ interface HeaderProps {
  */
 export function Header({
   current,
+  playingTitle,
   onSelectShelf,
   theme,
   onThemeChange,
@@ -59,6 +64,14 @@ export function Header({
         >
           Standings
         </a>
+        {current === "playing" && playingTitle && (
+          <span
+            className="system-bar-link system-bar-current-story"
+            aria-current="page"
+          >
+            {playingTitle}
+          </span>
+        )}
       </nav>
       {children}
       <ThemeSelector theme={theme} onChange={onThemeChange} />

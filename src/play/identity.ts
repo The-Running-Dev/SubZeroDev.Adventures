@@ -10,6 +10,11 @@ export interface Identity {
   readonly playerId: string | null;
   readonly kind: "anonymous" | "guest" | "member";
   readonly displayName: string | null;
+  /** The name `/api/auth/:provider/start` is actually registered under on this deployment
+   *  (server's `identity/registry.ts`), or `null` when nothing is configured. Read from the
+   *  server rather than assumed here, so a deployment's `OIDC_PROVIDER_NAME` can never
+   *  disagree with the URL a player is sent to -- issue #16. */
+  readonly signInProvider: string | null;
 }
 
 export interface CampaignProgress {
@@ -30,6 +35,7 @@ const anonymousIdentity: Identity = {
   playerId: null,
   kind: "anonymous",
   displayName: null,
+  signInProvider: null,
 };
 
 /** Fetches `/api/me` once on mount. `refreshToken` bumps to re-fetch after a sign-in/out
@@ -99,12 +105,11 @@ export function useProgress(
   return progress;
 }
 
-/** The generic OIDC provider slot (server/src/identity/oidc.ts), named "supabase" by this
- *  deployment's `OIDC_PROVIDER_NAME` -- see server/src/routes/identity.ts's
- *  `/api/auth/:provider/start`. Unconfigured is a runtime state the route itself answers
- *  (`oauth_not_configured`), not something this link needs to check for. */
-export function supabaseSignInUrl(apiUrl: string): string {
-  return `${apiUrl}/api/auth/supabase/start`;
+/** Builds the sign-in link for whichever provider `/api/me` reported as configured
+ *  (`Identity.signInProvider`). Callers should check that field is non-null first, so the
+ *  link never points somewhere that can only redirect back with `oauth_not_configured`. */
+export function signInUrl(apiUrl: string, provider: string): string {
+  return `${apiUrl}/api/auth/${provider}/start`;
 }
 
 export async function signOut(apiUrl: string): Promise<void> {

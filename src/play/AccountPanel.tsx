@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { supabaseSignInUrl, signOut, type Identity } from "./identity";
+import { signInUrl, signOut, type Identity } from "./identity";
 
 const AUTH_ERROR_MESSAGES: Readonly<Record<string, string>> = {
   oauth_not_configured: "Sign-in isn't set up on this deployment yet.",
@@ -22,7 +22,7 @@ interface AccountPanelProps {
  * of the guest-first design (server/src/principal.ts) that previously had no UI at all --
  * the OAuth routes and transfer codes existed and worked, but nothing on the page ever
  * told a player they were playing as an anonymous cookie. "Sign In" is the generic OIDC
- * slot (identity.ts's `supabaseSignInUrl`, server/src/identity/oidc.ts) -- deliberately not
+ * slot (identity.ts's `signInUrl`, server/src/identity/oidc.ts) -- deliberately not
  * labeled with a provider name since which one it is is a deployment config choice, not
  * something a player needs to know. A signed-in player is generically
  * `identity.kind === "member"` regardless of which provider they linked.
@@ -121,9 +121,14 @@ export function AccountPanel({
           <span>
             Playing as a guest -- progress lives only in this browser.
           </span>
-          <a className="cabinet-button" href={supabaseSignInUrl(apiUrl)}>
-            Sign In
-          </a>
+          {identity.signInProvider && (
+            <a
+              className="cabinet-button"
+              href={signInUrl(apiUrl, identity.signInProvider)}
+            >
+              Sign In
+            </a>
+          )}
           <button
             className="cabinet-button"
             onClick={() => setTransferOpen((open) => !open)}

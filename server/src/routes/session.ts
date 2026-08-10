@@ -15,6 +15,7 @@ import type { ServerDemo } from "../composition.js";
 import { requirePrincipal, resolvePrincipal, logout } from "../principal.js";
 import { listSavesForPlayer } from "../persistence.js";
 import { OwnershipError, ownedStore } from "../store/ownedStore.js";
+import type { IdentityProvider } from "../identity/provider.js";
 
 const ERROR_STATUS: Record<string, number> = {
   unknown_session: 404,
@@ -48,6 +49,7 @@ export function registerSessionRoutes(
   app: FastifyInstance,
   pool: Pool,
   demo: ServerDemo,
+  identityProviders: ReadonlyMap<string, IdentityProvider>,
 ): void {
   const store: SessionStore = demo.store;
   const auth = requirePrincipal(pool);
@@ -94,14 +96,25 @@ export function registerSessionRoutes(
     summaries: store.listCampaigns(),
   }));
 
+  // `signInProvider` is the name `/api/auth/:provider/start` is actually registered under
+  // (identity/registry.ts), read here rather than assumed by the frontend -- issue #16.
+  // There is only ever one configured provider today; `null` when none is.
+  const signInProvider = identityProviders.keys().next().value ?? null;
+
   app.get("/api/me", { preHandler: resolve }, async (request) => {
     const principal = request.principalOrNull;
     if (!principal)
-      return { playerId: null, kind: "anonymous", displayName: null };
+      return {
+        playerId: null,
+        kind: "anonymous",
+        displayName: null,
+        signInProvider,
+      };
     return {
       playerId: principal.playerId,
       kind: principal.kind,
       displayName: principal.displayName,
+      signInProvider,
     };
   });
 

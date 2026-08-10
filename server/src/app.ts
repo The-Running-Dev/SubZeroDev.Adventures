@@ -70,7 +70,7 @@ export async function buildApp(
 
   const demo = await createServerDemo(pool);
   const identityProviders = await loadIdentityProviders();
-  registerSessionRoutes(app, pool, demo);
+  registerSessionRoutes(app, pool, demo, identityProviders);
   registerReplayRoutes(app, pool, demo);
   registerIdentityRoutes(app, pool, identityProviders, { siteUrl, apiUrl });
   registerProgressRoutes(app, pool, demo);

@@ -544,13 +544,6 @@
   min-height: 6rem;
 }
 
-.briefing-advisory {
-  border-left: 3px solid var(--amber);
-  color: var(--ink);
-  font-size: 0.875rem;
-  padding-left: 0.75rem;
-}
-
 .briefing-actions {
   display: flex;
   flex-wrap: wrap;

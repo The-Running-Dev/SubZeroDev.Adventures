@@ -775,11 +775,6 @@ function PlayAppReady({ demo }: { demo: BrowserDemo }) {
                   <p className="briefing-meta">
                     Estimated duration: {selected.duration}
                   </p>
-                  {selected.contentNotice && (
-                    <p className="briefing-advisory">
-                      {selected.contentNotice}
-                    </p>
-                  )}
                   <div className="briefing-actions">
                     <button
                       className="cabinet-button primary"

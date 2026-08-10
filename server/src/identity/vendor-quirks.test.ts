@@ -13,7 +13,7 @@
  */
 import { describe, expect, it } from "vitest";
 import * as oidc from "openid-client";
-import { clientSecretBasicRaw } from "./oidc.js";
+import { clientSecretBasicRaw } from "./vendor-quirks.js";
 
 // Hyphens are the entire point: they are what `ClientSecretBasic`'s RFC 6749 section 2.3.1
 // encoding escapes, and Supabase issues client ids as UUIDs. A hyphen-free fixture would

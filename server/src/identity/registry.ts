@@ -7,8 +7,15 @@
  * "supabase" today, pointed at the deployment's Supabase Cloud project via
  * `OIDC_ISSUER_URL`. Swapping providers, or adding a second, is an environment-variable
  * change; nothing here names Supabase specifically.
+ *
+ * `OIDC_RAW_BASIC_AUTH` opts into `identity/vendor-quirks.ts`'s non-spec client
+ * authentication, which Supabase Cloud needs and no other issuer is known to. This is the
+ * one place a vendor's name may appear outside `identity/` itself (issue #8), and it does
+ * so only in this comment, not in code -- the variable is generic across any issuer with
+ * the same quirk.
  */
 import { createOidcProvider } from "./oidc.js";
+import { clientSecretBasicRaw } from "./vendor-quirks.js";
 import type { IdentityProvider } from "./provider.js";
 
 export async function loadIdentityProviders(): Promise<
@@ -30,6 +37,9 @@ export async function loadIdentityProviders(): Promise<
         oidcIssuer,
         oidcClientId,
         oidcClientSecret,
+        process.env.OIDC_RAW_BASIC_AUTH
+          ? clientSecretBasicRaw(oidcClientSecret)
+          : undefined,
       ),
     );
   }

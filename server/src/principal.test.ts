@@ -2,7 +2,7 @@
  * `mergePlayers`' achievement carry-over (issue #14). `api.test.ts` covers the
  * transfer-code path through the real HTTP surface; this covers the identity-upgrade merge
  * path directly -- `registerIdentityRoutes` needs a real `IdentityProvider` behind an OAuth
- * round trip that nothing in this repo mocks (`identity/oidc.test.ts`'s header explains why
+ * round trip that nothing in this repo mocks (`identity/vendor-quirks.test.ts`'s header explains why
  * a mock issuer isn't worth adding just for this), so this calls `upgradeViaIdentity` the
  * same way `routes/identity.ts`'s callback does, with a minimal fake
  * `FastifyRequest`/`FastifyReply` standing in for the ones a real request would carry --

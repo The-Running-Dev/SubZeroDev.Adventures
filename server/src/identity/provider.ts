@@ -3,13 +3,10 @@
  * knows whether a given provider speaks OIDC or something else -- `principal.ts` and the
  * routes that drive the sign-in flow only ever see `IdentityProvider`.
  *
- * GitHub does not speak OIDC (no discovery document, no `id_token`) -- "sign in with
- * GitHub" is plain OAuth2 against its own REST API. `github.ts` implements this same
- * interface with GitHub's native mechanics rather than forcing it through OIDC discovery
- * machinery it doesn't support. `oidc.ts` implements it for any real OIDC issuer (the
- * deployment's configured Supabase project, or any mock issuer in a test) via
- * `openid-client`. Provider-specific code lives behind exactly this interface and nowhere
- * else -- a second provider is a second file, not a second design.
+ * `oidc.ts` implements it for any real OIDC issuer (the deployment's configured Supabase
+ * project, or any mock issuer in a test) via `openid-client`. Provider-specific code lives
+ * behind exactly this interface and nowhere else -- a second provider is a second file,
+ * not a second design.
  */
 export interface AuthorizationRequest {
   readonly url: string;

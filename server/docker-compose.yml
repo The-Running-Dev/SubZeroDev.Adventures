@@ -36,7 +36,7 @@ x-adventures-api-dev: &adventures-api-dev
   # The repo-root .env, shared with the deployment file's own `env_file` -- one .env
   # location, one .env.example describing it. Optional here (unlike the deployment file,
   # where it is required) so a fresh clone can bring the stack up with no setup; only the
-  # OAuth upgrade path needs GITHUB_CLIENT_ID/SECRET, and the server treats both as absent
+  # OAuth upgrade path needs OIDC_CLIENT_ID/SECRET, and the server treats both as absent
   # when unset. CAMPAIGNS_DIR is deliberately left unset so this stack exercises
   # composition.ts's default module-relative path, which is what `npm run start` uses too.
   env_file:

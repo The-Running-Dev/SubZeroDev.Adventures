@@ -1,15 +1,10 @@
 import { useState } from "react";
-import {
-  githubSignInUrl,
-  supabaseSignInUrl,
-  signOut,
-  type Identity,
-} from "./identity";
+import { supabaseSignInUrl, signOut, type Identity } from "./identity";
 
 const AUTH_ERROR_MESSAGES: Readonly<Record<string, string>> = {
-  oauth_not_configured: "GitHub sign-in isn't set up on this deployment yet.",
+  oauth_not_configured: "Sign-in isn't set up on this deployment yet.",
   invalid_oauth_state: "That sign-in link expired. Try again.",
-  oauth_token_exchange_failed: "GitHub sign-in failed. Try again.",
+  oauth_token_exchange_failed: "Sign-in failed. Try again.",
 };
 
 interface AccountPanelProps {
@@ -21,8 +16,8 @@ interface AccountPanelProps {
 }
 
 /**
- * Guest -> "Sign in with GitHub" plus a quiet note that progress otherwise lives only in
- * this browser, and a device-transfer code for anyone who doesn't want to sign in at all
+ * Guest -> "Sign In" plus a quiet note that progress otherwise lives only in this browser,
+ * and a device-transfer code for anyone who doesn't want to sign in at all
  * (server/src/routes/transfer.ts). Signed in -> name and sign out. This is the one piece
  * of the guest-first design (server/src/principal.ts) that previously had no UI at all --
  * the OAuth routes and transfer codes existed and worked, but nothing on the page ever
@@ -126,9 +121,6 @@ export function AccountPanel({
           <span>
             Playing as a guest -- progress lives only in this browser.
           </span>
-          <a className="cabinet-button" href={githubSignInUrl(apiUrl)}>
-            Sign in with GitHub
-          </a>
           <a className="cabinet-button" href={supabaseSignInUrl(apiUrl)}>
             Sign In
           </a>

@@ -1,5 +1,5 @@
 /**
- * The account chip's data: `/api/me`, GitHub sign-in/out, and `/api/progress` --
+ * The account chip's data: `/api/me`, sign-in/out, and `/api/progress` --
  * everything PlayApp.tsx needs to show "guest vs signed in" and per-campaign progress.
  * Only ever used in remote mode (`BrowserDemo.apiUrl` set); there is nothing for these to
  * fetch against the local, in-browser store.
@@ -97,10 +97,6 @@ export function useProgress(
   }, [apiUrl, playerId]);
 
   return progress;
-}
-
-export function githubSignInUrl(apiUrl: string): string {
-  return `${apiUrl}/api/auth/github/start`;
 }
 
 /** The generic OIDC provider slot (server/src/identity/oidc.ts), named "supabase" by this

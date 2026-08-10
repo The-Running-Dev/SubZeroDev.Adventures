@@ -45,8 +45,8 @@ export async function buildApp(
   // blog on *.subzerodev.com is same-site, so its POST would still carry this player's
   // cookie. CORS stops that sibling from *reading* the JSON reply, not from making the
   // write, so this closes the gap CORS leaves open. GET is exempt: it's how the OAuth
-  // callback itself arrives, redirected here by github.com, which has no Origin header
-  // reason to match this site.
+  // callback itself arrives, redirected here by the identity provider, which has no
+  // Origin header reason to match this site.
   const siteOrigin = new URL(siteUrl).origin;
   app.addHook("onRequest", async (request, reply) => {
     if (request.method === "GET" || request.method === "HEAD") return;

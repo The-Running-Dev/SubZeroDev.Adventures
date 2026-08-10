@@ -8,7 +8,7 @@ name: Deploy API
 #
 # This repo does not manage the VPS or SSH into it. The Portainer stack (pointed at this
 # repo's root docker-compose.yml) owns its own environment variables -- DB_PASSWORD,
-# GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, and the proxy-net network -- configured directly
+# OIDC_CLIENT_ID, OIDC_CLIENT_SECRET, and the proxy-net network -- configured directly
 # in Portainer's UI, not written by this workflow. The webhook redeploy re-pulls whatever
 # image tag the stack is already configured for (docker-compose.yml defaults
 # ADVENTURES_API_IMAGE to :latest, which this workflow also pushes).

@@ -237,7 +237,7 @@
 
 .archive h1,
 .cabinet h1,
-.briefing h2,
+.dossier-brief h2,
 .status-console h2 {
   font-family: inherit;
   font-weight: 700;
@@ -447,7 +447,14 @@
   text-align: left;
 }
 
-.dossier:nth-child(odd) {
+/*
+ * Column and span are computed in PlayApp.tsx (`index % 2`), not read off DOM position
+ * with `:nth-child` -- the selected tile's folded-open brief (`.dossier-brief`, below) is
+ * inserted as a sibling grid item right after it, which would otherwise shift every
+ * later tile's odd/even parity and flip its border every time a different disk is
+ * selected.
+ */
+.dossier-col-left {
   border-right: 1px solid var(--rule);
 }
 
@@ -455,7 +462,7 @@
  * An odd-numbered catalog (7 today) otherwise leaves the final grid cell empty,
  * which reads as a missing tile rather than the end of the list.
  */
-.dossier:last-child:nth-child(odd) {
+.dossier-span-full {
   border-right: 0;
   grid-column: 1 / -1;
 }
@@ -529,41 +536,34 @@
   color: var(--on-cyan-strong);
 }
 
-.briefing {
-  /*
-   * `start`, not `stretch`: the emblem is a fixed 6rem badge, and stretching it
-   * to match the text column turned it into a 96x318 near-empty box.
-   */
-  align-items: start;
+/*
+ * The selected dossier's briefing, folded open inside the shelf grid instead of as a
+ * separate panel below it -- inserted as a sibling grid item right after the selected
+ * `.dossier` button (PlayApp.tsx) and spanning both columns with `.dossier-span-full`'s
+ * `grid-column: 1 / -1`, so it reads as that tile opening up in place. Deliberately
+ * smaller than the panel it replaces: no emblem, tighter type, an accent-colored rule
+ * standing in for the square badge.
+ */
+.dossier-brief {
   background: var(--surface-raised);
-  border: 2px solid var(--amber);
+  border-left: 3px solid var(--magenta);
   color: var(--muted);
   display: grid;
-  gap: 1.25rem;
-  grid-template-columns: 6rem 1fr;
-  padding: clamp(1rem, 3vw, 1.6rem);
+  gap: 0.6rem;
+  grid-column: 1 / -1;
+  padding: 0.85rem 1rem;
 }
 
-.briefing h2 {
+.dossier-brief h2 {
   color: var(--ink);
-  font-size: clamp(1.35rem, 3vw, 2.2rem);
-  margin: 0.35rem 0;
+  font-size: 1.1rem;
+  margin: 0;
 }
 
-.briefing p {
+.dossier-brief p {
+  font-size: 0.875rem;
   line-height: 1.5;
-}
-
-.briefing-emblem {
-  align-items: center;
-  background: var(--surface-deep);
-  border: 2px solid var(--magenta);
-  box-shadow: 4px 4px 0 var(--shadow-emblem);
-  color: var(--cyan);
-  display: grid;
-  font-size: 2.5rem;
-  justify-content: center;
-  min-height: 6rem;
+  margin: 0;
 }
 
 .briefing-actions {
@@ -1624,7 +1624,7 @@
   left: 0.35rem;
 }
 
-[data-theme="bbs"] .dossier:nth-child(odd) {
+[data-theme="bbs"] .dossier-col-left {
   border-right: 0;
 }
 
@@ -1647,21 +1647,20 @@
   box-shadow: none;
 }
 
-[data-theme="bbs"] .briefing {
+[data-theme="bbs"] .dossier-brief {
   background: none;
-  border: 0;
+  border-left: 0;
   border-top: 1px dashed var(--rule);
-  gap: 0.75rem;
-  grid-template-columns: 1fr;
-  padding: 0.75rem 0 0;
+  gap: 0.6rem;
+  padding: 0.6rem 0 0;
 }
 
-[data-theme="bbs"] .briefing h2 {
-  margin: 0.15rem 0;
+[data-theme="bbs"] .dossier-brief h2 {
+  margin: 0;
 }
 
-[data-theme="bbs"] .briefing,
-[data-theme="bbs"] .briefing p,
+[data-theme="bbs"] .dossier-brief,
+[data-theme="bbs"] .dossier-brief p,
 [data-theme="bbs"] .archive h1,
 [data-theme="bbs"] .cabinet h1,
 [data-theme="bbs"] .status-console,
@@ -1669,12 +1668,8 @@
   overflow-wrap: break-word;
 }
 
-[data-theme="bbs"] .briefing p {
+[data-theme="bbs"] .dossier-brief p {
   line-height: 1.4;
-}
-
-[data-theme="bbs"] .briefing-emblem {
-  display: none;
 }
 
 [data-theme="bbs"] .platform-stats,
@@ -1945,7 +1940,7 @@
     grid-template-columns: 1fr;
   }
 
-  .dossier:nth-child(odd) {
+  .dossier-col-left {
     border-right: 0;
   }
 
@@ -2023,9 +2018,9 @@
     top: 1.35rem;
   }
 
-  .briefing {
-    gap: 0.9rem;
-    padding: 1rem;
+  .dossier-brief {
+    gap: 0.5rem;
+    padding: 0.7rem 0.85rem;
   }
 
   .scene-viewport {
@@ -2112,14 +2107,6 @@
     margin-bottom: 1rem;
   }
 
-  .briefing {
-    grid-template-columns: 1fr;
-  }
-
-  .briefing-emblem {
-    min-height: 3.5rem;
-  }
-
   .arrival-receipt {
     align-items: start;
     flex-direction: column;
@@ -2165,7 +2152,7 @@
   .scene-viewport,
   .status-console,
   .dossier,
-  .briefing,
+  .dossier-brief,
   .action-card button,
   .platform-stats,
   .badge,

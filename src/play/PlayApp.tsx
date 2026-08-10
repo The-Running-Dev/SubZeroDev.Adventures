@@ -1,4 +1,5 @@
 import {
+  Fragment,
   useEffect,
   useMemo,
   useRef,
@@ -733,80 +734,99 @@ function PlayAppReady({ demo }: { demo: BrowserDemo }) {
               </p>
             </div>
             <div className="dossier-grid" aria-label="Story dossiers">
-              {demo.catalog.map((campaign, index) => (
-                <button
-                  className={`dossier ${campaign.featured ? "dossier-featured" : ""} ${selectedId === campaign.campaignId ? "is-selected" : ""}`}
-                  key={campaign.campaignId}
-                  onClick={() => setSelectedId(campaign.campaignId)}
-                  aria-pressed={selectedId === campaign.campaignId}
-                >
-                  <span className="dossier-number">
-                    DISK {String(index + 1).padStart(2, "0")} //{" "}
-                    {campaign.featured ? "FEATURED" : "READY"}
-                  </span>
-                  <strong>{campaign.title}</strong>
-                  <span>{campaign.duration}</span>
-                  {progress.get(campaign.campaignId) && (
-                    <span className="dossier-progress">
-                      {progressLabel(
-                        campaign,
-                        progress.get(campaign.campaignId)!,
-                      )}
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-            {selected && (
-              <section className="briefing" aria-labelledby="briefing-title">
-                <div
-                  className={`briefing-emblem accent-${cabinetThemes[selected.campaignId]?.accent ?? "default"}`}
-                  aria-hidden="true"
-                >
-                  ⌘
-                </div>
-                <div>
-                  <p className="eyebrow">
-                    {cabinetThemes[selected.campaignId]?.eyebrow ??
-                      "UNCLASSIFIED STORY"}
-                  </p>
-                  <h2 id="briefing-title">{selected.title}</h2>
-                  <p>{selected.description}</p>
-                  <p className="briefing-meta">
-                    Estimated duration: {selected.duration}
-                  </p>
-                  <div className="briefing-actions">
+              {demo.catalog.map((campaign, index) => {
+                const isSelected = selectedId === campaign.campaignId;
+                // An odd-numbered catalog's final tile has no partner column, so it
+                // spans both -- and drops the left/right column classing below, which
+                // exists only to alternate a border between adjacent tiles.
+                const isLastOdd =
+                  index === demo.catalog.length - 1 &&
+                  demo.catalog.length % 2 === 1;
+                return (
+                  <Fragment key={campaign.campaignId}>
                     <button
-                      className="cabinet-button primary"
-                      disabled={busy}
-                      onClick={() => void start(selected.campaignId)}
+                      className={[
+                        "dossier",
+                        campaign.featured ? "dossier-featured" : "",
+                        isSelected ? "is-selected" : "",
+                        isLastOdd
+                          ? "dossier-span-full"
+                          : index % 2 === 0
+                            ? "dossier-col-left"
+                            : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                      onClick={() => setSelectedId(campaign.campaignId)}
+                      aria-pressed={isSelected}
+                      aria-expanded={isSelected}
                     >
-                      Load selected adventure
+                      <span className="dossier-number">
+                        DISK {String(index + 1).padStart(2, "0")} //{" "}
+                        {campaign.featured ? "FEATURED" : "READY"}
+                      </span>
+                      <strong>{campaign.title}</strong>
+                      <span>{campaign.duration}</span>
+                      {progress.get(campaign.campaignId) && (
+                        <span className="dossier-progress">
+                          {progressLabel(
+                            campaign,
+                            progress.get(campaign.campaignId)!,
+                          )}
+                        </span>
+                      )}
                     </button>
-                    {demo.findLocalSave(selected.campaignId) && (
-                      <button
-                        className="cabinet-button"
-                        disabled={busy}
-                        onClick={() =>
-                          void resume(
-                            selected.campaignId,
-                            demo.findLocalSave(selected.campaignId)!,
-                          )
-                        }
+                    {isSelected && (
+                      <div
+                        className="dossier-brief"
+                        aria-labelledby={`dossier-brief-title-${campaign.campaignId}`}
                       >
-                        Resume saved run
-                      </button>
+                        <p className="eyebrow">
+                          {cabinetThemes[campaign.campaignId]?.eyebrow ??
+                            "UNCLASSIFIED STORY"}
+                        </p>
+                        <h2 id={`dossier-brief-title-${campaign.campaignId}`}>
+                          {campaign.title}
+                        </h2>
+                        <p>{campaign.description}</p>
+                        <p className="briefing-meta">
+                          Estimated duration: {campaign.duration}
+                        </p>
+                        <div className="briefing-actions">
+                          <button
+                            className="cabinet-button primary"
+                            disabled={busy}
+                            onClick={() => void start(campaign.campaignId)}
+                          >
+                            Load selected adventure
+                          </button>
+                          {demo.findLocalSave(campaign.campaignId) && (
+                            <button
+                              className="cabinet-button"
+                              disabled={busy}
+                              onClick={() =>
+                                void resume(
+                                  campaign.campaignId,
+                                  demo.findLocalSave(campaign.campaignId)!,
+                                )
+                              }
+                            >
+                              Resume saved run
+                            </button>
+                          )}
+                        </div>
+                        <p className="briefing-permalink">
+                          Permanent link:{" "}
+                          <a href={permalinkFor(campaign.campaignId)}>
+                            {permalinkFor(campaign.campaignId)}
+                          </a>
+                        </p>
+                      </div>
                     )}
-                  </div>
-                  <p className="briefing-permalink">
-                    Permanent link:{" "}
-                    <a href={permalinkFor(selected.campaignId)}>
-                      {permalinkFor(selected.campaignId)}
-                    </a>
-                  </p>
-                </div>
-              </section>
-            )}
+                  </Fragment>
+                );
+              })}
+            </div>
           </section>
         ) : (
           <section

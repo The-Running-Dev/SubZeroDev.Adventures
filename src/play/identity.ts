@@ -1,8 +1,9 @@
 /**
- * The account chip's data: `/api/me`, sign-in/out, and `/api/progress` --
- * everything PlayApp.tsx needs to show "guest vs signed in" and per-campaign progress.
- * Only ever used in remote mode (`BrowserDemo.apiUrl` set); there is nothing for these to
- * fetch against the local, in-browser store.
+ * The account chip's data: `/api/me`, sign-in/out, `/api/progress`, `/api/badges`, and the
+ * public `/api/stats` -- everything PlayApp.tsx needs to show "guest vs signed in",
+ * per-campaign progress, cross-campaign badges, and platform-wide numbers. All but
+ * `usePlatformStats` are per-player and only ever used in remote mode (`BrowserDemo.apiUrl`
+ * set); there is nothing for any of these to fetch against the local, in-browser store.
  */
 import { useEffect, useState } from "react";
 
@@ -29,6 +30,21 @@ export interface CampaignProgress {
     readonly total: number;
   };
   readonly achievements: readonly string[];
+}
+
+export interface Badge {
+  readonly badgeId: string;
+  readonly unlockedAt: string;
+}
+
+export interface PlatformStats {
+  readonly players: number;
+  readonly sessions: number;
+  readonly sessionsFinished: number;
+  readonly campaignsPlayed: number;
+  readonly stepsTaken: number;
+  readonly achievementsUnlocked: number;
+  readonly badgesUnlocked: number;
 }
 
 const anonymousIdentity: Identity = {
@@ -103,6 +119,68 @@ export function useProgress(
   }, [apiUrl, playerId]);
 
   return progress;
+}
+
+/** Mirrors `useProgress`'s shape exactly: keyed off `playerId` so it re-fetches after a
+ *  sign-in or transfer merges in a new set, and a no-op returning `[]` in local mode
+ *  where `apiUrl` is undefined -- there is no server to evaluate badges against. */
+export function useBadges(
+  apiUrl: string | undefined,
+  playerId: string | null,
+): readonly Badge[] {
+  const [badges, setBadges] = useState<readonly Badge[]>([]);
+
+  useEffect(() => {
+    if (!apiUrl || !playerId) {
+      setBadges([]);
+      return;
+    }
+    let cancelled = false;
+    fetch(`${apiUrl}/api/badges`, { credentials: "include" })
+      .then((response) => (response.ok ? response.json() : { badges: [] }))
+      .then((body: { badges: Badge[] }) => {
+        if (!cancelled) setBadges(body.badges);
+      })
+      .catch(() => {
+        if (!cancelled) setBadges([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [apiUrl, playerId]);
+
+  return badges;
+}
+
+/** The one public read in this module -- `/api/stats` needs no cookie and no player, so
+ *  no `credentials: "include"` (there's nothing for the server to read off it). Still
+ *  no-ops when `apiUrl` is undefined: local mode has no backend at all (composition.ts),
+ *  so there is nothing to fetch and the caller renders nothing. */
+export function usePlatformStats(
+  apiUrl: string | undefined,
+): PlatformStats | null {
+  const [stats, setStats] = useState<PlatformStats | null>(null);
+
+  useEffect(() => {
+    if (!apiUrl) {
+      setStats(null);
+      return;
+    }
+    let cancelled = false;
+    fetch(`${apiUrl}/api/stats`)
+      .then((response) => (response.ok ? response.json() : null))
+      .then((body: PlatformStats | null) => {
+        if (!cancelled) setStats(body);
+      })
+      .catch(() => {
+        if (!cancelled) setStats(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [apiUrl]);
+
+  return stats;
 }
 
 /** Builds the sign-in link for whichever provider `/api/me` reported as configured

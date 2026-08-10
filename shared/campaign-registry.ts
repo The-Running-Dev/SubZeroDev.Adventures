@@ -25,6 +25,11 @@ export interface StatBounds {
 
 export interface CatalogEntry {
   readonly campaignId: string;
+  /** The engine kind this campaign runs on (`story-graph`, `simulation`, `world-graph` --
+   *  see `KINDS` below). Every shipped campaign today is `story-graph`; read by the
+   *  server's `multiclass` badge (server/src/badges.ts) and available to any client that
+   *  wants to group or filter by kind. */
+  readonly kindId: string;
   readonly title: string;
   readonly description: string;
   readonly duration: string;
@@ -137,6 +142,7 @@ export function buildCatalog(
 
   const all = hydrated.map(({ built, catalog }) => ({
     campaignId: built.campaign.id,
+    kindId: built.campaign.kindId,
     title:
       registry.value!.strings.get(built.campaign.titleKey) ?? catalog.title,
     description: catalog.description,

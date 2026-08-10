@@ -315,6 +315,18 @@ describe("PlayApp cabinet presentation", () => {
     expect(screen.queryByText("UNCLASSIFIED STORY")).not.toBeInTheDocument();
   });
 
+  it("hides platform stats and the record toggle in local mode (no backend to ask)", async () => {
+    render(<PlayApp />);
+    await screen.findByRole("heading", { name: "Adventure disk library" });
+
+    expect(
+      screen.queryByRole("region", { name: "System activity" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Your record" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("offers a resume for a campaign with a local save, and reloads that run", async () => {
     const user = userEvent.setup();
     render(<PlayApp />);

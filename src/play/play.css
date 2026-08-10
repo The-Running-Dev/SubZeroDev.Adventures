@@ -436,6 +436,117 @@
   color: var(--cyan);
 }
 
+/* -- Platform stats, shelf nav, and the signed-in record view -------------------- */
+
+.shelf-nav {
+  display: flex;
+  gap: 0.75rem;
+  margin: 0.5rem 0 1rem;
+}
+
+.platform-stats {
+  background: var(--surface-raised);
+  border: 2px solid var(--rule-strong);
+  margin-bottom: 1.5rem;
+  padding: clamp(1rem, 3vw, 1.6rem);
+}
+
+.platform-stats dl,
+.home-summary {
+  display: grid;
+  gap: 0;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  margin: 0.75rem 0 0;
+}
+
+.platform-stats dl > div,
+.home-summary > div {
+  border-bottom: 1px solid var(--rule-soft);
+  padding: 0.6rem 0.75rem 0.6rem 0;
+  position: relative;
+}
+
+.platform-stats dt,
+.home-summary dt {
+  color: var(--text-dim);
+  font-size: 0.8125rem;
+  letter-spacing: 0.04em;
+  margin: 0 0 0.2rem;
+  text-transform: uppercase;
+}
+
+.platform-stats dd,
+.home-summary dd {
+  color: var(--ink);
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.player-home {
+  margin-top: 1rem;
+}
+
+.home-guest-note {
+  color: var(--text-dim);
+  font-size: 0.875rem;
+}
+
+.badge-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  list-style: none;
+  margin: 1.5rem 0 0;
+  padding: 0;
+}
+
+.badge {
+  background: var(--surface-raised);
+  border: 2px solid var(--cyan);
+  color: var(--ink);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.85rem;
+}
+
+.badge strong {
+  font-size: 0.95rem;
+}
+
+.badge span {
+  color: var(--text-dim);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+.badge-emblem {
+  color: var(--cyan);
+  font-size: 1.25rem;
+}
+
+.badge-stamp {
+  color: var(--text-faint) !important;
+  font-size: 0.75rem !important;
+  letter-spacing: 0.06em;
+  margin-top: auto;
+  text-transform: uppercase;
+}
+
+/* Dimmed, never hidden -- an unearned badge's description is the aspiration, and the
+   `.badge-stamp` text is what keeps "locked" legible once color/opacity are stripped
+   (forced-colors, below) or unavailable (a screen reader). */
+.badge-locked {
+  border-color: var(--rule-strong);
+  filter: saturate(0);
+  opacity: 0.55;
+}
+
+.badge-locked .badge-emblem {
+  color: var(--text-faint);
+}
+
 .cabinet-marquee {
   align-items: center;
   background: var(--surface-raised);
@@ -1279,6 +1390,36 @@
   display: none;
 }
 
+[data-theme="bbs"] .platform-stats,
+[data-theme="bbs"] .player-home .badge {
+  background: none;
+  border: 0;
+}
+
+[data-theme="bbs"] .platform-stats {
+  border-top: 1px dashed var(--rule);
+  border-bottom: 1px dashed var(--rule);
+  padding: 0.75rem 0;
+}
+
+[data-theme="bbs"] .badge-grid {
+  gap: 0;
+  grid-template-columns: 1fr;
+}
+
+[data-theme="bbs"] .player-home .badge {
+  border-bottom: 1px dashed var(--rule);
+  padding: 0.5rem 0;
+}
+
+[data-theme="bbs"] .badge strong::before {
+  content: "[ ";
+}
+
+[data-theme="bbs"] .badge strong::after {
+  content: " ]";
+}
+
 [data-theme="bbs"] .action-deck,
 [data-theme="bbs"] .ending-controls {
   border-top: 1px dashed var(--rule);
@@ -1614,6 +1755,23 @@
     padding-bottom: calc(1.5rem + env(safe-area-inset-bottom));
     padding-inline: var(--page-inline);
   }
+
+  .shelf-nav {
+    flex-direction: column;
+  }
+
+  .shelf-nav .cabinet-button {
+    width: 100%;
+  }
+
+  .platform-stats dl,
+  .home-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .badge-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 389px) {
@@ -1642,6 +1800,15 @@
     align-items: start;
     flex-direction: column;
     gap: 0.3rem;
+  }
+
+  .platform-stats dl,
+  .home-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .badge span {
+    font-size: 0.75rem;
   }
 }
 
@@ -1674,9 +1841,19 @@
   .status-console,
   .dossier,
   .briefing,
-  .action-card button {
+  .action-card button,
+  .platform-stats,
+  .badge {
     border: 2px solid CanvasText;
     box-shadow: none;
+  }
+
+  /* Opacity/saturation are ignored in forced-colors mode, so a locked badge would
+     otherwise be indistinguishable from an unlocked one -- fall back entirely to the
+     `.badge-stamp` LOCKED/UNLOCKED text, which forced-colors leaves untouched. */
+  .badge-locked {
+    filter: none;
+    opacity: 1;
   }
 
   .dossier:focus-visible,

@@ -42,7 +42,7 @@ describeIfDb("server API", () => {
 
   beforeEach(async () => {
     await pool.query(
-      "truncate achievements, auth_sessions, saves, sessions, players restart identity cascade",
+      "truncate badges, achievements, auth_sessions, saves, sessions, players restart identity cascade",
     );
   });
 
@@ -84,6 +84,57 @@ describeIfDb("server API", () => {
 
     const { rows } = await pool.query("select count(*)::int from players");
     expect(rows[0].count).toBe(0);
+  });
+
+  it("serves platform-wide stats with no cookie and mints nothing", async () => {
+    const response = await app.inject({ method: "GET", url: "/api/stats" });
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["set-cookie"]).toBeUndefined();
+    const body = response.json() as Record<string, unknown>;
+    // Guards the ::int casts in stats.ts -- `pg` returns an uncast count as a string.
+    for (const key of [
+      "players",
+      "sessions",
+      "sessionsFinished",
+      "campaignsPlayed",
+      "stepsTaken",
+      "achievementsUnlocked",
+      "badgesUnlocked",
+    ]) {
+      expect(typeof body[key]).toBe("number");
+    }
+    const { rows } = await pool.query("select count(*)::int from players");
+    expect(rows[0].count).toBe(0);
+  });
+
+  it("evaluates badges for a guest and returns an empty list for an anonymous request", async () => {
+    const anonymous = await app.inject({ method: "GET", url: "/api/badges" });
+    expect(anonymous.headers["set-cookie"]).toBeUndefined();
+    expect(anonymous.json()).toEqual({ badges: [] });
+
+    const cookie = await guestCookie();
+    const first = await app.inject({
+      method: "GET",
+      url: "/api/badges",
+      headers: { cookie },
+    });
+    const body = first.json() as {
+      badges: { badgeId: string; unlockedAt: string }[];
+    };
+    expect(body.badges.map((b) => b.badgeId)).toContain("first-steps");
+
+    // Idempotent: re-evaluating doesn't move unlockedAt for a badge already held.
+    const second = await app.inject({
+      method: "GET",
+      url: "/api/badges",
+      headers: { cookie },
+    });
+    const secondBody = second.json() as {
+      badges: { badgeId: string; unlockedAt: string }[];
+    };
+    expect(
+      secondBody.badges.find((b) => b.badgeId === "first-steps")?.unlockedAt,
+    ).toBe(body.badges.find((b) => b.badgeId === "first-steps")?.unlockedAt);
   });
 
   it("lists the campaign catalog", async () => {

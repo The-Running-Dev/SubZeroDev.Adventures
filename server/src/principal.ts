@@ -155,11 +155,14 @@ export async function logout(
 }
 
 /**
- * Re-points every session/save owned by `fromPlayerId` onto `toPlayerId` and deletes the
- * now-empty `fromPlayerId` row, in one transaction. Shared by `upgradeViaIdentity` below
- * and transfer-code redemption (`routes/transfer.ts`) -- both are "fold one player's
- * history into another's" operations, differing only in how the target player is
- * identified. No-ops (does not delete `fromPlayerId`) when the two ids are already equal.
+ * Re-points every session/save owned by `fromPlayerId` onto `toPlayerId`, carries over
+ * achievements and badges (both copied rather than repointed -- see the comments below),
+ * bumps `toPlayerId`'s `merge_count` (009, read by the `frequent-flyer` badge), and
+ * deletes the now-empty `fromPlayerId` row, in one transaction. Shared by
+ * `upgradeViaIdentity` below and transfer-code redemption (`routes/transfer.ts`) -- both
+ * are "fold one player's history into another's" operations, differing only in how the
+ * target player is identified. No-ops (does not delete `fromPlayerId`, does not touch
+ * `merge_count`) when the two ids are already equal.
  */
 export async function mergePlayers(
   pool: Pool,
@@ -191,6 +194,24 @@ export async function mergePlayers(
          from achievements where player_id = $2
        on conflict (player_id, campaign_id, achievement_id) do nothing`,
       [toPlayerId, fromPlayerId],
+    );
+    // Same copy-not-repoint reasoning as achievements above: the primary key is
+    // (player_id, badge_id), so a straight repoint would collide wherever both players
+    // hold the same badge. `unlocked_at` carries over for the same reason -- it is when
+    // the badge was earned, not when this merge happened to run. Otherwise deleted along
+    // with `fromPlayerId`'s row below (`badges.player_id` is `on delete cascade`, 009).
+    await client.query(
+      `insert into badges (player_id, badge_id, unlocked_at)
+       select $1, badge_id, unlocked_at from badges where player_id = $2
+       on conflict (player_id, badge_id) do nothing`,
+      [toPlayerId, fromPlayerId],
+    );
+    // Feeds the `frequent-flyer` badge (server/src/badges.ts). Safe to increment
+    // unconditionally here: the `fromPlayerId === toPlayerId` early return above means a
+    // self-merge no-op never reaches this line.
+    await client.query(
+      `update players set merge_count = merge_count + 1 where player_id = $1`,
+      [toPlayerId],
     );
     await client.query(`delete from players where player_id = $1`, [
       fromPlayerId,

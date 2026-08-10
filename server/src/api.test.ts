@@ -526,4 +526,63 @@ describeIfDb("server API", () => {
     });
     assertOpaque("POST /api/transfer/redeem", redeemed.json());
   });
+
+  // Regression for issue #14: mergePlayers used to repoint sessions and saves but not
+  // achievements, so the foreign key's `on delete cascade` deleted them along with the
+  // merged-away player row. This is the redeeming-device side of that bug -- the
+  // second-device-sign-in side is covered directly in principal.test.ts, since exercising
+  // it through routes/identity.ts needs a real OAuth round trip nothing here mocks.
+  it("carries the redeeming device's achievements through a transfer-code redeem", async () => {
+    const sourceCookie = await guestCookie();
+    const redeemerCookie = await guestCookie();
+
+    const redeemerId = await app
+      .inject({
+        method: "GET",
+        url: "/api/me",
+        headers: { cookie: redeemerCookie },
+      })
+      .then((r) => (r.json() as { playerId: string }).playerId);
+    await pool.query(
+      `insert into achievements (player_id, campaign_id, achievement_id) values ($1, 'test-campaign', 'chapter-one')`,
+      [redeemerId],
+    );
+
+    const created = await app
+      .inject({
+        method: "POST",
+        url: "/api/transfer/create",
+        headers: { cookie: sourceCookie },
+      })
+      .then((r) => r.json() as { code: string });
+
+    const redeemed = await app.inject({
+      method: "POST",
+      url: "/api/transfer/redeem",
+      headers: { cookie: redeemerCookie },
+      payload: { code: created.code },
+    });
+    expect(redeemed.statusCode).toBe(200);
+
+    // rotateSession (principal.ts) deletes the redeemer's old auth_sessions row and issues
+    // a fresh one bound to the merge target, so the *old* cookie no longer resolves to
+    // anything -- has to pick up the Set-Cookie this response just issued, not reuse
+    // redeemerCookie. That new cookie now authenticates as the source player -- the merge
+    // target -- so /api/me is the one place this repo's own rules allow reading playerId
+    // back (see the opacity test above), and the natural way to find where the achievement
+    // should have landed.
+    const mergedId = await app
+      .inject({
+        method: "GET",
+        url: "/api/me",
+        headers: { cookie: cookieFrom(redeemed) },
+      })
+      .then((r) => (r.json() as { playerId: string }).playerId);
+
+    const { rows } = await pool.query(
+      `select achievement_id from achievements where player_id = $1`,
+      [mergedId],
+    );
+    expect(rows.map((row) => row.achievement_id)).toEqual(["chapter-one"]);
+  });
 });

@@ -178,6 +178,20 @@ export async function mergePlayers(
       `update saves set profile_id = $1 where profile_id = $2`,
       [toPlayerId, fromPlayerId],
     );
+    // Copied, not repointed with an `update` like sessions/saves above -- the primary key
+    // is `(player_id, campaign_id, achievement_id)`, so a straight repoint would collide
+    // wherever both players had already unlocked the same achievement. `on conflict do
+    // nothing` collapses that overlap to one row instead of failing the merge.
+    // `unlocked_at` carries over rather than being re-stamped: it records when the player
+    // actually earned it, not when this merge happened to run. Otherwise deleted along
+    // with `fromPlayerId`'s row below (`achievements.player_id` is `on delete cascade`).
+    await client.query(
+      `insert into achievements (player_id, campaign_id, achievement_id, unlocked_at)
+       select $1, campaign_id, achievement_id, unlocked_at
+         from achievements where player_id = $2
+       on conflict (player_id, campaign_id, achievement_id) do nothing`,
+      [toPlayerId, fromPlayerId],
+    );
     await client.query(`delete from players where player_id = $1`, [
       fromPlayerId,
     ]);

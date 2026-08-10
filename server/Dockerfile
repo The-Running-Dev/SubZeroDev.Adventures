@@ -44,6 +44,9 @@ COPY --from=engine /app/engine/src/engine engine/src/engine
 # it, so the engine's node_modules is where Node resolves that import from at runtime.
 RUN npm prune --prefix engine/src/engine --omit=dev
 COPY server/package.json server/package-lock.json server/
+# The service-contract dependency is a vendored tgz (server/package.json), not a registry
+# package -- `npm ci` needs it on disk before it runs, not just the manifests that name it.
+COPY server/vendor server/vendor
 RUN npm ci --prefix server --omit=dev
 
 # ---- build: emit JS ------------------------------------------------------------------
@@ -51,6 +54,9 @@ FROM ${NODE_IMAGE} AS build
 WORKDIR /app
 COPY --from=engine /app/engine/src/engine engine/src/engine
 COPY server/package.json server/package-lock.json server/
+# The service-contract dependency is a vendored tgz (server/package.json), not a registry
+# package -- `npm ci` needs it on disk before it runs, not just the manifests that name it.
+COPY server/vendor server/vendor
 RUN npm ci --prefix server
 # tsc resolves module specifiers the same way Node does, by walking node_modules up
 # through a file's ancestors, so shared/campaign-registry.ts cannot see its sibling's
@@ -73,6 +79,9 @@ FROM ${NODE_IMAGE} AS dev
 WORKDIR /app
 COPY --from=engine /app/engine/src/engine engine/src/engine
 COPY server/package.json server/package-lock.json server/
+# The service-contract dependency is a vendored tgz (server/package.json), not a registry
+# package -- `npm ci` needs it on disk before it runs, not just the manifests that name it.
+COPY server/vendor server/vendor
 RUN npm ci --prefix server
 COPY package.json package.json
 COPY shared shared

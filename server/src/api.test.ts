@@ -29,7 +29,10 @@ describeIfDb("server API", () => {
 
   beforeAll(async () => {
     pool = new Pool({ connectionString: databaseUrl });
-    app = await buildApp(pool, "http://localhost:5173");
+    app = await buildApp(pool, {
+      siteUrl: "http://localhost:5173",
+      apiUrl: "http://localhost:8787",
+    });
   });
 
   afterAll(async () => {
@@ -142,7 +145,10 @@ describeIfDb("server API", () => {
 
     // Discard this store and build a fresh one over the same Postgres -- proves
     // durability, not the in-memory write-through cache.
-    const freshApp = await buildApp(pool, "http://localhost:5173");
+    const freshApp = await buildApp(pool, {
+      siteUrl: "http://localhost:5173",
+      apiUrl: "http://localhost:8787",
+    });
     const resumed = await freshApp.inject({
       method: "POST",
       url: `/api/sessions/${created.sessionId}/resume`,
@@ -154,6 +160,72 @@ describeIfDb("server API", () => {
     const scene = (resumed.json() as { scene: { body: { text: string } } })
       .scene;
     expect(scene.body.text).toContain("Correct");
+  });
+
+  it("refuses one of two concurrent moves against the same session rather than losing it", async () => {
+    const cookie = await guestCookie();
+    const created = await app
+      .inject({
+        method: "POST",
+        url: "/api/sessions",
+        headers: { cookie },
+        payload: {
+          campaignId: "what-would-lucifer-do",
+          seed: "concurrency-seed",
+        },
+      })
+      .then((r) => r.json() as { sessionId: string });
+
+    // Two independent store instances over the same Postgres -- the "two tabs" scenario,
+    // and the shape a second replica would produce. Each has its own in-memory cache and
+    // its own per-session lock, so nothing in-process serializes these two submissions
+    // against each other; only the compare-and-swap in persistence.ts's `sessions.put`
+    // can.
+    const tabA = await buildApp(pool, {
+      siteUrl: "http://localhost:5173",
+      apiUrl: "http://localhost:8787",
+    });
+    const tabB = await buildApp(pool, {
+      siteUrl: "http://localhost:5173",
+      apiUrl: "http://localhost:8787",
+    });
+    try {
+      // Both read the same starting state before either writes, by resuming first --
+      // mirroring two tabs that both loaded the session before either player moved.
+      await tabA.inject({
+        method: "POST",
+        url: `/api/sessions/${created.sessionId}/resume`,
+        headers: { cookie },
+      });
+      await tabB.inject({
+        method: "POST",
+        url: `/api/sessions/${created.sessionId}/resume`,
+        headers: { cookie },
+      });
+
+      const [resultA, resultB] = await Promise.all([
+        tabA.inject({
+          method: "POST",
+          url: `/api/sessions/${created.sessionId}/actions`,
+          headers: { cookie },
+          payload: { actionId: "laugh" },
+        }),
+        tabB.inject({
+          method: "POST",
+          url: `/api/sessions/${created.sessionId}/actions`,
+          headers: { cookie },
+          payload: { actionId: "laugh" },
+        }),
+      ]);
+
+      const statuses = [resultA.statusCode, resultB.statusCode].sort();
+      // Exactly one success, one explicit refusal -- never two 200s (the lost update
+      // this guards against) and never a request that just hangs or times out.
+      expect(statuses).toEqual([200, 503]);
+    } finally {
+      await tabA.close();
+      await tabB.close();
+    }
   });
 
   it("verifies a played session replays byte-identical, and catches a corrupted blob", async () => {
@@ -213,6 +285,75 @@ describeIfDb("server API", () => {
     });
 
     expect(response.statusCode).toBe(403);
+  });
+
+  it("denies a session with no recorded owner to anyone -- not reachable by id alone", async () => {
+    const created = await app
+      .inject({
+        method: "POST",
+        url: "/api/sessions",
+        payload: {
+          campaignId: "what-would-lucifer-do",
+          seed: "unowned-seed",
+        },
+      })
+      .then((r) => r.json() as { sessionId: string });
+
+    await pool.query(
+      "update sessions set profile_id = null where session_id = $1",
+      [created.sessionId],
+    );
+
+    const cookie = await guestCookie();
+    const response = await app.inject({
+      method: "GET",
+      url: `/api/sessions/${created.sessionId}/scene`,
+      headers: { cookie },
+    });
+
+    expect(response.statusCode).toBe(403);
+  });
+
+  it("still 404s a nonexistent session id, rather than the ownership guard preempting it", async () => {
+    const cookie = await guestCookie();
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/sessions/00000000-0000-0000-0000-000000000000/scene",
+      headers: { cookie },
+    });
+
+    expect(response.statusCode).toBe(404);
+  });
+
+  it("denies replay of a session to a player who does not own it", async () => {
+    const ownerCookie = await guestCookie();
+    const created = await app
+      .inject({
+        method: "POST",
+        url: "/api/sessions",
+        headers: { cookie: ownerCookie },
+        payload: {
+          campaignId: "what-would-lucifer-do",
+          seed: "replay-auth-seed",
+        },
+      })
+      .then((r) => r.json() as { sessionId: string });
+
+    const strangerCookie = await guestCookie();
+    const replayResponse = await app.inject({
+      method: "GET",
+      url: `/api/sessions/${created.sessionId}/replay`,
+      headers: { cookie: strangerCookie },
+    });
+    expect(replayResponse.statusCode).toBe(403);
+
+    const branchResponse = await app.inject({
+      method: "POST",
+      url: `/api/sessions/${created.sessionId}/branch`,
+      headers: { cookie: strangerCookie },
+      payload: { atSeq: 0 },
+    });
+    expect(branchResponse.statusCode).toBe(403);
   });
 
   it("branches a session at a past step without mutating the original", async () => {
@@ -283,5 +424,106 @@ describeIfDb("server API", () => {
       })
       .then((r) => r.json());
     expect(stillAfterAction).toEqual(afterActionScene);
+  });
+
+  // The internal `players.player_id` is what keeps the eventual Platform identity handover
+  // (SubZeroDev.Platform design/90-decisions.md) a retrofit rather than a migration -- that
+  // only holds if nothing outside `/api/me` ever echoes it back to the client, in a
+  // response body or a URL, giving a caller something to correlate against another
+  // player's data by. Walks every route that touches a real session/save/transfer, not
+  // just the ones that historically leaked it (routes/transfer.ts's old `{ playerId }` in
+  // its redeem response).
+  it("keeps the internal player identifier out of every response but /api/me", async () => {
+    const cookie = await guestCookie();
+    const me = await app
+      .inject({ method: "GET", url: "/api/me", headers: { cookie } })
+      .then((r) => r.json() as { playerId: string });
+    const playerId = me.playerId;
+    expect(playerId).toBeTruthy();
+
+    const otherCookie = await guestCookie();
+
+    function assertOpaque(label: string, body: unknown): void {
+      expect(JSON.stringify(body), label).not.toContain(playerId);
+    }
+
+    const created = await app
+      .inject({
+        method: "POST",
+        url: "/api/sessions",
+        headers: { cookie },
+        payload: { campaignId: "what-would-lucifer-do", seed: "opaque-seed" },
+      })
+      .then((r) => r.json() as { sessionId: string });
+    assertOpaque("POST /api/sessions", created);
+
+    const sessionId = created.sessionId;
+    const routes: { method: "GET" | "POST"; url: string; payload?: unknown }[] =
+      [
+        { method: "GET", url: "/api/campaigns" },
+        { method: "GET", url: "/api/saves" },
+        { method: "POST", url: `/api/sessions/${sessionId}/resume` },
+        { method: "GET", url: `/api/sessions/${sessionId}/scene` },
+        { method: "GET", url: `/api/sessions/${sessionId}/view` },
+        { method: "GET", url: `/api/sessions/${sessionId}/strings` },
+        {
+          method: "POST",
+          url: `/api/sessions/${sessionId}/actions/preview`,
+          payload: { actionId: "laugh" },
+        },
+        {
+          method: "POST",
+          url: `/api/sessions/${sessionId}/actions`,
+          payload: { actionId: "laugh" },
+        },
+        { method: "POST", url: `/api/sessions/${sessionId}/save` },
+        { method: "GET", url: `/api/sessions/${sessionId}/replay` },
+        { method: "POST", url: `/api/sessions/${sessionId}/replay/verify` },
+        {
+          method: "POST",
+          url: `/api/sessions/${sessionId}/branch`,
+          payload: { atSeq: 0 },
+        },
+      ];
+
+    for (const route of routes) {
+      const response = await app.inject({
+        method: route.method,
+        url: route.url,
+        headers: { cookie },
+        ...(route.payload ? { payload: route.payload } : {}),
+      });
+      assertOpaque(`${route.method} ${route.url}`, response.json());
+      expect(route.url).not.toContain(playerId);
+    }
+
+    const savedFor = await app
+      .inject({ method: "GET", url: "/api/saves", headers: { cookie } })
+      .then((r) => r.json() as { saves: { saveId: string }[] });
+    const saveId = savedFor.saves[0]!.saveId;
+    const loaded = await app.inject({
+      method: "POST",
+      url: `/api/saves/${saveId}/load`,
+      headers: { cookie },
+    });
+    assertOpaque("POST /api/saves/:saveId/load", loaded.json());
+    expect(`/api/saves/${saveId}/load`).not.toContain(playerId);
+
+    const transferCreated = await app
+      .inject({
+        method: "POST",
+        url: "/api/transfer/create",
+        headers: { cookie },
+      })
+      .then((r) => r.json() as { code: string });
+    assertOpaque("POST /api/transfer/create", transferCreated);
+
+    const redeemed = await app.inject({
+      method: "POST",
+      url: "/api/transfer/redeem",
+      headers: { cookie: otherCookie },
+      payload: { code: transferCreated.code },
+    });
+    assertOpaque("POST /api/transfer/redeem", redeemed.json());
   });
 });

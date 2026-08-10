@@ -118,9 +118,30 @@ export function createPostgresPersistence(
         );
         return rows[0] ? toSessionRecord(rows[0]) : undefined;
       },
+      /**
+       * Compare-and-swap on `attempt_counter`, not a new column -- `submitAction`
+       * (`engine/…/core/session/store.ts`) already increments it by exactly 1 on every
+       * write to an *existing* row (`createSession`/`loadGame` only ever `put` a brand
+       * new `sessionId`, never a conflicting one), so it's already the version number
+       * this needs. `on conflict … do update … where` is the standard optimistic-lock
+       * shape: a real insert (new id) is unaffected by the `where`, a legitimate
+       * sequential update matches it and applies, and a write that lost the race --
+       * two tabs, or two store instances behind a future second replica, both starting
+       * from the same `attempt_counter` -- fails to match and is silently *not* applied
+       * (0 rows affected), which the check below turns into a thrown rejection rather
+       * than a merge. That rejection crosses `writeSession`'s `catch { throw
+       * SessionStoreError("session","storage_failure") }` in the engine (out of this
+       * repo's control), so it surfaces to the client as a 503 -- indistinguishable from
+       * a genuine storage outage, but still the one signal that means "re-read and
+       * retry" rather than a silently applied lost update.
+       *
+       * No backfill risk: `attempt_counter` is an existing, already-populated, `not
+       * null` column, so this enforces from the moment it deploys -- there is no new
+       * column that could be null on rows written before this change.
+       */
       async put(record) {
         const progress = deriveProgressColumns(kinds, record.blob);
-        await pool.query(
+        const { rowCount } = await pool.query(
           `insert into sessions (session_id, blob, audience, attempt_counter, replay_compatible, profile_id, created_at, updated_at, campaign_id, status, ending_id, step_count)
            values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
            on conflict (session_id) do update set
@@ -133,7 +154,8 @@ export function createPostgresPersistence(
              campaign_id = excluded.campaign_id,
              status = excluded.status,
              ending_id = excluded.ending_id,
-             step_count = excluded.step_count`,
+             step_count = excluded.step_count
+           where sessions.attempt_counter = excluded.attempt_counter - 1`,
           [
             record.sessionId,
             record.blob,
@@ -149,6 +171,11 @@ export function createPostgresPersistence(
             progress.stepCount,
           ],
         );
+        if (rowCount === 0) {
+          throw new Error(
+            `session store: concurrent write conflict for session "${record.sessionId}" at attempt ${record.attemptCounter}`,
+          );
+        }
       },
     },
     saves: {
@@ -209,27 +236,35 @@ export async function listSavesForPlayer(
   }));
 }
 
-/** Ownership check backing the authorization `preHandler` — the store itself has no
- *  concept of a caller (`getScene(sessionId)` would succeed for anyone holding the id), so
- *  this is the server's own gate, run before any store delegation. */
+/**
+ * Ownership check backing the authorization `preHandler` — the store itself has no
+ * concept of a caller (`getScene(sessionId)` would succeed for anyone holding the id), so
+ * this is the server's own gate, run before any store delegation.
+ *
+ * Returns `undefined` for a row that does not exist at all, distinct from `null` for a
+ * row that exists but carries no `profile_id` — the caller (`store/ownedStore.ts`) needs
+ * to tell those apart: a missing id should still surface as the store's own 404
+ * (`unknown_session`/`unknown_save`), not get preempted by a 403 that implies something
+ * real is being withheld.
+ */
 export async function sessionOwner(
   pool: Pool,
   sessionId: string,
-): Promise<string | null> {
+): Promise<string | null | undefined> {
   const { rows } = await pool.query(
     `select profile_id from sessions where session_id = $1`,
     [sessionId],
   );
-  return rows[0]?.profile_id ?? null;
+  return rows[0] ? (rows[0].profile_id ?? null) : undefined;
 }
 
 export async function saveOwner(
   pool: Pool,
   saveId: string,
-): Promise<string | null> {
+): Promise<string | null | undefined> {
   const { rows } = await pool.query(
     `select profile_id from saves where save_id = $1`,
     [saveId],
   );
-  return rows[0]?.profile_id ?? null;
+  return rows[0] ? (rows[0].profile_id ?? null) : undefined;
 }

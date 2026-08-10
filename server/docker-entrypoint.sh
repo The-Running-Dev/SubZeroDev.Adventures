@@ -21,7 +21,12 @@ migrate)
 	# node-pg-migrate resolves its migrations directory relative to the working directory
 	# and its connection from DATABASE_URL. Both stages set WORKDIR so that `migrations/`
 	# sits directly beneath it, and put node_modules/.bin on PATH.
-	exec node-pg-migrate up
+	node-pg-migrate up
+	# Deterministic upkeep (server/src/maintenance.ts) rides along on the same one-shot
+	# container run rather than a chance-based sweep on the live `serve` path -- see
+	# issue #12. Deliberately unquoted, same reasoning as ADVENTURES_SERVE_CMD above.
+	# shellcheck disable=SC2086
+	exec ${ADVENTURES_MAINTAIN_CMD:?ADVENTURES_MAINTAIN_CMD is not set -- the image is misbuilt}
 	;;
 *)
 	# Anything else is run verbatim, so `docker compose run --rm api sh` and one-off

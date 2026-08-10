@@ -39,26 +39,39 @@ function normalizeCode(raw: string): string {
     .replace(/[^0-9A-Z]/g, "");
 }
 
-// Process-local, best-effort: bounds brute-force attempts against an 8-character code
-// without adding a rate-limit dependency or shared store. Resets on restart and doesn't
-// coordinate across replicas -- acceptable for this deployment's single instance, not a
-// substitute for a real rate limiter if this ever scales out.
+// Bounds brute-force attempts against an 8-character code. Backed by `transfer_redeem_attempts`
+// (migration 008) rather than a process-local Map so the count survives a restart and is
+// shared between replicas -- two copies counting the same IP separately would each let
+// through REDEEM_MAX_ATTEMPTS, not REDEEM_MAX_ATTEMPTS combined.
 const REDEEM_WINDOW_MS = 1000 * 60 * 10;
 const REDEEM_MAX_ATTEMPTS = 20;
-const redeemAttempts = new Map<
-  string,
-  { count: number; windowStart: number }
->();
 
-function redeemAllowed(ip: string): boolean {
-  const now = Date.now();
-  const entry = redeemAttempts.get(ip);
-  if (!entry || now - entry.windowStart > REDEEM_WINDOW_MS) {
-    redeemAttempts.set(ip, { count: 1, windowStart: now });
-    return true;
-  }
-  entry.count += 1;
-  return entry.count <= REDEEM_MAX_ATTEMPTS;
+/**
+ * One upsert, not a read-then-write -- two requests from the same IP racing each other
+ * (across replicas or in the same process) both go through this statement and Postgres
+ * serializes the conflicting writes, so neither can observe a stale count the other has
+ * already moved past.
+ */
+async function redeemAllowed(pool: Pool, ip: string): Promise<boolean> {
+  const windowStart = new Date(Date.now() - REDEEM_WINDOW_MS);
+  const { rows } = await pool.query(
+    `insert into transfer_redeem_attempts (ip, count, window_start)
+     values ($1, 1, now())
+     on conflict (ip) do update set
+       count = case
+         when transfer_redeem_attempts.window_start <= $2
+           then 1
+           else transfer_redeem_attempts.count + 1
+         end,
+       window_start = case
+         when transfer_redeem_attempts.window_start <= $2
+           then now()
+           else transfer_redeem_attempts.window_start
+         end
+     returning count`,
+    [ip, windowStart.toISOString()],
+  );
+  return (rows[0].count as number) <= REDEEM_MAX_ATTEMPTS;
 }
 
 export function registerTransferRoutes(app: FastifyInstance, pool: Pool): void {
@@ -81,7 +94,7 @@ export function registerTransferRoutes(app: FastifyInstance, pool: Pool): void {
     "/api/transfer/redeem",
     { preHandler: auth },
     async (request, reply) => {
-      if (!redeemAllowed(request.ip)) {
+      if (!(await redeemAllowed(pool, request.ip))) {
         reply.code(429);
         return {
           error: { operation: "transfer_redeem", code: "rate_limited" },
@@ -146,7 +159,9 @@ export function registerTransferRoutes(app: FastifyInstance, pool: Pool): void {
       await mergePlayers(pool, currentPlayerId, sourcePlayerId);
       await rotateSession(pool, request, reply, sourcePlayerId);
 
-      return { ok: true, playerId: sourcePlayerId };
+      // `playerId` deliberately not echoed here -- the internal player identifier is only
+      // ever surfaced through `/api/me` (issue #12).
+      return { ok: true };
     },
   );
 }

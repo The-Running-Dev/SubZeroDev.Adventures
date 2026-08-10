@@ -88,6 +88,7 @@ RUN ln -s server/node_modules node_modules
 WORKDIR /app/server
 ENV PATH=/app/server/node_modules/.bin:$PATH
 ENV ADVENTURES_SERVE_CMD="tsx src/index.ts"
+ENV ADVENTURES_MAINTAIN_CMD="tsx src/maintenance-cli.ts"
 # CAMPAIGNS_DIR is deliberately unset: this target runs composition.ts from its source
 # location, where the module-relative default already resolves to /app/public/campaigns.
 COPY server/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
@@ -135,6 +136,7 @@ ENV PATH=/app/server/node_modules/.bin:$PATH
 # down inside dist/. Kept here rather than in a package.json script so the layout stays a
 # property of the image and never leaks into either compose file.
 ENV ADVENTURES_SERVE_CMD="node dist/server/src/index.js"
+ENV ADVENTURES_MAINTAIN_CMD="node dist/server/src/maintenance-cli.js"
 # Required, not optional: composition.ts's module-relative default is computed from
 # dist/server/src/ here, which is not where the campaign JSON went.
 ENV CAMPAIGNS_DIR=/app/public/campaigns

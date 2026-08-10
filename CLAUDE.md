@@ -104,24 +104,32 @@ than flattening it, for two reasons that are easy to break and hard to diagnose:
   same line for the same reason. The `runtime` target needs no symlink only because it puts
   `dist/` _under_ `server/`, making `server/node_modules` a genuine ancestor.
 
-Campaign JSON is the exception: `server/src/composition.ts` finds it module-relative by
-default, which stops being true once tsc moves the module, so the `runtime` target sets
-`CAMPAIGNS_DIR` to an absolute path instead of contorting its layout to match.
+Campaign JSON is the exception: `server/src/campaigns/source.ts`'s disk-backed
+`CampaignSource` finds it module-relative by default, which stops being true once tsc moves
+the module, so the `runtime` target sets `CAMPAIGNS_DIR` to an absolute path instead of
+contorting its layout to match.
 
 ## Visual Baselines — The One Real Gotcha
 
-`src/play/browser/__screenshots__/visual-baseline.browser.test.tsx/` holds 32 PNGs: 16
-snapshots × two platform suffixes (`chromium-win32`, `chromium-linux`). **CI runs on
-`ubuntu-latest` with Playwright's managed Chromium** — only the `-linux` set is ever compared
-there. If a UI change legitimately changes rendered output, regenerate locally:
+`src/play/browser/__screenshots__/visual-baseline.browser.test.tsx/` holds 16 PNGs, one per
+snapshot, all suffixed `chromium-linux`. **CI runs on `ubuntu-latest` with Playwright's
+managed Chromium** and that `-linux` set is the only baseline the repo maintains — no
+`chromium-win32` set is committed. `vitest.browser.config.ts` excludes
+`visual-baseline.browser.test.tsx` from the run when `os.platform() === "win32"` (checked at
+config load, in Node — the spec file itself also runs inside the real browser tab it tests
+in, where there is no equivalent platform check), so running `npm run test:browser` natively
+on Windows silently skips these specs instead of failing on baselines that don't exist for
+that platform. That means a Windows contributor gets no local visual-regression signal before
+pushing — the tradeoff for not having to keep two baseline sets in sync — so treat CI as the
+first real check for a visual change made on Windows.
+
+If a UI change legitimately changes rendered output, regenerate the `chromium-linux` set from
+Windows (there is no other set to regenerate) by running it inside a Linux container so the
+pixels actually match what CI will compare against:
 
 ```bash
 npm run test:browser:update
 ```
-
-This updates whichever platform suffix matches your machine. To regenerate the
-`chromium-linux` set from Windows (needed before most PRs, since CI only checks that set),
-run it inside a Linux container so the pixels actually match what CI will compare against.
 
 **Use a plain `node:24` image with `playwright install --with-deps`, not the
 `mcr.microsoft.com/playwright` image** — its bundled Chromium build renders text a few
@@ -137,6 +145,33 @@ docker run --rm -v "${PWD}:/w" -w /w node:24 \
 
 Commit both the regenerated PNGs and the source change together — a screenshot diff with no
 accompanying code change, or vice versa, is a review red flag.
+
+## The Identity Seam — A Contract Platform Is Building From
+
+`SubZeroDev.Platform` is designing its own identity package by reading this repo's, not
+in the abstract (`SubZeroDev.Platform` `design/90-decisions.md`,
+The-Running-Dev/SubZeroDev.Platform#90). That only holds if these five properties keep
+holding — they're about staying _readable as a contract_, a different goal from staying
+correct, and one that can erode without any test failing. Check a change against these
+before assuming server-side identity/session work is done:
+
+- Adding a sign-in provider is a new file implementing `IdentityProvider`
+  (`server/src/identity/provider.ts`), not a new design. `server/src/identity/oidc.ts` is
+  the one provider today, fully generic — no vendor named in its code.
+- There is exactly one place a request becomes a player: `requirePrincipal`/
+  `resolvePrincipal` in `server/src/principal.ts`. Nothing else mints or resolves one.
+- No provider name (`github`, `supabase`, …) appears outside `server/src/identity/` or
+  environment configuration — `server/src/identity/registry.ts` assembles providers from
+  env vars, naming Supabase only in a comment. A grep for a vendor name landing in
+  `principal.ts` or a route file is a regression, unless it's prose explaining history (as
+  in `principal.ts`'s comments on the old GitHub-specific column).
+- Nothing durable about a player's permissions or access is stored in the session cookie —
+  it carries an opaque token; `auth_sessions` is looked up fresh on every request.
+- Accounts are matched on `(provider, subject)` (`migrations/007_identities.sql`'s primary
+  key), never on email — there is no email column on `identities`.
+- Ownership is enforced at a store decorator (`server/src/store/ownedStore.ts`), not
+  per-route — this was the one property that didn't hold as of issue #6; keep it that way
+  rather than letting a new guarded route reach back for a per-route preHandler instead.
 
 ## House Conventions
 

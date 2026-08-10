@@ -4,7 +4,7 @@
  * delegation, no game logic in the adapter. Plus `/api/campaigns`, `/api/me`,
  * `/api/auth/logout`, and `/api/saves`, which the store contract has no operation for.
  */
-import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { Pool } from "pg";
 import {
   SessionStoreError,
@@ -13,7 +13,8 @@ import {
 } from "@the-running-dev/game-engine";
 import type { ServerDemo } from "../composition.js";
 import { requirePrincipal, resolvePrincipal, logout } from "../principal.js";
-import { listSavesForPlayer, saveOwner, sessionOwner } from "../persistence.js";
+import { listSavesForPlayer } from "../persistence.js";
+import { OwnershipError, ownedStore } from "../store/ownedStore.js";
 
 const ERROR_STATUS: Record<string, number> = {
   unknown_session: 404,
@@ -32,26 +33,14 @@ function statusFor(code: string): number {
 
 /**
  * Authorization is the server's job, not the engine's -- `SessionStore.getScene(id)`
- * would succeed for anyone holding the id. Runs before any store delegation, on every
- * route that references an existing `:id`.
+ * would succeed for anyone holding the id. Attaches a store decorated for the calling
+ * principal (`store/ownedStore.ts`) so every route below reaches session/save data only
+ * through a store that already enforces ownership, rather than through a check a route
+ * has to remember to attach for itself.
  */
-function ownershipGuard(pool: Pool, kind: "session" | "save") {
-  return async (
-    request: FastifyRequest,
-    reply: FastifyReply,
-  ): Promise<void> => {
-    const params = request.params as { id?: string; saveId?: string };
-    const id = kind === "session" ? params.id : params.saveId;
-    if (!id) return;
-    const owner =
-      kind === "session"
-        ? await sessionOwner(pool, id)
-        : await saveOwner(pool, id);
-    if (owner !== null && owner !== request.principal.playerId) {
-      await reply
-        .code(403)
-        .send({ error: { operation: kind, code: "forbidden" } });
-    }
+function attachStore(pool: Pool, store: SessionStore) {
+  return async (request: FastifyRequest): Promise<void> => {
+    request.store = ownedStore(store, pool, request.principal.playerId);
   };
 }
 
@@ -65,8 +54,15 @@ export function registerSessionRoutes(
   // Read-only: resolves an existing session but never mints a guest row, so a bare GET
   // from a crawler or a logged-out browser doesn't grow the `players` table.
   const resolve = resolvePrincipal(pool);
+  const owned = attachStore(pool, store);
 
   app.setErrorHandler((error, request, reply) => {
+    if (error instanceof OwnershipError) {
+      reply.code(403);
+      return reply.send({
+        error: { operation: error.operation, code: "forbidden" },
+      });
+    }
     if (error instanceof SessionStoreError) {
       reply.code(statusFor(error.code));
       return reply.send({
@@ -134,62 +130,66 @@ export function registerSessionRoutes(
 
   app.post(
     "/api/sessions/:id/resume",
-    { preHandler: [auth, ownershipGuard(pool, "session")] },
+    { preHandler: [auth, owned] },
     async (request) => {
       const { id } = request.params as { id: string };
-      const scene = await store.resumeSession(id);
+      const scene = await request.store.resumeSession(id);
       return { sessionId: id, scene };
     },
   );
 
   app.get(
     "/api/sessions/:id/scene",
-    { preHandler: [auth, ownershipGuard(pool, "session")] },
-    async (request) => store.getScene((request.params as { id: string }).id),
+    { preHandler: [auth, owned] },
+    async (request) =>
+      request.store.getScene((request.params as { id: string }).id),
   );
 
   app.get(
     "/api/sessions/:id/view",
-    { preHandler: [auth, ownershipGuard(pool, "session")] },
-    async (request) => store.getView((request.params as { id: string }).id),
+    { preHandler: [auth, owned] },
+    async (request) =>
+      request.store.getView((request.params as { id: string }).id),
   );
 
   app.get(
     "/api/sessions/:id/strings",
-    { preHandler: [auth, ownershipGuard(pool, "session")] },
-    async (request) => store.getStrings((request.params as { id: string }).id),
+    { preHandler: [auth, owned] },
+    async (request) =>
+      request.store.getStrings((request.params as { id: string }).id),
   );
 
   app.post(
     "/api/sessions/:id/actions/preview",
-    { preHandler: [auth, ownershipGuard(pool, "session")] },
+    { preHandler: [auth, owned] },
     async (request) => {
       const { id } = request.params as { id: string };
       const body = request.body as { actionId: string; params?: ActionParams };
-      return store.previewAction(id, body.actionId, body.params);
+      return request.store.previewAction(id, body.actionId, body.params);
     },
   );
 
   app.post(
     "/api/sessions/:id/actions",
-    { preHandler: [auth, ownershipGuard(pool, "session")] },
+    { preHandler: [auth, owned] },
     async (request) => {
       const { id } = request.params as { id: string };
       const body = request.body as { actionId: string; params?: ActionParams };
-      return store.submitAction(id, body.actionId, body.params);
+      return request.store.submitAction(id, body.actionId, body.params);
     },
   );
 
   app.post(
     "/api/sessions/:id/save",
-    { preHandler: [auth, ownershipGuard(pool, "session")] },
-    async (request) => store.saveGame((request.params as { id: string }).id),
+    { preHandler: [auth, owned] },
+    async (request) =>
+      request.store.saveGame((request.params as { id: string }).id),
   );
 
   app.post(
     "/api/saves/:saveId/load",
-    { preHandler: [auth, ownershipGuard(pool, "save")] },
+    { preHandler: [auth, owned] },
     async (request) =>
-      store.loadGame((request.params as { saveId: string }).saveId),
+      request.store.loadGame((request.params as { saveId: string }).saveId),
   );
 }

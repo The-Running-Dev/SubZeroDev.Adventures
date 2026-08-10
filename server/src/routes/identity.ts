@@ -30,9 +30,8 @@ export function registerIdentityRoutes(
   app: FastifyInstance,
   pool: Pool,
   providers: ReadonlyMap<string, IdentityProvider>,
+  { siteUrl, apiUrl }: { siteUrl: string; apiUrl: string },
 ): void {
-  const siteUrl = process.env.SITE_URL ?? "http://localhost:5173";
-  const apiUrl = process.env.API_URL ?? "http://localhost:8787";
   const auth = requirePrincipal(pool);
 
   app.get(

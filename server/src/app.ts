@@ -11,11 +11,19 @@ import { registerProgressRoutes } from "./routes/progress.js";
 import { registerTransferRoutes } from "./routes/transfer.js";
 import { loadIdentityProviders } from "./identity/registry.js";
 
+/** The one place this server reads deployment configuration from -- `index.ts` is the only
+ *  caller that reads `process.env` and passes the result in here (issue #12); everything
+ *  below, including `routes/identity.ts`, takes it as a parameter instead. */
+export interface AppConfig {
+  readonly siteUrl: string;
+  readonly apiUrl: string;
+}
+
 /** Builds the wired Fastify instance without binding a port -- shared by `index.ts`
  *  (which calls `listen`) and the test suite (which uses `app.inject()`). */
 export async function buildApp(
   pool: Pool,
-  siteUrl: string,
+  { siteUrl, apiUrl }: AppConfig,
 ): Promise<FastifyInstance> {
   const app = Fastify({ logger: process.env.NODE_ENV !== "test" });
 
@@ -64,7 +72,7 @@ export async function buildApp(
   const identityProviders = await loadIdentityProviders();
   registerSessionRoutes(app, pool, demo);
   registerReplayRoutes(app, pool, demo);
-  registerIdentityRoutes(app, pool, identityProviders);
+  registerIdentityRoutes(app, pool, identityProviders, { siteUrl, apiUrl });
   registerProgressRoutes(app, pool, demo);
   registerTransferRoutes(app, pool);
 

@@ -3,16 +3,13 @@
  * `createBrowserDemo`, but reading campaign JSON off disk instead of over `fetch`, and
  * handed a Postgres-backed `SessionPersistence` instead of `localPersistence()`.
  */
-import { readFile } from "node:fs/promises";
-import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
 import type { Pool } from "pg";
 import {
   createEngine,
   createInMemorySessionStore,
+  defaultRecordIdSource,
   type Engine,
-  type PortableCampaign,
-  type PortableManifest,
+  type RecordIdSource,
   type SessionStore,
 } from "@the-running-dev/game-engine";
 import {
@@ -22,31 +19,10 @@ import {
 } from "../../shared/campaign-registry.js";
 import { createPostgresPersistence } from "./persistence.js";
 import { createPostgresProfileStore } from "./profile-store.js";
-
-const here = dirname(fileURLToPath(import.meta.url));
-// The same generated, committed JSON the browser fetches at runtime (CLAUDE.md, "Campaign
-// Content"), read off disk here instead of over HTTP.
-//
-// The default is module-relative -- server/src/composition.ts -> ../../public/campaigns --
-// which holds for `npm run start`, for vitest, and for the Dockerfile's `dev` target,
-// since all three run this file from its source location. It does not hold once tsc emits
-// the module somewhere else, so the runtime image sets CAMPAIGNS_DIR to an absolute path
-// rather than arranging its layout to satisfy a relative one that is invisible from the
-// Dockerfile. See server/Dockerfile.
-const campaignsDir =
-  process.env.CAMPAIGNS_DIR ?? join(here, "..", "..", "public", "campaigns");
-
-async function readJson<T>(fileName: string): Promise<T> {
-  const raw = await readFile(join(campaignsDir, fileName), "utf8");
-  return JSON.parse(raw) as T;
-}
-
-async function loadPortableCampaigns(): Promise<readonly PortableCampaign[]> {
-  const manifest = await readJson<PortableManifest>("manifest.json");
-  return Promise.all(
-    manifest.campaigns.map((fileName) => readJson<PortableCampaign>(fileName)),
-  );
-}
+import {
+  createDiskCampaignSource,
+  type CampaignSource,
+} from "./campaigns/source.js";
 
 export interface ServerDemo {
   readonly all: readonly CatalogEntry[];
@@ -68,12 +44,24 @@ export interface ServerDemo {
    * every call.
    */
   createReplayEngine(gameId: string): Engine;
+  /**
+   * The same `RecordIdSource` `store` is built with -- exposed so `routes/replay.ts`'s
+   * `branch` can mint its new session id through the engine's own identifier source
+   * rather than calling `randomUUID()` on the side (issue #11). Branch still writes to
+   * `persistence.sessions.put` directly instead of through `SessionStore`, since there is
+   * no store operation for it yet; this only closes the id-minting half.
+   */
+  readonly recordIds: RecordIdSource;
 }
 
-export async function createServerDemo(pool: Pool): Promise<ServerDemo> {
-  const portables = await loadPortableCampaigns();
+export async function createServerDemo(
+  pool: Pool,
+  campaignSource: CampaignSource = createDiskCampaignSource(),
+): Promise<ServerDemo> {
+  const portables = await campaignSource.load();
   const { registry, all } = buildCatalog(portables);
   const engine = createEngine({ kinds: KINDS, registry });
+  const recordIds = defaultRecordIdSource;
 
   return {
     all,
@@ -93,11 +81,13 @@ export async function createServerDemo(pool: Pool): Promise<ServerDemo> {
           },
         },
       }),
+    recordIds,
     store: createInMemorySessionStore({
       engine,
       registry,
       persistence: createPostgresPersistence(pool, KINDS),
       profiles: createPostgresProfileStore(pool),
+      recordIds,
     }),
   };
 }

@@ -482,6 +482,11 @@ function PlayAppReady({ demo }: { demo: BrowserDemo }) {
     const saveId = demo.findLocalSave(requested);
     if (saveId) void resume(requested, saveId);
     else void start(requested);
+    // `start` and `resume` are intentionally excluded below: this effect must fire once
+    // on mount (guarded by `autoStarted`), and both functions are redefined every render,
+    // so including them would either force this disable anyway or reintroduce the
+    // repeated-start bug the ref exists to prevent.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [demo]);
 
   async function start(id: string) {

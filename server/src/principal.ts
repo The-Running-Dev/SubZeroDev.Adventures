@@ -59,11 +59,6 @@ async function createGuest(pool: Pool): Promise<Principal> {
   return toPrincipal(rows[0]);
 }
 
-// Expired auth_sessions rows are otherwise only ever filtered, never deleted -- there is
-// no cron in this deployment to do it separately. Sweeping on ~1% of issues bounds the
-// table's growth without adding a delete to the hot path of every session mint.
-const SWEEP_SAMPLE_RATE = 0.01;
-
 async function issueSession(
   pool: Pool,
   reply: FastifyReply,
@@ -75,9 +70,9 @@ async function issueSession(
     `insert into auth_sessions (token_hash, player_id, expires_at) values ($1, $2, $3)`,
     [hashToken(token), playerId, expiresAt],
   );
-  if (Math.random() < SWEEP_SAMPLE_RATE) {
-    await pool.query(`delete from auth_sessions where expires_at <= now()`);
-  }
+  // Expired rows are otherwise only ever filtered, never deleted -- swept deterministically
+  // by `maintenance.ts`, run once per deploy from the one-shot migrate container
+  // (docker-entrypoint.sh), not by chance here on the hot path of every session mint.
   reply.setCookie(SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",

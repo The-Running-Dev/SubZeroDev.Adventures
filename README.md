@@ -13,7 +13,10 @@ npm run dev
 ```
 
 See [`CLAUDE.md`](CLAUDE.md) for the engine submodule contract, campaign content generation,
-and how to regenerate the visual-regression baselines.
+and how to regenerate the visual-regression baselines. See
+[`docs/player-model.md`](docs/player-model.md) for what a player keeps across campaigns —
+what's per-player vs. per-campaign, `display_name`'s provenance, how `/api/progress`
+derives its numbers, and what each cross-device path preserves.
 
 ## Scripts
 

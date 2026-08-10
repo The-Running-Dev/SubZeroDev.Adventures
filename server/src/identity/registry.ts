@@ -8,11 +8,16 @@
  * `OIDC_ISSUER_URL`. Swapping providers, or adding a second, is an environment-variable
  * change; nothing here names Supabase specifically.
  *
- * `OIDC_RAW_BASIC_AUTH` opts into `identity/vendor-quirks.ts`'s non-spec client
- * authentication, which Supabase Cloud needs and no other issuer is known to. This is the
- * one place a vendor's name may appear outside `identity/` itself (issue #8), and it does
- * so only in this comment, not in code -- the variable is generic across any issuer with
- * the same quirk.
+ * `identity/vendor-quirks.ts`'s non-spec client authentication is the *default* here,
+ * deliberately -- Supabase Cloud is the only issuer this deployment has ever pointed at,
+ * and defaulting the other way once already broke production sign-in silently (issue #15
+ * flipped the default to spec-compliant behind a new opt-in var, and the deployment's
+ * environment was never updated to set it -- the exact encoding regression `a2faa88` and
+ * `69317ee` had already fixed and pinned, back from the dead). `OIDC_SPEC_COMPLIANT_BASIC_AUTH`
+ * opts *out* of the quirk for a future issuer configured through this same adapter that
+ * doesn't need it, rather than requiring every deployment to opt in to keep working. This
+ * is the one place a vendor's name may appear outside `identity/` itself (issue #8), and
+ * it does so only in this comment, not in code.
  */
 import { createOidcProvider } from "./oidc.js";
 import { clientSecretBasicRaw } from "./vendor-quirks.js";
@@ -37,9 +42,9 @@ export async function loadIdentityProviders(): Promise<
         oidcIssuer,
         oidcClientId,
         oidcClientSecret,
-        process.env.OIDC_RAW_BASIC_AUTH
-          ? clientSecretBasicRaw(oidcClientSecret)
-          : undefined,
+        process.env.OIDC_SPEC_COMPLIANT_BASIC_AUTH
+          ? undefined
+          : clientSecretBasicRaw(oidcClientSecret),
       ),
     );
   }

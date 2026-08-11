@@ -35,6 +35,12 @@ export interface AppConfig {
    *  `createServerDemo`'s own `campaignSource` parameter is (#12) -- so this file never
    *  has to know which kind it got. */
   readonly campaignSource?: CampaignSource;
+  /** Content to boot from when the *first* build off `campaignSource` fails -- see
+   *  `content-cell.ts`'s `ready`. `index.ts` passes the committed disk snapshot. Undefined
+   *  keeps the strict posture (a failed first build throws), which is what a test wants:
+   *  there, a build that fails is the thing under test, not an operator locked out of
+   *  their own server. */
+  readonly bootstrapSource?: CampaignSource;
   /** `provider:subject` pairs, matched against a signed-in principal's linked identities
    *  (`identities` table) to gate `/api/admin/*`. No provider name is ever typed into this
    *  file or `routes/admin.ts` -- these are opaque strings from configuration, the same
@@ -51,6 +57,7 @@ export async function buildApp(
     siteUrl,
     apiUrl,
     campaignSource = createDiskCampaignSource(),
+    bootstrapSource,
     adminSubjects = [],
   }: AppConfig,
 ): Promise<FastifyInstance> {
@@ -101,7 +108,12 @@ export async function buildApp(
   const { cell, ready } = createContentCell(() =>
     createServerDemo(pool, campaignSource),
   );
-  await ready();
+  // The fallback covers the *first* build only, and it exists so unusable content an
+  // operator added cannot keep the server from starting -- the admin routes below are the
+  // only way to remove that content, so they have to come up. See `ready`.
+  await ready(
+    bootstrapSource ? () => createServerDemo(pool, bootstrapSource) : undefined,
+  );
   registerHealthRoute(app, pool, cell);
   const identityProviders = await loadIdentityProviders();
   registerSessionRoutes(app, pool, cell, identityProviders);

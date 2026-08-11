@@ -44,6 +44,7 @@ interface AdminContentStatus {
     readonly lastSuccessAt?: string;
     readonly lastFailureAt?: string;
     readonly lastError?: string;
+    readonly bootstrapFallback?: boolean;
   };
   readonly campaigns: readonly AdminCampaignStatus[];
   readonly extensions: readonly AdminExtensionStatus[];
@@ -367,6 +368,17 @@ export function AdminPanel({
               </>
             )}
           </dl>
+
+          {adminStatus?.status.bootstrapFallback && (
+            // The server started, but not from its own sources -- without saying so, the
+            // catalog above looks like a normal one and the failure above looks historical.
+            <p className="admin-notice admin-notice-warn" role="status">
+              This server booted from the committed snapshot because its first
+              build failed, and no sync has succeeded since. What is listed
+              below is the snapshot, not what these sources say. Fix or remove
+              the source named in the failure reason, then Sync.
+            </p>
+          )}
 
           {statusError !== undefined && (
             <p className="admin-error" role="alert">

@@ -14,6 +14,9 @@ export interface ContentStatus {
   readonly lastSuccessAt: string | undefined;
   readonly lastFailureAt: string | undefined;
   readonly lastError: string | undefined;
+  /** The server booted from `ready`'s fallback because the real build failed, and no refresh
+   *  has succeeded since. What is being served is not what the configured sources say. */
+  readonly bootstrapFallback: boolean;
 }
 
 export interface RefreshResult {
@@ -37,15 +40,31 @@ export interface ContentCell {
  *  `CampaignSource`; it only knows how to publish or reject a rebuild. */
 export function createContentCell(build: () => Promise<ServerDemo>): {
   cell: ContentCell;
-  /** Runs `build` once and publishes it before returning -- `app.ts` awaits this so the
-   *  server never serves an unpopulated cell. */
-  ready(): Promise<void>;
+  /**
+   * Runs `build` once and publishes it before returning -- `app.ts` awaits this so the
+   * server never serves an unpopulated cell.
+   *
+   * `fallbackBuild` is what keeps content an operator added from being able to *brick* the
+   * server rather than merely fail a refresh. #22's rule ("a bad rebuild must not take the
+   * server down") held for every rebuild after the first and nowhere else: one unusable
+   * source -- a pasted extension that collides with its base campaign, say -- failed the
+   * very first build, `ready` threw, the process exited before binding a port, and the only
+   * surface that could have removed that source was the API that never came up. Under
+   * `restart: unless-stopped` that is a crash loop with no way in but psql.
+   *
+   * So a failed first build now boots from `fallbackBuild` (the committed disk snapshot,
+   * `index.ts`) instead of throwing, keeping `lastError` and `bootstrapFallback` set so the
+   * admin page can say what happened and let an operator fix it the ordinary way. Only if
+   * the fallback fails too is there genuinely nothing to serve, and that throws.
+   */
+  ready(fallbackBuild?: () => Promise<ServerDemo>): Promise<void>;
 } {
   let demo: ServerDemo | undefined;
   let inFlight: Promise<RefreshResult> | undefined;
   let lastSuccessAt: string | undefined;
   let lastFailureAt: string | undefined;
   let lastError: string | undefined;
+  let bootstrapFallback = false;
 
   async function doRefresh(): Promise<RefreshResult> {
     try {
@@ -53,6 +72,7 @@ export function createContentCell(build: () => Promise<ServerDemo>): {
       demo = next;
       lastSuccessAt = new Date().toISOString();
       lastError = undefined;
+      bootstrapFallback = false;
       return { ok: true };
     } catch (error) {
       lastFailureAt = new Date().toISOString();
@@ -84,16 +104,33 @@ export function createContentCell(build: () => Promise<ServerDemo>): {
         lastSuccessAt,
         lastFailureAt,
         lastError,
+        bootstrapFallback,
       };
     },
   };
 
   return {
     cell,
-    async ready() {
+    async ready(fallbackBuild) {
       const result = await refresh();
-      if (!result.ok)
+      if (result.ok) return;
+      if (!fallbackBuild)
         throw new Error(`initial content build failed: ${result.error}`);
+      try {
+        demo = await fallbackBuild();
+        bootstrapFallback = true;
+      } catch (fallbackError) {
+        // Both the real content and the snapshot that stands in for it are unusable, so
+        // there is nothing to serve at all -- the one case where refusing to start is
+        // still right. Both reasons, because the second one alone explains nothing.
+        const message =
+          fallbackError instanceof Error
+            ? fallbackError.message
+            : String(fallbackError);
+        throw new Error(
+          `initial content build failed: ${result.error} (the bootstrap fallback failed too: ${message})`,
+        );
+      }
     },
   };
 }

@@ -29,11 +29,56 @@ describe("content cell", () => {
     expect(cell.status().lastSuccessAt).toBeDefined();
   });
 
-  it("rejects an initial build that fails", async () => {
+  it("rejects an initial build that fails with no fallback to boot from", async () => {
     const { ready } = createContentCell(async () => {
       throw new Error("boom");
     });
     await expect(ready()).rejects.toThrow(/boom/);
+  });
+
+  // The production failure this exists for: content an operator pasted made the first build
+  // fail, `ready` threw, the process exited before binding a port, and the admin API that
+  // could have removed that content was the thing that never came up.
+  it("boots from the fallback when the initial build fails, and says so", async () => {
+    const { cell, ready } = createContentCell(async () => {
+      throw new Error("extension collides with its base campaign");
+    });
+
+    await ready(async () => fakeDemo(9));
+
+    expect(cell.current().all.length).toBe(9);
+    const status = cell.status();
+    expect(status.bootstrapFallback).toBe(true);
+    expect(status.lastError).toMatch(/collides with its base campaign/);
+    // Never "succeeded" -- what is serving is the snapshot, not the configured content.
+    expect(status.lastSuccessAt).toBeUndefined();
+  });
+
+  it("clears the bootstrap flag once a later refresh succeeds", async () => {
+    let broken = true;
+    const { cell, ready } = createContentCell(async () => {
+      if (broken) throw new Error("still broken");
+      return fakeDemo(4);
+    });
+    await ready(async () => fakeDemo(9));
+    expect(cell.status().bootstrapFallback).toBe(true);
+
+    broken = false;
+    expect(await cell.refresh()).toEqual({ ok: true });
+    expect(cell.status().bootstrapFallback).toBe(false);
+    expect(cell.current().all.length).toBe(4);
+  });
+
+  it("throws with both reasons when the fallback fails too", async () => {
+    const { ready } = createContentCell(async () => {
+      throw new Error("real content is broken");
+    });
+
+    await expect(
+      ready(async () => {
+        throw new Error("no snapshot either");
+      }),
+    ).rejects.toThrow(/real content is broken.*no snapshot either/);
   });
 
   it("keeps serving the previous demo when a refresh fails, and records the failure", async () => {

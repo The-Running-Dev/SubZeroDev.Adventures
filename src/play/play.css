@@ -2274,6 +2274,23 @@
   opacity: 0.6;
 }
 
+/* Same shape as .admin-error, deliberately -- an operator reads these two in the same place
+   for the same reason. Only the colour differs, because only the meaning does: a notice is
+   "this worked", not "this failed". The warn variant is the middle case, where the source
+   was saved and something else is keeping the catalog from going live. */
+.admin-notice {
+  background: var(--notice-bg);
+  border-left: 3px solid var(--cyan);
+  color: var(--notice-text);
+  font-size: 0.8rem;
+  margin: 1rem 0 0;
+  padding: 0.6rem 0.9rem;
+}
+
+.admin-notice-warn {
+  border-left-color: var(--amber);
+}
+
 .admin-error {
   background: var(--danger-bg);
   border-left: 3px solid var(--danger-border);

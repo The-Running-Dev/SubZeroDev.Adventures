@@ -325,6 +325,49 @@ describeIfDb("/api/admin/content/sources", () => {
     }
   });
 
+  // The difference an operator has to be able to see: a refresh is fail-closed across every
+  // source, so a perfectly good paste lands on a failed refresh whenever some *other* source
+  // is broken. `source.lastError` is what distinguishes that from "your paste is broken" --
+  // it must be absent here even though `refresh.ok` is false.
+  it("reports the added source's own outcome, not just the whole refresh's", async () => {
+    const admin = await adminCookie();
+    const broken = await app.inject({
+      method: "POST",
+      url: "/api/admin/content/sources",
+      headers: { cookie: admin },
+      payload: {
+        kind: "url",
+        label: "unreachable",
+        url: "http://127.0.0.1:1/",
+      },
+    });
+    expect(broken.statusCode).toBe(201);
+    const brokenBody = broken.json() as {
+      source: { lastError?: string };
+      refresh: { ok: boolean };
+    };
+    expect(brokenBody.refresh.ok).toBe(false);
+    expect(brokenBody.source.lastError).toBeDefined();
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/admin/content/sources",
+      headers: { cookie: admin },
+      payload: {
+        kind: "pasted",
+        payload: minimalPortableCampaign("late-campaign"),
+      },
+    });
+    expect(response.statusCode).toBe(201);
+    const body = response.json() as {
+      source: { lastError?: string; campaignCount?: number };
+      refresh: { ok: boolean; error?: string };
+    };
+    expect(body.refresh.ok).toBe(false);
+    expect(body.source.lastError).toBeUndefined();
+    expect(body.source.campaignCount).toBe(1);
+  });
+
   it("adds a pasted campaign with an auto-derived label", async () => {
     const admin = await adminCookie();
     const payload = minimalPortableCampaign("pasted-campaign");

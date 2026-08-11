@@ -74,6 +74,23 @@ export async function listContentSources(
   return rows.map(toRow);
 }
 
+/** One row by id, or `undefined` if it's gone. `routes/admin.ts` re-reads a row it just
+ *  inserted with this, after the refresh that followed the insert: the insert's own
+ *  `returning` predates `recordSourceOutcome`, so it cannot say whether *this* source
+ *  loaded -- which is the difference between "your paste is broken" and "your paste is
+ *  fine, some other source is broken". */
+export async function getContentSource(
+  pool: Pool,
+  sourceId: string,
+): Promise<ContentSourceRow | undefined> {
+  const { rows } = await pool.query<ContentSourceDbRow>(
+    `select ${SELECT_COLUMNS} from content_sources where source_id = $1`,
+    [sourceId],
+  );
+  const row = rows[0];
+  return row ? toRow(row) : undefined;
+}
+
 export async function addUrlSource(
   pool: Pool,
   label: string,

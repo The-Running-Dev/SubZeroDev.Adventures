@@ -4,10 +4,12 @@
  * "admin" -- the allowlist checks `(provider, subject)` rows, never a stored role, so that
  * is the only way to become one.
  */
+import { createServer, type Server } from "node:http";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Pool } from "pg";
 import type { FastifyInstance } from "fastify";
 import { buildApp } from "../app.js";
+import { createMultiSourceCampaignSource } from "../campaigns/multi-source.js";
 
 const databaseUrl = process.env.DATABASE_URL;
 const describeIfDb = databaseUrl ? describe : describe.skip;
@@ -20,6 +22,86 @@ function cookieFrom(response: { headers: Record<string, unknown> }): string {
   if (typeof value !== "string")
     throw new Error("no Set-Cookie header in response");
   return value.split(";")[0]!;
+}
+
+/** A minimal but fully valid story-graph `PortableCampaign` -- same shape proven against
+ *  `buildValidatedContentRegistry` in `shared/campaign-extension.test.ts`'s own fixture,
+ *  parameterized by id so each mock server below can serve a distinct one. */
+function minimalPortableCampaign(id: string) {
+  return {
+    formatVersion: 1,
+    catalog: {
+      title: id,
+      description: "d",
+      duration: "5 min",
+      contentNotice: "none",
+      featured: false,
+    },
+    campaign: {
+      id,
+      kindId: "story-graph",
+      version: "1.0.0",
+      titleKey: `${id}.title`,
+      content: {
+        descriptionKey: `${id}.description`,
+        variables: {},
+        nodes: {
+          start: {
+            id: "start",
+            kind: "choice",
+            textKey: `${id}.start.text`,
+            choices: [{ id: "go", labelKey: `${id}.start.go`, goto: "end" }],
+          },
+          end: {
+            id: "end",
+            kind: "ending",
+            textKey: `${id}.end.text`,
+            endingId: "end",
+          },
+        },
+        startNodeId: "start",
+        achievements: [],
+      },
+    },
+    strings: {
+      [`${id}.title`]: id,
+      [`${id}.description`]: "d",
+      [`${id}.start.text`]: "You are at the start.",
+      [`${id}.start.go`]: "Go to the end",
+      [`${id}.end.text`]: "The end.",
+    },
+  };
+}
+
+/** Serves one `manifest.json` + the campaign files it lists, matching what
+ *  `createHttpCampaignSource` expects -- a local stand-in for a real content host. */
+function startCampaignServer(
+  campaignIds: readonly string[],
+): Promise<{ server: Server; url: string }> {
+  const files: Record<string, unknown> = {
+    "/manifest.json": {
+      formatVersion: 1,
+      campaigns: campaignIds.map((id) => `${id}.json`),
+    },
+  };
+  for (const id of campaignIds) {
+    files[`/${id}.json`] = minimalPortableCampaign(id);
+  }
+  return new Promise((resolve) => {
+    const server = createServer((request, response) => {
+      const body = files[request.url ?? "/"];
+      response.writeHead(body === undefined ? 404 : 200, {
+        "content-type": "application/json",
+      });
+      response.end(body === undefined ? "" : JSON.stringify(body));
+    });
+    server.listen(0, "127.0.0.1", () => {
+      const address = server.address();
+      if (address === null || typeof address === "string")
+        throw new Error("expected a bound TCP address");
+      resolve({ server, url: `http://127.0.0.1:${address.port}/` });
+    });
+  });
 }
 
 describeIfDb("/api/admin/content", () => {
@@ -124,5 +206,267 @@ describeIfDb("/api/admin/content", () => {
       headers: { cookie: admin },
     });
     expect((adminStatus.json() as { isAdmin: boolean }).isAdmin).toBe(true);
+  });
+});
+
+describeIfDb("/api/admin/content/sources", () => {
+  let pool: Pool;
+  let app: FastifyInstance;
+  let builtinServer: Server;
+
+  beforeAll(async () => {
+    pool = new Pool({ connectionString: databaseUrl });
+    const builtin = await startCampaignServer(["builtin-campaign"]);
+    builtinServer = builtin.server;
+    app = await buildApp(pool, {
+      siteUrl: "http://localhost:5173",
+      apiUrl: "http://localhost:8787",
+      adminSubjects: [ADMIN_SUBJECT],
+      campaignSource: createMultiSourceCampaignSource(pool, {
+        id: "builtin-test",
+        label: "builtin test source",
+        kind: "url",
+        url: builtin.url,
+      }),
+    });
+  });
+
+  afterAll(async () => {
+    await app.close();
+    await pool.end();
+    await new Promise((resolve) => builtinServer.close(resolve));
+  });
+
+  beforeEach(async () => {
+    await pool.query(
+      "truncate content_sources, badges, achievements, identities, auth_sessions, saves, sessions, players restart identity cascade",
+    );
+  });
+
+  // No campaign this app's builtin source serves is a valid `POST /api/sessions`
+  // `campaignId` for every test below, so a cookie is minted the same way `requireAdmin`
+  // itself does it for an anonymous caller: `requirePrincipal` mints and sets the cookie
+  // before the allowlist check ever runs, so the 403 body doesn't matter here.
+  async function cookie(): Promise<string> {
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/admin/content/refresh",
+    });
+    return cookieFrom(response);
+  }
+
+  async function adminCookie(): Promise<string> {
+    const c = await cookie();
+    const me = await app.inject({
+      method: "GET",
+      url: "/api/me",
+      headers: { cookie: c },
+    });
+    const { playerId } = me.json() as { playerId: string };
+    const [provider, subject] = ADMIN_SUBJECT.split(":");
+    await pool.query(
+      `insert into identities (provider, subject, player_id) values ($1, $2, $3)`,
+      [provider, subject, playerId],
+    );
+    return c;
+  }
+
+  it("lists the builtin source, not removable, alongside the real catalog", async () => {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/admin/content/status",
+    });
+    const body = response.json() as {
+      sources: { id: string; builtin: boolean; removable: boolean }[];
+    };
+    expect(body.sources).toEqual([
+      expect.objectContaining({
+        id: "builtin-test",
+        builtin: true,
+        removable: false,
+      }),
+    ]);
+  });
+
+  it("adds a URL source, refreshes automatically, and the merged catalog shows it", async () => {
+    const admin = await adminCookie();
+    const added = await startCampaignServer(["second-campaign"]);
+    try {
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/admin/content/sources",
+        headers: { cookie: admin },
+        payload: { kind: "url", label: "second", url: added.url },
+      });
+      expect(response.statusCode).toBe(201);
+      const body = response.json() as {
+        source: { id: string; label: string };
+        refresh: { ok: boolean };
+      };
+      expect(body.refresh.ok).toBe(true);
+
+      const status = await app.inject({
+        method: "GET",
+        url: "/api/admin/content/status",
+      });
+      const statusBody = status.json() as {
+        campaigns: { campaignId: string }[];
+        sources: { id: string; campaignCount?: number }[];
+      };
+      expect(
+        statusBody.campaigns.some((c) => c.campaignId === "second-campaign"),
+      ).toBe(true);
+      const addedSource = statusBody.sources.find(
+        (s) => s.id === body.source.id,
+      );
+      expect(addedSource?.campaignCount).toBe(1);
+    } finally {
+      await new Promise((resolve) => added.server.close(resolve));
+    }
+  });
+
+  it("adds a pasted campaign with an auto-derived label", async () => {
+    const admin = await adminCookie();
+    const payload = minimalPortableCampaign("pasted-campaign");
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/admin/content/sources",
+      headers: { cookie: admin },
+      payload: { kind: "pasted", payload },
+    });
+
+    expect(response.statusCode).toBe(201);
+    const body = response.json() as {
+      source: { label: string };
+      refresh: { ok: boolean };
+    };
+    expect(body.source.label).toBe("pasted-campaign");
+    expect(body.refresh.ok).toBe(true);
+  });
+
+  it("adds a pasted extension whose choice is selectable in a live session", async () => {
+    const admin = await adminCookie();
+    const extension = {
+      formatVersion: 1,
+      id: "test-extension",
+      extends: "builtin-campaign",
+      nodes: {
+        side_quest: {
+          id: "side_quest",
+          kind: "ending",
+          textKey: "ext.side_quest.text",
+          endingId: "side_quest",
+        },
+      },
+      addChoices: [
+        {
+          nodeId: "start",
+          choice: {
+            id: "take_side_quest",
+            labelKey: "ext.side_quest.label",
+            goto: "side_quest",
+          },
+        },
+      ],
+      strings: {
+        "ext.side_quest.text": "A side quest.",
+        "ext.side_quest.label": "Take the side quest",
+      },
+    };
+
+    const added = await app.inject({
+      method: "POST",
+      url: "/api/admin/content/sources",
+      headers: { cookie: admin },
+      payload: { kind: "pasted", payload: extension },
+    });
+    expect((added.json() as { refresh: { ok: boolean } }).refresh.ok).toBe(
+      true,
+    );
+
+    const created = await app.inject({
+      method: "POST",
+      url: "/api/sessions",
+      headers: { cookie: admin },
+      payload: { campaignId: "builtin-campaign" },
+    });
+    const { sessionId } = created.json() as { sessionId: string };
+
+    const result = await app.inject({
+      method: "POST",
+      url: `/api/sessions/${sessionId}/actions`,
+      headers: { cookie: admin },
+      payload: { actionId: "take_side_quest" },
+    });
+    expect(result.statusCode).toBe(200);
+  });
+
+  it("rejects a pasted payload that is neither a campaign nor an extension", async () => {
+    const admin = await adminCookie();
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/admin/content/sources",
+      headers: { cookie: admin },
+      payload: { kind: "pasted", payload: { nonsense: true } },
+    });
+    expect(response.statusCode).toBe(400);
+  });
+
+  it("refuses to remove the builtin source", async () => {
+    const admin = await adminCookie();
+    const response = await app.inject({
+      method: "DELETE",
+      url: "/api/admin/content/sources/builtin-test",
+      headers: { cookie: admin },
+    });
+    expect(response.statusCode).toBe(400);
+  });
+
+  it("removes an added source", async () => {
+    const admin = await adminCookie();
+    const payload = minimalPortableCampaign("removable-campaign");
+    const added = await app.inject({
+      method: "POST",
+      url: "/api/admin/content/sources",
+      headers: { cookie: admin },
+      payload: { kind: "pasted", payload },
+    });
+    const { source } = added.json() as { source: { id: string } };
+
+    const removed = await app.inject({
+      method: "DELETE",
+      url: `/api/admin/content/sources/${source.id}`,
+      headers: { cookie: admin },
+    });
+    expect(removed.statusCode).toBe(200);
+
+    const status = await app.inject({
+      method: "GET",
+      url: "/api/admin/content/status",
+    });
+    const statusBody = status.json() as { sources: { id: string }[] };
+    expect(statusBody.sources.some((s) => s.id === source.id)).toBe(false);
+  });
+
+  it("refuses add/remove from a non-admin, same as refresh", async () => {
+    const guest = await cookie();
+    const addResponse = await app.inject({
+      method: "POST",
+      url: "/api/admin/content/sources",
+      headers: { cookie: guest },
+      payload: {
+        kind: "pasted",
+        payload: minimalPortableCampaign("unauthorized-campaign"),
+      },
+    });
+    expect(addResponse.statusCode).toBe(403);
+
+    const removeResponse = await app.inject({
+      method: "DELETE",
+      url: "/api/admin/content/sources/builtin-test",
+      headers: { cookie: guest },
+    });
+    expect(removeResponse.statusCode).toBe(403);
   });
 });

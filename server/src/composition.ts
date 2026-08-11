@@ -79,14 +79,17 @@ export async function createServerDemo(
   pool: Pool,
   campaignSource: CampaignSource = createDiskCampaignSource(),
 ): Promise<ServerDemo> {
-  const portables = await campaignSource.load();
-  const { registry, all } = buildCatalog(portables);
+  const [portables, extensions] = await Promise.all([
+    campaignSource.load(),
+    campaignSource.loadExtensions(),
+  ]);
+  const { registry, all } = buildCatalog(portables, extensions);
   const engine = createEngine({ kinds: KINDS, registry });
   const recordIds = defaultRecordIdSource;
 
   return {
     all,
-    contentDigest: digestOf(portables),
+    contentDigest: digestOf([portables, extensions]),
     catalog: all.filter((campaign) => !campaign.hidden),
     findCampaign: (campaignId) =>
       all.find((campaign) => campaign.campaignId === campaignId),

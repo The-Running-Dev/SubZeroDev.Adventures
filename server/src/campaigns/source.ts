@@ -9,13 +9,17 @@
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import type {
-  PortableCampaign,
-  PortableManifest,
-} from "@the-running-dev/game-engine";
+import type { PortableCampaign } from "@the-running-dev/game-engine";
+import {
+  type PortableExtension,
+  type PortableManifestWithExtensions,
+} from "../../../shared/campaign-extension.js";
 
 export interface CampaignSource {
   load(): Promise<readonly PortableCampaign[]>;
+  /** Extension JSON (issue #27) -- absent from the manifest means none, returned as `[]`
+   *  rather than the caller having to treat "no extensions" as a special case. */
+  loadExtensions(): Promise<readonly PortableExtension[]>;
 }
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -44,10 +48,20 @@ export function createDiskCampaignSource(dir?: string): CampaignSource {
 
   return {
     async load() {
-      const manifest = await readJson<PortableManifest>("manifest.json");
+      const manifest =
+        await readJson<PortableManifestWithExtensions>("manifest.json");
       return Promise.all(
         manifest.campaigns.map((fileName) =>
           readJson<PortableCampaign>(fileName),
+        ),
+      );
+    },
+    async loadExtensions() {
+      const manifest =
+        await readJson<PortableManifestWithExtensions>("manifest.json");
+      return Promise.all(
+        (manifest.extensions ?? []).map((fileName) =>
+          readJson<PortableExtension>(fileName),
         ),
       );
     },
@@ -109,10 +123,20 @@ export function createHttpCampaignSource(
 
   return {
     async load() {
-      const manifest = await readJson<PortableManifest>("manifest.json");
+      const manifest =
+        await readJson<PortableManifestWithExtensions>("manifest.json");
       return Promise.all(
         manifest.campaigns.map((fileName) =>
           readJson<PortableCampaign>(fileName),
+        ),
+      );
+    },
+    async loadExtensions() {
+      const manifest =
+        await readJson<PortableManifestWithExtensions>("manifest.json");
+      return Promise.all(
+        (manifest.extensions ?? []).map((fileName) =>
+          readJson<PortableExtension>(fileName),
         ),
       );
     },

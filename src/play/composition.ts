@@ -3,7 +3,6 @@ import {
   createInMemorySessionStore,
   type CampaignSummary,
   type PortableCampaign,
-  type PortableManifest,
   type SessionPersistence,
   type StoredSaveRecord,
   type SessionStore,
@@ -14,6 +13,10 @@ import {
   type CatalogEntry,
   type StatBounds,
 } from "../../shared/campaign-registry";
+import {
+  type PortableExtension,
+  type PortableManifestWithExtensions,
+} from "../../shared/campaign-extension";
 import { createRemoteSessionStore, fetchSaveIndex } from "./remote-store";
 
 export type { StatBounds };
@@ -114,9 +117,24 @@ async function fetchJson<T>(path: string): Promise<T> {
 }
 
 async function loadPortableCampaigns(): Promise<readonly PortableCampaign[]> {
-  const manifest = await fetchJson<PortableManifest>("manifest.json");
+  const manifest =
+    await fetchJson<PortableManifestWithExtensions>("manifest.json");
   return Promise.all(
     manifest.campaigns.map((fileName) => fetchJson<PortableCampaign>(fileName)),
+  );
+}
+
+// Local mode is never the deployed configuration (CLAUDE.md, "Why the merge has to happen
+// at content level" -- `deploy.yml` always sets `VITE_API_URL`), but the unit test suite
+// forces it (`vite.config.ts`), so it still has to exercise extension merging honestly
+// rather than silently skip it.
+async function loadPortableExtensions(): Promise<readonly PortableExtension[]> {
+  const manifest =
+    await fetchJson<PortableManifestWithExtensions>("manifest.json");
+  return Promise.all(
+    (manifest.extensions ?? []).map((fileName) =>
+      fetchJson<PortableExtension>(fileName),
+    ),
   );
 }
 
@@ -133,8 +151,11 @@ export interface BrowserDemo {
 }
 
 async function createLocalBrowserDemo(): Promise<BrowserDemo> {
-  const portables = await loadPortableCampaigns();
-  const { registry, all } = buildCatalog(portables);
+  const [portables, extensions] = await Promise.all([
+    loadPortableCampaigns(),
+    loadPortableExtensions(),
+  ]);
+  const { registry, all } = buildCatalog(portables, extensions);
 
   return {
     catalog: Object.freeze(all.filter((campaign) => !campaign.hidden)),

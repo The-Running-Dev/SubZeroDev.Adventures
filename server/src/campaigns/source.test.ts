@@ -63,6 +63,45 @@ describe("createHttpCampaignSource", () => {
     ]);
   });
 
+  it("loads no extensions when the manifest declares none", async () => {
+    const manifest = { formatVersion: 1, campaigns: [] };
+    const started = await startServer((path) =>
+      path === "/manifest.json"
+        ? { status: 200, body: manifest }
+        : { status: 404 },
+    );
+    server = started.server;
+
+    const source = createHttpCampaignSource(started.url);
+    expect(await source.loadExtensions()).toEqual([]);
+  });
+
+  it("loads every extension the manifest lists", async () => {
+    const manifest = {
+      formatVersion: 1,
+      campaigns: [],
+      extensions: ["ext-a.json"],
+    };
+    const extension = {
+      formatVersion: 1,
+      id: "ext-a",
+      extends: "a",
+      nodes: {},
+    };
+    const files: Record<string, unknown> = {
+      "/manifest.json": manifest,
+      "/ext-a.json": extension,
+    };
+    const started = await startServer((path) => ({
+      status: 200,
+      body: files[path],
+    }));
+    server = started.server;
+
+    const source = createHttpCampaignSource(started.url);
+    expect(await source.loadExtensions()).toEqual([extension]);
+  });
+
   it("throws rather than returning a partial catalog when one file 404s", async () => {
     const manifest = {
       formatVersion: 1,

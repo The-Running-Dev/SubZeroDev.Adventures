@@ -300,8 +300,7 @@ export function AdminPanel({
         // anymore), a 404 (already gone), or a network failure all used to be swallowed
         // silently here, which reads identically to the button doing nothing at all.
         const json = (await response.json().catch(() => undefined)) as
-          | { error?: { code?: string } }
-          | undefined;
+          { error?: { code?: string } } | undefined;
         throw new Error(
           json?.error?.code
             ? `${response.status} (${json.error.code})`

@@ -25,17 +25,23 @@ const pool = new Pool({ connectionString: databaseUrl });
 // It is not admin-editable and carries no `CAMPAIGNS_DIR`/env override: the way to point a
 // deployment somewhere else is to add another source, not to change this one.
 //
-// `The-Running-Dev/SubZeroDev.Adventures.Content` does not exist yet as of this writing --
-// every *refresh* fails-closed and reports that until it does, same as any other broken
-// source; `withBootstrapFallback` (multi-source.ts) is only what keeps that from also
-// blocking the very first boot, by falling back to the committed disk snapshot exactly
-// once, on the first `load()`, if the real source fails.
+// `The-Running-Dev/SubZeroDev.Adventures.Content` does not exist yet as of this writing, so
+// this source 404s on every load. Its `fallback` is what keeps that from making the whole
+// server unpublishable: it degrades to the committed disk snapshot -- the same content this
+// URL is meant to serve -- and the refresh goes through, so content an operator adds through
+// the admin page actually goes live instead of being saved behind a source that cannot
+// succeed. The failure is still reported, on the builtin's own row.
+//
+// `withBootstrapFallback` stays for the case the above does not cover: a *DB-added* source
+// that is broken at boot. That one still fails the refresh, correctly, and this keeps it
+// from taking the process down before it binds a port.
 const campaignSource = withBootstrapFallback(
   createMultiSourceCampaignSource(pool, {
     id: "builtin-default",
     label: "SubZeroDev.Adventures.Content",
     kind: "url",
     url: "https://the-running-dev.github.io/SubZeroDev.Adventures.Content/",
+    fallback: createDiskCampaignSource(),
   }),
   createDiskCampaignSource(),
 );

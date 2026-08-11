@@ -10,6 +10,16 @@
  * serving. `Promise.allSettled` (not `Promise.all`) is what makes that failure attributable
  * to the row that caused it instead of an opaque "something failed" -- each source's own
  * outcome is recorded (`recordSourceOutcome`) whether the overall refresh succeeds or not.
+ *
+ * The one exception is an entry carrying a `fallback` -- only the hardcoded builtin does
+ * (`index.ts`), and its fallback is the committed disk snapshot the repository ships anyway.
+ * That entry degrades to its fallback instead of failing the refresh. This is not a hole in
+ * the rule above: the rule exists so a *smaller* catalog never ships silently, and the
+ * snapshot is the same content the builtin URL is meant to serve, so the catalog stays whole
+ * and the failure stays visible (`degraded`, surfaced as the builtin row's `lastError`).
+ * Without it, an operator cannot publish anything at all -- every paste and every added URL
+ * is saved but permanently unpublishable -- for as long as one unremovable source that does
+ * not exist yet keeps 404ing.
  */
 import type { Pool } from "pg";
 import type { PortableCampaign } from "@the-running-dev/game-engine";
@@ -31,13 +41,21 @@ export interface SourceEntry {
   readonly kind: "url" | "pasted";
   readonly url?: string;
   readonly payload?: unknown;
+  /** Content to serve in this entry's place when its own load fails, instead of failing the
+   *  refresh. Only the builtin has one; a DB-backed row never does, and nothing lets an
+   *  operator give a row one. */
+  readonly fallback?: CampaignSource;
 }
 
 export interface EntryOutcome {
   readonly sourceId: string;
   readonly label: string;
   readonly ok: boolean;
+  /** Set on a failure, and *also* set alongside `ok: true` when `degraded` -- there, it is
+   *  why the fallback was used, not a reason the refresh failed. */
   readonly error?: string;
+  /** This entry contributed its fallback's content rather than its own. */
+  readonly degraded?: boolean;
   readonly campaignCount?: number;
   readonly extensionCount?: number;
 }
@@ -64,7 +82,13 @@ export function classifyPastedPayload(
   return undefined;
 }
 
-async function loadOneEntry(entry: SourceEntry): Promise<LoadedContent> {
+interface EntryLoad {
+  readonly content: LoadedContent;
+  /** Present only when `content` came from `entry.fallback` -- the primary's own error. */
+  readonly degradedError?: string;
+}
+
+async function loadPrimary(entry: SourceEntry): Promise<LoadedContent> {
   if (entry.kind === "url") {
     if (!entry.url)
       throw new Error(`source "${entry.label}": a url source has no url`);
@@ -86,6 +110,20 @@ async function loadOneEntry(entry: SourceEntry): Promise<LoadedContent> {
   );
 }
 
+/** A fallback that throws too is not a second chance -- the entry then fails exactly as it
+ *  would have with no fallback at all, and the refresh fails with it. */
+async function loadOneEntry(entry: SourceEntry): Promise<EntryLoad> {
+  try {
+    return { content: await loadPrimary(entry) };
+  } catch (error) {
+    if (!entry.fallback) throw error;
+    return {
+      content: await entry.fallback.load(),
+      degradedError: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
 /**
  * Never throws for a source's own fetch/shape failure -- that's what `outcomes` is for.
  * **Does** throw for a duplicate campaign id across two otherwise-successful sources: that
@@ -101,12 +139,16 @@ export async function loadAllSources(
   const outcomes: EntryOutcome[] = settled.map((result, index) => {
     const entry = entries[index]!;
     if (result.status === "fulfilled") {
+      const { content, degradedError } = result.value;
       return {
         sourceId: entry.id,
         label: entry.label,
         ok: true,
-        campaignCount: result.value.campaigns.length,
-        extensionCount: result.value.extensions.length,
+        ...(degradedError !== undefined
+          ? { degraded: true, error: degradedError }
+          : {}),
+        campaignCount: content.campaigns.length,
+        extensionCount: content.extensions.length,
       };
     }
     const reason = result.reason;
@@ -120,10 +162,10 @@ export async function loadAllSources(
 
   const ok = outcomes.every((outcome) => outcome.ok);
   const campaigns = settled.flatMap((result) =>
-    result.status === "fulfilled" ? result.value.campaigns : [],
+    result.status === "fulfilled" ? result.value.content.campaigns : [],
   );
   const extensions = settled.flatMap((result) =>
-    result.status === "fulfilled" ? result.value.extensions : [],
+    result.status === "fulfilled" ? result.value.content.extensions : [],
   );
 
   if (ok) {
@@ -182,7 +224,9 @@ export function isMultiCampaignSource(
 
 /** The real `CampaignSource` the deployed server uses (`index.ts`). `builtin` is always
  *  prepended, first, ahead of whatever `listContentSources` returns -- not stored, not
- *  editable, not removable through `routes/admin.ts`. */
+ *  editable, not removable through `routes/admin.ts`. Give it a `fallback` and it stops
+ *  being able to block a refresh; see this file's header for why that is the builtin's
+ *  privilege and no other source's. */
 export function createMultiSourceCampaignSource(
   pool: Pool,
   builtin: SourceEntry,
@@ -219,7 +263,12 @@ export function createMultiSourceCampaignSource(
           ? {
               ...builtinStatus,
               lastSyncedAt: new Date().toISOString(),
-              lastError: undefined,
+              // A degraded builtin still reports its failure -- the counts below are the
+              // snapshot's, and saying nothing here would turn "the content host is down"
+              // into a green row nobody ever looks at again.
+              lastError: builtinOutcome.degraded
+                ? `serving the committed snapshot instead: ${builtinOutcome.error}`
+                : undefined,
               campaignCount: builtinOutcome.campaignCount,
               extensionCount: builtinOutcome.extensionCount,
             }
@@ -245,10 +294,11 @@ export function createMultiSourceCampaignSource(
  * `ContentCell.refresh()`/`ready()` (content-cell.ts) never publish a failed build, which
  * is exactly right for a *re*fresh -- the previous catalog keeps serving. It is exactly
  * wrong for the *first* build: there is no previous catalog yet, so a `source` that fails
- * on its very first `load()` (the hardcoded default does, until
- * `SubZeroDev.Adventures.Content` exists to serve it -- `index.ts`) would leave `ready()`
- * with nothing to publish, and it throws -- taking the whole process down before it ever
- * binds a port.
+ * on its very first `load()` would leave `ready()` with nothing to publish, and it throws --
+ * taking the whole process down before it ever binds a port. Since the builtin carries its
+ * own `fallback` (`index.ts`), what is left for this to catch is a *DB-added* source that is
+ * broken at boot: an operator's bad paste from last week must not be able to stop the server
+ * from starting today.
  *
  * Wraps `source` so its first `load()` falls back to `fallback` if and only if that first
  * attempt fails, then gets out of the way permanently: every later call reaches `source`

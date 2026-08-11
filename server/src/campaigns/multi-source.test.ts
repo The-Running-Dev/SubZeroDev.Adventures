@@ -158,6 +158,76 @@ describe("loadAllSources", () => {
     expect(result.campaigns).toEqual([{ campaign: { id: "a" } }]);
   });
 
+  it("degrades an entry with a fallback instead of failing the refresh, and still reports why", async () => {
+    const entries: SourceEntry[] = [
+      {
+        id: "builtin",
+        label: "builtin",
+        kind: "url",
+        url: "http://127.0.0.1:1",
+        fallback: fakeSource("snapshot"),
+      },
+      {
+        id: "pasted",
+        label: "pasted",
+        kind: "pasted",
+        payload: { campaign: { id: "added" }, catalog: {} },
+      },
+    ];
+
+    const result = await loadAllSources(entries);
+
+    // The whole point: content an operator added is publishable even though the builtin
+    // URL is unreachable, and the catalog is still whole -- snapshot *plus* the paste.
+    expect(result.ok).toBe(true);
+    expect(result.campaigns.map((c) => c.campaign.id)).toEqual([
+      "snapshot",
+      "added",
+    ]);
+    const builtin = result.outcomes.find((o) => o.sourceId === "builtin")!;
+    expect(builtin.ok).toBe(true);
+    expect(builtin.degraded).toBe(true);
+    expect(builtin.error).toMatch(/failed to fetch manifest\.json/);
+    expect(builtin.campaignCount).toBe(1);
+  });
+
+  it("fails an entry whose fallback fails too, exactly as if it had none", async () => {
+    const result = await loadAllSources([
+      {
+        id: "builtin",
+        label: "builtin",
+        kind: "url",
+        url: "http://127.0.0.1:1",
+        fallback: {
+          load: async () => {
+            throw new Error("no snapshot on disk either");
+          },
+        },
+      },
+    ]);
+
+    expect(result.ok).toBe(false);
+    expect(result.outcomes[0]!.error).toMatch(/no snapshot on disk either/);
+  });
+
+  it("leaves an entry with no fallback fail-closed", async () => {
+    const result = await loadAllSources([
+      { id: "added", label: "added", kind: "url", url: "http://127.0.0.1:1" },
+      {
+        id: "builtin",
+        label: "builtin",
+        kind: "url",
+        url: "http://127.0.0.1:1",
+        fallback: fakeSource("snapshot"),
+      },
+    ]);
+
+    // Degrading is the builtin's privilege alone -- a broken source an operator added still
+    // aborts the refresh rather than quietly dropping its content (#22).
+    expect(result.ok).toBe(false);
+    expect(result.outcomes.find((o) => o.sourceId === "added")!.ok).toBe(false);
+  });
+
   it("fails the whole merge on a duplicate campaign id across sources, without attributing it to either", async () => {
     const entries: SourceEntry[] = [
       {

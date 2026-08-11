@@ -22,18 +22,19 @@ const pool = new Pool({ connectionString: databaseUrl });
 // It is not admin-editable and carries no `CAMPAIGNS_DIR`/env override: the way to point a
 // deployment somewhere else is to add another source, not to change this one.
 //
-// `The-Running-Dev/SubZeroDev.Adventures.Content` does not exist yet as of this writing, so
-// this source 404s on every load. Its `fallback` is what keeps that from making the whole
-// server unpublishable: it degrades to the committed disk snapshot -- the same content this
-// URL is meant to serve -- and the refresh goes through, so content an operator adds through
-// the admin page actually goes live instead of being saved behind a source that cannot
-// succeed. The failure is still reported, on the builtin's own row.
+// `The-Running-Dev/SubZeroDev.Adventures.Content` serves its manifest under a `v2/` path,
+// not at the repo root -- the root 404s. Its `fallback` is what keeps a bad URL here (or any
+// other failure) from making the whole server unpublishable: it degrades to the committed
+// disk snapshot -- the same content this URL is meant to serve -- and the refresh goes
+// through, so content an operator adds through the admin page actually goes live instead of
+// being saved behind a source that cannot succeed. The failure is still reported, on the
+// builtin's own row.
 //
 const campaignSource = createMultiSourceCampaignSource(pool, {
   id: "builtin-default",
   label: "SubZeroDev.Adventures.Content",
   kind: "url",
-  url: "https://the-running-dev.github.io/SubZeroDev.Adventures.Content/",
+  url: "https://the-running-dev.github.io/SubZeroDev.Adventures.Content/v2/",
   fallback: createDiskCampaignSource(),
 });
 

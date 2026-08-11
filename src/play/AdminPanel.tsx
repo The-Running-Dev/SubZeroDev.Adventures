@@ -23,6 +23,19 @@ interface AdminExtensionStatus {
   readonly extends: string;
 }
 
+interface AdminSourceStatus {
+  readonly id: string;
+  readonly label: string;
+  readonly kind: "url" | "pasted";
+  readonly url?: string;
+  readonly builtin: boolean;
+  readonly removable: boolean;
+  readonly lastSyncedAt?: string;
+  readonly lastError?: string;
+  readonly campaignCount?: number;
+  readonly extensionCount?: number;
+}
+
 interface AdminContentStatus {
   readonly isAdmin: boolean;
   readonly status: {
@@ -34,6 +47,7 @@ interface AdminContentStatus {
   };
   readonly campaigns: readonly AdminCampaignStatus[];
   readonly extensions: readonly AdminExtensionStatus[];
+  readonly sources: readonly AdminSourceStatus[];
 }
 
 /** Short, no year -- an operator reading this is looking at "did that just happen," not an
@@ -47,16 +61,21 @@ function formatTimestamp(iso: string | undefined): string {
 /**
  * Reads `/api/admin/content/status` (issue #27) -- independent of the catalog `demo` this
  * component already receives, since it reports what the *server* is serving, not what this
- * tab last fetched. Refetched after every sync (`lastSyncedAt` in the dependency array) so a
- * refresh's outcome shows up here even when the sync itself came back with a soft error
- * (`syncError`, e.g. "not an admin" rather than a network failure).
+ * tab last fetched. `refetchKey` is opaque to this hook -- `AdminPanel` folds together
+ * "a sync just finished" and "a source was just added/removed" into one string so both
+ * trigger a refetch without this hook needing to know about either.
  */
 function useAdminContentStatus(
   apiUrl: string | undefined,
-  lastSyncedAt: string,
-): { status: AdminContentStatus | undefined; error: string | undefined } {
+  refetchKey: string,
+): {
+  status: AdminContentStatus | undefined;
+  error: string | undefined;
+  refetch: () => void;
+} {
   const [status, setStatus] = useState<AdminContentStatus>();
   const [error, setError] = useState<string>();
+  const [manualToken, setManualToken] = useState(0);
 
   useEffect(() => {
     if (!apiUrl) return;
@@ -79,11 +98,15 @@ function useAdminContentStatus(
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `lastSyncedAt` is the refetch
-    // trigger, not a value read inside the effect.
-  }, [apiUrl, lastSyncedAt]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `refetchKey`/`manualToken` are
+    // the refetch triggers, not values read inside the effect.
+  }, [apiUrl, refetchKey, manualToken]);
 
-  return { status, error };
+  return { status, error, refetch: () => setManualToken((t) => t + 1) };
+}
+
+function shortPreview(text: string, max = 60): string {
+  return text.length <= max ? text : `${text.slice(0, max - 1)}…`;
 }
 
 /**
@@ -96,9 +119,11 @@ function useAdminContentStatus(
  * this browser holds (`createBrowserDemo()` again, refetching `/api/campaigns` or the
  * campaign JSON directly) -- worth having on its own, since the catalog is otherwise read
  * once at startup and frozen (`composition.ts`). In remote mode it *also* asks the server
- * to rebuild its own catalog first (`POST /api/admin/content/refresh`, issue #27), so a
- * campaign or extension published since the server last read it is actually there to fetch
- * -- `PlayApp.tsx`'s `onSync` handler is what sequences the two.
+ * to rebuild its own catalog first (`POST /api/admin/content/refresh`, issue #27), from
+ * *every* configured content source at once -- there is no such thing as syncing one source
+ * in isolation, since every source's content only ever ships as one merged, validated
+ * catalog. `PlayApp.tsx`'s `onSync` handler is what sequences the two; every "Sync" button
+ * on this page, including each source row's own, calls that same handler.
  */
 export function AdminPanel({
   demo,
@@ -107,11 +132,105 @@ export function AdminPanel({
   lastSyncedAt,
   onSync,
 }: AdminPanelProps) {
-  const { status: adminStatus, error: statusError } = useAdminContentStatus(
-    demo.apiUrl,
-    lastSyncedAt,
-  );
+  const [sourcesToken, setSourcesToken] = useState(0);
+  const {
+    status: adminStatus,
+    error: statusError,
+    refetch: refetchStatus,
+  } = useAdminContentStatus(demo.apiUrl, `${lastSyncedAt}:${sourcesToken}`);
   const listed = demo.catalog.length;
+
+  const [urlLabel, setUrlLabel] = useState("");
+  const [urlValue, setUrlValue] = useState("");
+  const [addingUrl, setAddingUrl] = useState(false);
+  const [urlError, setUrlError] = useState<string>();
+
+  const [pasteText, setPasteText] = useState("");
+  const [addingPaste, setAddingPaste] = useState(false);
+  const [pasteError, setPasteError] = useState<string>();
+
+  const [removingId, setRemovingId] = useState<string>();
+
+  async function postSource(body: unknown): Promise<void> {
+    if (!demo.apiUrl) return;
+    const response = await fetch(`${demo.apiUrl}/api/admin/content/sources`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const json = (await response.json().catch(() => undefined)) as
+      | { error?: { code?: string }; refresh?: { ok: boolean; error?: string } }
+      | undefined;
+    if (!response.ok) {
+      throw new Error(
+        json?.error?.code
+          ? `${response.status} (${json.error.code})`
+          : `${response.status}`,
+      );
+    }
+    if (json?.refresh && !json.refresh.ok) {
+      // The row was still added -- only the automatic refresh that followed it failed
+      // (e.g. the pasted content doesn't validate). Surfaced, but not thrown: the source
+      // now exists and shows its own `lastError`, same as any other row that failed a Sync.
+      throw new Error(`added, but the refresh failed: ${json.refresh.error}`);
+    }
+  }
+
+  async function handleAddUrl(): Promise<void> {
+    setAddingUrl(true);
+    setUrlError(undefined);
+    try {
+      await postSource({ kind: "url", label: urlLabel, url: urlValue });
+      setUrlLabel("");
+      setUrlValue("");
+      setSourcesToken((t) => t + 1);
+      onSync();
+    } catch (error) {
+      setUrlError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setAddingUrl(false);
+    }
+  }
+
+  async function handleAddPaste(): Promise<void> {
+    setAddingPaste(true);
+    setPasteError(undefined);
+    try {
+      let payload: unknown;
+      try {
+        payload = JSON.parse(pasteText);
+      } catch {
+        throw new Error("that isn't valid JSON");
+      }
+      await postSource({ kind: "pasted", payload });
+      setPasteText("");
+      setSourcesToken((t) => t + 1);
+      onSync();
+    } catch (error) {
+      setPasteError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setAddingPaste(false);
+    }
+  }
+
+  async function handleRemove(id: string): Promise<void> {
+    if (!demo.apiUrl) return;
+    setRemovingId(id);
+    try {
+      const response = await fetch(
+        `${demo.apiUrl}/api/admin/content/sources/${id}`,
+        { method: "DELETE", credentials: "include" },
+      );
+      if (!response.ok) throw new Error(`${response.status}`);
+      refetchStatus();
+    } catch {
+      // Nothing removed; the row's own state is unchanged, so there's nothing new to show
+      // beyond what a retry click already communicates.
+    } finally {
+      setRemovingId(undefined);
+    }
+  }
 
   return (
     <main className="play-main admin">
@@ -160,7 +279,7 @@ export function AdminPanel({
             <dd>
               {adminStatus
                 ? adminStatus.isAdmin
-                  ? "Allowed — this session can trigger a server refresh"
+                  ? "Allowed — this session can manage sources and trigger a server refresh"
                   : "Not allowed — Sync only re-fetches this tab's catalog"
                 : "—"}
             </dd>
@@ -187,6 +306,140 @@ export function AdminPanel({
               Could not read server status: {statusError}
             </p>
           )}
+        </section>
+      )}
+
+      {demo.apiUrl && (
+        <section className="admin-block">
+          <h2 className="admin-heading">Content sources</h2>
+          <p className="admin-note">
+            Every source below merges into the one catalog above -- there is no
+            such thing as syncing a single row in isolation, so each row's Sync
+            button triggers the same full refresh as the one at the top of the
+            page.
+          </p>
+          <div className="admin-table-scroll">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th scope="col">Label</th>
+                  <th scope="col">Kind</th>
+                  <th scope="col">Origin</th>
+                  <th scope="col">Last synced</th>
+                  <th scope="col">Last error</th>
+                  <th scope="col">Campaigns</th>
+                  <th scope="col">Extensions</th>
+                  <th scope="col" />
+                </tr>
+              </thead>
+              <tbody>
+                {(adminStatus?.sources ?? []).map((source) => (
+                  <tr key={source.id}>
+                    <td>
+                      {source.label}
+                      {source.builtin ? " (default)" : ""}
+                    </td>
+                    <td>{source.kind}</td>
+                    <td>
+                      <code>
+                        {source.url ? shortPreview(source.url) : "pasted JSON"}
+                      </code>
+                    </td>
+                    <td>{formatTimestamp(source.lastSyncedAt)}</td>
+                    <td>
+                      {source.lastError
+                        ? shortPreview(source.lastError, 80)
+                        : "—"}
+                    </td>
+                    <td>{source.campaignCount ?? "—"}</td>
+                    <td>{source.extensionCount ?? "—"}</td>
+                    <td>
+                      <button
+                        type="button"
+                        className="admin-sync admin-row-action"
+                        onClick={onSync}
+                        disabled={syncing}
+                      >
+                        Sync
+                      </button>
+                      {source.removable && (
+                        <button
+                          type="button"
+                          className="admin-remove admin-row-action"
+                          onClick={() => void handleRemove(source.id)}
+                          disabled={removingId === source.id}
+                        >
+                          {removingId === source.id ? "Removing…" : "Remove"}
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+                {(adminStatus?.sources ?? []).length === 0 && (
+                  <tr>
+                    <td colSpan={8}>No sources yet.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="admin-form">
+            <h3 className="admin-subheading">Add a URL source</h3>
+            <div className="admin-form-row">
+              <input
+                type="text"
+                placeholder="Label"
+                value={urlLabel}
+                onChange={(event) => setUrlLabel(event.target.value)}
+              />
+              <input
+                type="text"
+                placeholder="https://…/campaigns/"
+                value={urlValue}
+                onChange={(event) => setUrlValue(event.target.value)}
+              />
+              <button
+                type="button"
+                className="admin-sync"
+                onClick={() => void handleAddUrl()}
+                disabled={addingUrl || !urlLabel || !urlValue}
+              >
+                {addingUrl ? "Adding…" : "Add & Sync"}
+              </button>
+            </div>
+            {urlError !== undefined && (
+              <p className="admin-error" role="alert">
+                {urlError}
+              </p>
+            )}
+          </div>
+
+          <div className="admin-form">
+            <h3 className="admin-subheading">Paste a campaign or extension</h3>
+            <textarea
+              className="admin-paste"
+              placeholder="Paste a whole campaign or extension JSON file here…"
+              value={pasteText}
+              onChange={(event) => setPasteText(event.target.value)}
+              rows={6}
+            />
+            <div className="admin-form-row">
+              <button
+                type="button"
+                className="admin-sync"
+                onClick={() => void handleAddPaste()}
+                disabled={addingPaste || !pasteText.trim()}
+              >
+                {addingPaste ? "Adding…" : "Add & Sync"}
+              </button>
+            </div>
+            {pasteError !== undefined && (
+              <p className="admin-error" role="alert">
+                {pasteError}
+              </p>
+            )}
+          </div>
         </section>
       )}
 

@@ -2309,3 +2309,62 @@
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
+
+.admin-row-action {
+  font-size: 0.7rem;
+  margin: 0 0.35rem 0.35rem 0;
+  padding: 0.3rem 0.7rem;
+}
+
+.admin-remove {
+  background: transparent;
+  border: 1px solid var(--danger-border);
+  color: var(--danger-text);
+  cursor: pointer;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.admin-remove:hover:not(:disabled) {
+  background: var(--danger-bg);
+}
+
+.admin-remove:disabled {
+  cursor: progress;
+  opacity: 0.6;
+}
+
+.admin-subheading {
+  color: var(--muted);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  margin: 1.5rem 0 0.6rem;
+  text-transform: uppercase;
+}
+
+.admin-form-row {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.admin-form input,
+.admin-paste {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  color: var(--ink);
+  font-family: inherit;
+  padding: 0.4rem 0.6rem;
+}
+
+.admin-form input {
+  flex: 1 1 12rem;
+}
+
+.admin-paste {
+  font-size: 0.8rem;
+  margin-bottom: 0.5rem;
+  resize: vertical;
+  width: 100%;
+}

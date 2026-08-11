@@ -183,22 +183,21 @@ describeIfDb("/api/admin/content", () => {
     expect(response.json()).toEqual({ ok: true });
   });
 
-  it("shows status and the catalog to anyone, but isAdmin only to an allowlisted signed-in player", async () => {
+  it("shows status and the catalog only to an allowlisted signed-in player", async () => {
     const guest = await guestCookie();
     const guestStatus = await app.inject({
       method: "GET",
       url: "/api/admin/content/status",
       headers: { cookie: guest },
     });
-    expect(guestStatus.statusCode).toBe(200);
-    const guestBody = guestStatus.json() as {
-      isAdmin: boolean;
-      campaigns: unknown[];
-      status: { campaignCount: number };
-    };
-    expect(guestBody.isAdmin).toBe(false);
-    expect(guestBody.campaigns.length).toBeGreaterThan(0);
-    expect(guestBody.status.campaignCount).toBe(guestBody.campaigns.length);
+    expect(guestStatus.statusCode).toBe(403);
+
+    const anonymousStatus = await app.inject({
+      method: "GET",
+      url: "/api/admin/content/status",
+    });
+    expect(anonymousStatus.statusCode).toBe(403);
+    expect(anonymousStatus.cookies).toHaveLength(0);
 
     const admin = await adminCookie();
     const adminStatus = await app.inject({
@@ -206,7 +205,15 @@ describeIfDb("/api/admin/content", () => {
       url: "/api/admin/content/status",
       headers: { cookie: admin },
     });
-    expect((adminStatus.json() as { isAdmin: boolean }).isAdmin).toBe(true);
+    expect(adminStatus.statusCode).toBe(200);
+    const adminBody = adminStatus.json() as {
+      isAdmin: boolean;
+      campaigns: unknown[];
+      status: { campaignCount: number };
+    };
+    expect(adminBody.isAdmin).toBe(true);
+    expect(adminBody.campaigns.length).toBeGreaterThan(0);
+    expect(adminBody.status.campaignCount).toBe(adminBody.campaigns.length);
   });
 });
 
@@ -273,9 +280,11 @@ describeIfDb("/api/admin/content/sources", () => {
   }
 
   it("lists the builtin source, not removable, alongside the real catalog", async () => {
+    const admin = await adminCookie();
     const response = await app.inject({
       method: "GET",
       url: "/api/admin/content/status",
+      headers: { cookie: admin },
     });
     const body = response.json() as {
       sources: { id: string; builtin: boolean; removable: boolean }[];
@@ -309,6 +318,7 @@ describeIfDb("/api/admin/content/sources", () => {
       const status = await app.inject({
         method: "GET",
         url: "/api/admin/content/status",
+        headers: { cookie: admin },
       });
       const statusBody = status.json() as {
         campaigns: { campaignId: string }[];
@@ -488,6 +498,7 @@ describeIfDb("/api/admin/content/sources", () => {
     const status = await app.inject({
       method: "GET",
       url: "/api/admin/content/status",
+      headers: { cookie: admin },
     });
     const statusBody = status.json() as { sources: { id: string }[] };
     expect(statusBody.sources.some((s) => s.id === source.id)).toBe(false);
@@ -598,6 +609,7 @@ describeIfDb("/api/admin/content/sources with an unreachable builtin", () => {
     const status = await app.inject({
       method: "GET",
       url: "/api/admin/content/status",
+      headers: { cookie: admin },
     });
     const body = status.json() as {
       campaigns: { campaignId: string }[];
@@ -691,20 +703,6 @@ describeIfDb("a stored source that cannot be merged", () => {
   });
 
   it("boots anyway, says it is on the snapshot, and lets an admin delete the row and recover", async () => {
-    const beforeFix = await app.inject({
-      method: "GET",
-      url: "/api/admin/content/status",
-    });
-    const before = beforeFix.json() as {
-      status: { bootstrapFallback: boolean; lastError?: string };
-      campaigns: { campaignId: string }[];
-    };
-    expect(before.status.bootstrapFallback).toBe(true);
-    expect(before.status.lastError).toMatch(/already exists on campaign/);
-    expect(before.campaigns.map((c) => c.campaignId)).toEqual([
-      "snapshot-campaign",
-    ]);
-
     // Exactly the recovery an operator has through the admin page, with no psql involved.
     const cookie = cookieFrom(
       await app.inject({ method: "POST", url: "/api/admin/content/refresh" }),
@@ -719,6 +717,21 @@ describeIfDb("a stored source that cannot be merged", () => {
       `insert into identities (provider, subject, player_id) values ($1, $2, $3)`,
       [provider, subject, (me.json() as { playerId: string }).playerId],
     );
+
+    const beforeFix = await app.inject({
+      method: "GET",
+      url: "/api/admin/content/status",
+      headers: { cookie },
+    });
+    const before = beforeFix.json() as {
+      status: { bootstrapFallback: boolean; lastError?: string };
+      campaigns: { campaignId: string }[];
+    };
+    expect(before.status.bootstrapFallback).toBe(true);
+    expect(before.status.lastError).toMatch(/already exists on campaign/);
+    expect(before.campaigns.map((c) => c.campaignId)).toEqual([
+      "snapshot-campaign",
+    ]);
 
     const removed = await app.inject({
       method: "DELETE",
@@ -737,6 +750,7 @@ describeIfDb("a stored source that cannot be merged", () => {
     const afterFix = await app.inject({
       method: "GET",
       url: "/api/admin/content/status",
+      headers: { cookie },
     });
     const after = afterFix.json() as {
       status: { bootstrapFallback: boolean };

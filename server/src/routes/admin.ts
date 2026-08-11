@@ -59,6 +59,26 @@ function requireAdmin(pool: Pool, adminSubjects: ReadonlySet<string>) {
   };
 }
 
+/** Read-only admin guard: unlike `requireAdmin`, this never mints a guest account merely
+ *  because somebody guessed an admin URL. */
+function resolveAdmin(pool: Pool, adminSubjects: ReadonlySet<string>) {
+  const resolve = resolvePrincipal(pool);
+  return async (
+    request: FastifyRequest,
+    reply: FastifyReply,
+  ): Promise<void> => {
+    await resolve(request);
+    const principal = request.principalOrNull;
+    if (
+      !principal ||
+      !(await isAdmin(pool, principal.playerId, adminSubjects))
+    ) {
+      reply.code(403);
+      await reply.send({ error: { operation: "admin", code: "forbidden" } });
+    }
+  };
+}
+
 interface SourceStatusEntry {
   readonly id: string;
   readonly label: string;
@@ -139,37 +159,26 @@ export function registerAdminRoutes(
 ): void {
   const allowlist = new Set(adminSubjects);
   const admin = requireAdmin(pool, allowlist);
-  // Read-only, so this resolves an existing session but never mints a guest row --
-  // `resolvePrincipal`'s posture on every other read-only route (progress.ts, badges.ts).
-  // A logged-out visitor just gets `isAdmin: false`.
-  const resolve = resolvePrincipal(pool);
+  const readAdmin = resolveAdmin(pool, allowlist);
 
-  // Answers "am I allowed" alongside the catalog/refresh status, so `AdminPanel.tsx` can
-  // disable Sync with a reason instead of letting a click 403.
-  app.get(
-    "/api/admin/content/status",
-    { preHandler: resolve },
-    async (request) => {
-      const principal = request.principalOrNull;
-      const allowed = principal
-        ? await isAdmin(pool, principal.playerId, allowlist)
-        : false;
-      const demo = cell.current();
-      return {
-        isAdmin: allowed,
-        status: cell.status(),
-        campaigns: demo.all.map((campaign) => ({
-          campaignId: campaign.campaignId,
-          title: campaign.title,
-          kindId: campaign.kindId,
-          version: campaign.version,
-          endingCount: campaign.endingCount,
-        })),
-        extensions: demo.appliedExtensions,
-        sources: await listSourceStatuses(pool, campaignSource),
-      };
-    },
-  );
+  // This response contains source URLs and refresh errors as well as the catalog, so the
+  // read itself is guarded rather than relying on the browser to hide the page.
+  app.get("/api/admin/content/status", { preHandler: readAdmin }, async () => {
+    const demo = cell.current();
+    return {
+      isAdmin: true,
+      status: cell.status(),
+      campaigns: demo.all.map((campaign) => ({
+        campaignId: campaign.campaignId,
+        title: campaign.title,
+        kindId: campaign.kindId,
+        version: campaign.version,
+        endingCount: campaign.endingCount,
+      })),
+      extensions: demo.appliedExtensions,
+      sources: await listSourceStatuses(pool, campaignSource),
+    };
+  });
 
   app.post("/api/admin/content/refresh", { preHandler: admin }, async () =>
     cell.refresh(),

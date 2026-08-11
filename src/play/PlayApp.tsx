@@ -27,6 +27,7 @@ import {
 } from "./composition";
 import {
   consumeAuthError,
+  useAdminAccess,
   useIdentity,
   usePlatformStats,
   useProgress,
@@ -501,6 +502,10 @@ function PlayAppReady({
     demo.apiUrl,
     identityRefreshToken,
   );
+  const { isAdmin, loading: adminAccessLoading } = useAdminAccess(
+    demo.apiUrl,
+    identity.playerId,
+  );
   const progress = useProgress(demo.apiUrl, identity.playerId);
   const platformStats = usePlatformStats(demo.apiUrl);
   const [authError] = useState(() => consumeAuthError());
@@ -815,18 +820,42 @@ function PlayAppReady({
               loading={identityLoading}
               authError={authError}
               onChanged={() => setIdentityRefreshToken((token) => token + 1)}
+              isAdmin={isAdmin}
               profileAvailable={profileAvailable}
             />
           )}
         </Header>
         {isAdminPage ? (
-          <AdminPanel
-            demo={demo}
-            syncing={syncing}
-            syncError={syncError}
-            lastSyncedAt={lastSyncedAt}
-            onSync={onSync}
-          />
+          adminAccessLoading ? (
+            <div className="play-loading" role="status">
+              Checking admin access…
+            </div>
+          ) : isAdmin ? (
+            <AdminPanel
+              demo={demo}
+              syncing={syncing}
+              syncError={syncError}
+              lastSyncedAt={lastSyncedAt}
+              onSync={onSync}
+            />
+          ) : (
+            <section
+              className="archive admin"
+              aria-labelledby="admin-denied-title"
+            >
+              <div className="archive-heading">
+                <p className="eyebrow">RESTRICTED SYSTEM // ACCESS DENIED</p>
+                <h1 id="admin-denied-title">Admin access required</h1>
+                <p>
+                  This page is available only to an authorized signed-in
+                  account.
+                </p>
+                <a className="cabinet-button" href="/">
+                  Return to disk library
+                </a>
+              </div>
+            </section>
+          )
         ) : !state ? (
           <section className="archive" aria-labelledby="shelf-title">
             <div className="archive-heading">
@@ -895,7 +924,9 @@ function PlayAppReady({
                     </button>
                     {isSelected && (
                       <div className="dossier-brief">
-                        <p>{campaign.description}</p>
+                        <p className="dossier-description">
+                          {campaign.description}
+                        </p>
                         <div className="briefing-actions">
                           <button
                             className="cabinet-button primary"

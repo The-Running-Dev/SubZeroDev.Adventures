@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { signInUrl, signOut, type Identity, useAdminAccess } from "./identity";
+import { signInUrl, signOut, type Identity } from "./identity";
 
 const AUTH_ERROR_MESSAGES: Readonly<Record<string, string>> = {
   oauth_not_configured: "Sign-in isn't set up on this deployment yet.",
@@ -13,6 +13,7 @@ interface AccountPanelProps {
   readonly loading: boolean;
   readonly authError: string | null;
   readonly onChanged: () => void;
+  readonly isAdmin: boolean;
   /** Whether there's anywhere for "Profile" to link to -- a signed-in-or-guest player on
    *  a deployment with a backend. Hidden without it, same as the page itself. */
   readonly profileAvailable: boolean;
@@ -45,9 +46,9 @@ export function AccountPanel({
   loading,
   authError,
   onChanged,
+  isAdmin,
   profileAvailable,
 }: AccountPanelProps) {
-  const isAdmin = useAdminAccess(apiUrl, identity.playerId);
   /* A failed sign-in round trip is reported inside the menu, so it opens itself rather
      than leaving the message behind a click nobody knows to make. */
   const [open, setOpen] = useState(Boolean(authError));

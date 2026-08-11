@@ -100,7 +100,7 @@ describe("PlayApp cabinet presentation", () => {
       screen.getByText(
         "Municipal, cadastral, archive, notary, and translation routes through one determined folder.",
       ),
-    ).toBeVisible();
+    ).toHaveClass("dossier-description");
     expect(screen.getByRole("button", { name: "Load" })).toBeVisible();
   });
 
@@ -473,12 +473,12 @@ describe("PlayApp admin shell", () => {
     delete document.documentElement.dataset.theme;
   });
 
-  it("keeps the shared header and archive presentation on the admin page", async () => {
+  it("blocks the admin page when no authorized backend session exists", async () => {
     window.history.pushState({}, "", "/?admin");
     render(<PlayApp />);
 
     expect(
-      await screen.findByRole("heading", { name: "Content admin" }),
+      await screen.findByRole("heading", { name: "Admin access required" }),
     ).toBeVisible();
     expect(screen.getByRole("navigation", { name: "Primary" })).toBeVisible();
     expect(screen.getByRole("link", { name: "Disk library" })).toHaveAttribute(
@@ -489,6 +489,9 @@ describe("PlayApp admin shell", () => {
       screen.getByRole("combobox", { name: "DISPLAY MODE" }),
     ).toBeVisible();
     expect(document.querySelector("section.archive.admin")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "Content admin" }),
+    ).not.toBeInTheDocument();
   });
 });
 

@@ -16,6 +16,7 @@ import { AccountPanel } from "../play/AccountPanel";
 import type { BrowserCampaign } from "../play/composition";
 import {
   consumeAuthError,
+  useAdminAccess,
   useBadges,
   useIdentity,
   useProfileSettings,
@@ -78,6 +79,7 @@ export function OwnProfile({ apiUrl }: { apiUrl?: string }) {
     apiUrl,
     identityRefreshToken,
   );
+  const { isAdmin } = useAdminAccess(apiUrl, identity.playerId);
   const progress = useProgress(apiUrl, identity.playerId);
   const { badges, records } = useBadges(apiUrl, identity.playerId);
   const { settings, setPublic } = useProfileSettings(
@@ -101,6 +103,7 @@ export function OwnProfile({ apiUrl }: { apiUrl?: string }) {
             loading={identityLoading}
             authError={authError}
             onChanged={() => setIdentityRefreshToken((token) => token + 1)}
+            isAdmin={isAdmin}
             // Already on the profile page -- the account menu's own link to it would be
             // redundant.
             profileAvailable={false}

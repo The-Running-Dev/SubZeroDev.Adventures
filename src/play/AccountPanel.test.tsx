@@ -1,5 +1,5 @@
-import { render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
 import { AccountPanel } from "./AccountPanel";
 import type { Identity } from "./identity";
 
@@ -10,7 +10,7 @@ const identity: Identity = {
   signInProvider: "oidc",
 };
 
-function renderPanel(): void {
+function renderPanel(isAdmin: boolean): void {
   render(
     <AccountPanel
       apiUrl="https://api.example.test"
@@ -18,25 +18,15 @@ function renderPanel(): void {
       loading={false}
       authError={null}
       onChanged={() => {}}
+      isAdmin={isAdmin}
       profileAvailable
     />,
   );
 }
 
-afterEach(() => {
-  vi.unstubAllGlobals();
-});
-
 describe("AccountPanel admin link", () => {
   it("shows Admin beside the account control for an authorized session", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(() =>
-        Promise.resolve(new Response(JSON.stringify({ isAdmin: true }))),
-      ),
-    );
-
-    renderPanel();
+    renderPanel(true);
 
     expect(await screen.findByRole("link", { name: "Admin" })).toHaveAttribute(
       "href",
@@ -45,14 +35,8 @@ describe("AccountPanel admin link", () => {
   });
 
   it("hides Admin for a non-admin session", async () => {
-    const fetchMock = vi.fn(() =>
-      Promise.resolve(new Response(JSON.stringify({ isAdmin: false }))),
-    );
-    vi.stubGlobal("fetch", fetchMock);
+    renderPanel(false);
 
-    renderPanel();
-
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
     expect(
       screen.queryByRole("link", { name: "Admin" }),
     ).not.toBeInTheDocument();

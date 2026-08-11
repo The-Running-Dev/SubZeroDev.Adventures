@@ -159,15 +159,19 @@ export function useIdentity(
 export function useAdminAccess(
   apiUrl: string | undefined,
   playerId: string | null,
-): boolean {
+): { isAdmin: boolean; loading: boolean } {
   const [isAdmin, setIsAdmin] = useState(false);
+  const [loading, setLoading] = useState(apiUrl !== undefined);
 
   useEffect(() => {
     if (!apiUrl) {
       setIsAdmin(false);
+      setLoading(false);
       return;
     }
     let cancelled = false;
+    setIsAdmin(false);
+    setLoading(true);
     fetch(`${apiUrl}/api/admin/content/status`, { credentials: "include" })
       .then((response) =>
         response.ok
@@ -179,13 +183,16 @@ export function useAdminAccess(
       })
       .catch(() => {
         if (!cancelled) setIsAdmin(false);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
       });
     return () => {
       cancelled = true;
     };
   }, [apiUrl, playerId]);
 
-  return isAdmin;
+  return { isAdmin, loading };
 }
 
 /** Progress is keyed by campaignId; a campaign with no session yet simply has no entry.

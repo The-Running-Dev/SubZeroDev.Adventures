@@ -5,18 +5,15 @@
  * `content_sources` table anyway).
  */
 import { createServer, type Server } from "node:http";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import type { PortableCampaign } from "@the-running-dev/game-engine";
 import type { PortableExtension } from "../../../shared/campaign-extension.js";
 import {
   classifyPastedPayload,
   loadAllSources,
-  withBootstrapFallback,
-  type MultiCampaignSource,
   type SourceEntry,
-  type SourceStatus,
 } from "./multi-source.js";
-import type { CampaignSource, LoadedContent } from "./source.js";
+import type { CampaignSource } from "./source.js";
 
 function startServer(
   handler: (path: string) => { status: number; body?: unknown },
@@ -248,14 +245,31 @@ describe("loadAllSources", () => {
       /duplicate campaign id/,
     );
   });
-});
 
-function fakeMultiSource(
-  load: () => Promise<LoadedContent>,
-): MultiCampaignSource {
-  const status: SourceStatus = { id: "builtin", label: "builtin" };
-  return { load, builtinStatus: () => status };
-}
+  // Two Add & Sync clicks on the same extension. Left to the merge, this surfaces as
+  // `node "x" already exists on campaign "y"` from deep inside validation -- true, and
+  // useless for finding the row to delete.
+  it("fails on the same extension id arriving from two sources", async () => {
+    const entries: SourceEntry[] = [
+      {
+        id: "s1",
+        label: "pasted once",
+        kind: "pasted",
+        payload: { id: "ext-a", extends: "base" },
+      },
+      {
+        id: "s2",
+        label: "pasted again",
+        kind: "pasted",
+        payload: { id: "ext-a", extends: "base" },
+      },
+    ];
+
+    await expect(loadAllSources(entries)).rejects.toThrow(
+      /duplicate extension id "ext-a"/,
+    );
+  });
+});
 
 function fakeSource(campaignId: string): CampaignSource {
   return {
@@ -269,59 +283,3 @@ function fakeSource(campaignId: string): CampaignSource {
     },
   };
 }
-
-describe("withBootstrapFallback", () => {
-  it("boots from the fallback when the real source fails on its very first load", async () => {
-    const real = fakeMultiSource(async () => {
-      throw new Error("real source unreachable");
-    });
-    const wrapped = withBootstrapFallback(real, fakeSource("fallback"));
-
-    const result = await wrapped.load();
-    expect(result.campaigns[0]!.campaign.id).toBe("fallback");
-  });
-
-  it("does not touch the fallback once the real source has ever succeeded", async () => {
-    const load = vi.fn(async () => ({
-      campaigns: [{ campaign: { id: "real" } } as unknown as PortableCampaign],
-      extensions: [] as readonly PortableExtension[],
-    }));
-    const real = fakeMultiSource(load);
-    const wrapped = withBootstrapFallback(real, fakeSource("fallback"));
-
-    const first = await wrapped.load();
-    expect(first.campaigns[0]!.campaign.id).toBe("real");
-
-    load.mockRejectedValueOnce(new Error("a later refresh failed"));
-    // A failure *after* the first success must propagate for real -- the fallback is a
-    // one-time bootstrap escape hatch, not a standing safety net that would otherwise
-    // quietly undermine every source's fail-closed guarantee.
-    await expect(wrapped.load()).rejects.toThrow("a later refresh failed");
-  });
-
-  it("never falls back a second time even if the real source's first success never happened", async () => {
-    let attempt = 0;
-    const real = fakeMultiSource(async () => {
-      attempt += 1;
-      throw new Error(`attempt ${attempt} failed`);
-    });
-    const wrapped = withBootstrapFallback(real, fakeSource("fallback"));
-
-    const first = await wrapped.load();
-    expect(first.campaigns[0]!.campaign.id).toBe("fallback");
-
-    // The real source is still broken, but the bootstrap fallback already spent its one
-    // use on the first call -- a second failure propagates instead of silently re-serving
-    // the fallback forever, which would hide that the real source never came back.
-    await expect(wrapped.load()).rejects.toThrow("attempt 2 failed");
-  });
-
-  it("passes builtinStatus() through to the real source untouched", () => {
-    const real = fakeMultiSource(async () => ({
-      campaigns: [] as readonly PortableCampaign[],
-      extensions: [] as readonly PortableExtension[],
-    }));
-    const wrapped = withBootstrapFallback(real, fakeSource("fallback"));
-    expect(wrapped.builtinStatus()).toEqual(real.builtinStatus());
-  });
-});

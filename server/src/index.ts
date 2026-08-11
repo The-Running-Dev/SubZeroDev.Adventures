@@ -1,10 +1,7 @@
 import { Pool } from "pg";
 import { buildApp } from "./app.js";
 import { createDiskCampaignSource } from "./campaigns/source.js";
-import {
-  createMultiSourceCampaignSource,
-  withBootstrapFallback,
-} from "./campaigns/multi-source.js";
+import { createMultiSourceCampaignSource } from "./campaigns/multi-source.js";
 
 const port = Number(process.env.PORT ?? 8787);
 const siteUrl = process.env.SITE_URL ?? "http://localhost:5173";
@@ -32,24 +29,25 @@ const pool = new Pool({ connectionString: databaseUrl });
 // the admin page actually goes live instead of being saved behind a source that cannot
 // succeed. The failure is still reported, on the builtin's own row.
 //
-// `withBootstrapFallback` stays for the case the above does not cover: a *DB-added* source
-// that is broken at boot. That one still fails the refresh, correctly, and this keeps it
-// from taking the process down before it binds a port.
-const campaignSource = withBootstrapFallback(
-  createMultiSourceCampaignSource(pool, {
-    id: "builtin-default",
-    label: "SubZeroDev.Adventures.Content",
-    kind: "url",
-    url: "https://the-running-dev.github.io/SubZeroDev.Adventures.Content/",
-    fallback: createDiskCampaignSource(),
-  }),
-  createDiskCampaignSource(),
-);
+const campaignSource = createMultiSourceCampaignSource(pool, {
+  id: "builtin-default",
+  label: "SubZeroDev.Adventures.Content",
+  kind: "url",
+  url: "https://the-running-dev.github.io/SubZeroDev.Adventures.Content/",
+  fallback: createDiskCampaignSource(),
+});
 
 const app = await buildApp(pool, {
   siteUrl,
   apiUrl,
   campaignSource,
+  // Boots from the snapshot when the first build off `campaignSource` fails for any reason
+  // -- including one that no source-level fallback can see, because it happens *after*
+  // every source has loaded: a pasted extension that collides with the campaign it extends
+  // fails validation of the merged registry, not a fetch. That is the failure that
+  // crash-looped this server in production, and it is why this guard lives at the cell and
+  // not on a source (`content-cell.ts`'s `ready`).
+  bootstrapSource: createDiskCampaignSource(),
   adminSubjects,
 });
 

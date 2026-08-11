@@ -178,6 +178,20 @@ export async function loadAllSources(
       }
       seen.add(portable.campaign.id);
     }
+    // The same check for extensions, and not for symmetry: applying one extension twice is
+    // *not* idempotent -- the second application hits nodes the first one already added and
+    // fails deep inside the merge, naming the node rather than the source. Adding the same
+    // extension twice is an ordinary operator slip (two Add & Sync clicks), so it earns an
+    // error that says which id is duplicated instead of one that reads like broken content.
+    const seenExtensions = new Set<string>();
+    for (const extension of extensions) {
+      if (seenExtensions.has(extension.id)) {
+        throw new Error(
+          `duplicate extension id "${extension.id}" across content sources`,
+        );
+      }
+      seenExtensions.add(extension.id);
+    }
   }
 
   return { campaigns, extensions, outcomes, ok };
@@ -290,39 +304,11 @@ export function createMultiSourceCampaignSource(
   };
 }
 
-/**
- * `ContentCell.refresh()`/`ready()` (content-cell.ts) never publish a failed build, which
- * is exactly right for a *re*fresh -- the previous catalog keeps serving. It is exactly
- * wrong for the *first* build: there is no previous catalog yet, so a `source` that fails
- * on its very first `load()` would leave `ready()` with nothing to publish, and it throws --
- * taking the whole process down before it ever binds a port. Since the builtin carries its
- * own `fallback` (`index.ts`), what is left for this to catch is a *DB-added* source that is
- * broken at boot: an operator's bad paste from last week must not be able to stop the server
- * from starting today.
- *
- * Wraps `source` so its first `load()` falls back to `fallback` if and only if that first
- * attempt fails, then gets out of the way permanently: every later call reaches `source`
- * directly and stays exactly as fail-closed as every other source. `builtinStatus()` passes
- * through untouched, so the admin page always shows `source`'s own real outcome, never the
- * fallback's.
- */
-export function withBootstrapFallback(
-  source: MultiCampaignSource,
-  fallback: CampaignSource,
-): MultiCampaignSource {
-  let firstLoadDone = false;
-  return {
-    async load() {
-      try {
-        const result = await source.load();
-        firstLoadDone = true;
-        return result;
-      } catch (error) {
-        if (firstLoadDone) throw error;
-        firstLoadDone = true;
-        return fallback.load();
-      }
-    },
-    builtinStatus: () => source.builtinStatus(),
-  };
-}
+// `withBootstrapFallback` used to live here: it let the *first* `load()` fall back when the
+// whole multi-source failed, so a broken source could not stop the process from starting.
+// It only ever saw load failures, and the failure that actually crash-looped this server in
+// production happened after every source had loaded successfully -- a pasted extension
+// colliding with the campaign it extends, caught by validation of the merged registry. The
+// guard therefore belongs where it can see that too, which is `content-cell.ts`'s `ready`
+// (`app.ts` passes it the disk snapshot). Two overlapping bootstrap fallbacks, one of which
+// covered a strict subset of the other, was one more than this needed.

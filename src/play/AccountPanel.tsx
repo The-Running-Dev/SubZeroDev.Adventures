@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { signInUrl, signOut, type Identity } from "./identity";
+import { signInUrl, signOut, type Identity, useAdminAccess } from "./identity";
 
 const AUTH_ERROR_MESSAGES: Readonly<Record<string, string>> = {
   oauth_not_configured: "Sign-in isn't set up on this deployment yet.",
@@ -47,6 +47,7 @@ export function AccountPanel({
   onChanged,
   profileAvailable,
 }: AccountPanelProps) {
+  const isAdmin = useAdminAccess(apiUrl, identity.playerId);
   /* A failed sign-in round trip is reported inside the menu, so it opens itself rather
      than leaving the message behind a click nobody knows to make. */
   const [open, setOpen] = useState(Boolean(authError));
@@ -130,127 +131,134 @@ export function AccountPanel({
   const label = member ? `Signed in as ${name}` : "Playing as a guest";
 
   return (
-    <div className="account-menu" ref={menu}>
-      <button
-        className={`account-sigil ${open ? "is-open" : ""}`}
-        aria-expanded={open}
-        aria-haspopup="true"
-        onClick={() => setOpen((current) => !current)}
-      >
-        <span aria-hidden="true">{sigilFor(name, member)}</span>
-        <span className="sr-only">{label} -- account menu</span>
-      </button>
-      {open && (
-        <div className="account-dropdown">
-          <p className="account-dropdown-name">{label}</p>
-          {authError && (
-            <p className="account-error" role="alert">
-              {AUTH_ERROR_MESSAGES[authError] ?? "Sign-in failed. Try again."}
-            </p>
-          )}
-          {profileAvailable && (
-            <a
-              className="cabinet-button"
-              href="/profile"
-              onClick={() => setOpen(false)}
-            >
-              Profile
-            </a>
-          )}
-          {member ? (
-            <button
-              className="cabinet-button"
-              disabled={busy}
-              onClick={() => {
-                setBusy(true);
-                void signOut(apiUrl).finally(() => {
-                  setBusy(false);
-                  onChanged();
-                });
-              }}
-            >
-              Sign out
-            </button>
-          ) : (
-            <>
-              <p className="account-note">
-                Progress lives only in this browser until you sign in.
+    <>
+      {isAdmin && (
+        <a className="system-bar-link" href="/?admin">
+          Admin
+        </a>
+      )}
+      <div className="account-menu" ref={menu}>
+        <button
+          className={`account-sigil ${open ? "is-open" : ""}`}
+          aria-expanded={open}
+          aria-haspopup="true"
+          onClick={() => setOpen((current) => !current)}
+        >
+          <span aria-hidden="true">{sigilFor(name, member)}</span>
+          <span className="sr-only">{label} -- account menu</span>
+        </button>
+        {open && (
+          <div className="account-dropdown">
+            <p className="account-dropdown-name">{label}</p>
+            {authError && (
+              <p className="account-error" role="alert">
+                {AUTH_ERROR_MESSAGES[authError] ?? "Sign-in failed. Try again."}
               </p>
-              {identity.signInProvider && (
-                <a
-                  className="cabinet-button primary"
-                  href={signInUrl(apiUrl, identity.signInProvider)}
-                >
-                  Sign In
-                </a>
-              )}
+            )}
+            {profileAvailable && (
+              <a
+                className="cabinet-button"
+                href="/profile"
+                onClick={() => setOpen(false)}
+              >
+                Profile
+              </a>
+            )}
+            {member ? (
               <button
                 className="cabinet-button"
-                onClick={() => setTransferOpen((isOpen) => !isOpen)}
+                disabled={busy}
+                onClick={() => {
+                  setBusy(true);
+                  void signOut(apiUrl).finally(() => {
+                    setBusy(false);
+                    onChanged();
+                  });
+                }}
               >
-                Transfer progress
+                Sign out
               </button>
-            </>
-          )}
-          {transferOpen && (
-            <div className="account-transfer">
-              <p className="account-transfer-intro">
-                Playing on a second device without signing in? A code moves this
-                browser's progress there, or the reverse.
-              </p>
-
-              <div className="account-transfer-section">
-                <p className="account-transfer-label">
-                  Send this device's progress elsewhere
+            ) : (
+              <>
+                <p className="account-note">
+                  Progress lives only in this browser until you sign in.
                 </p>
-                {issuedCode ? (
-                  <p className="account-transfer-code">
-                    Enter <strong>{issuedCode}</strong> on the other device
-                    within 15 minutes.
-                  </p>
-                ) : (
-                  <button
-                    className="cabinet-button"
-                    disabled={busy}
-                    onClick={() => void createTransferCode()}
+                {identity.signInProvider && (
+                  <a
+                    className="cabinet-button primary"
+                    href={signInUrl(apiUrl, identity.signInProvider)}
                   >
-                    Get a code
-                  </button>
+                    Sign In
+                  </a>
+                )}
+                <button
+                  className="cabinet-button"
+                  onClick={() => setTransferOpen((isOpen) => !isOpen)}
+                >
+                  Transfer progress
+                </button>
+              </>
+            )}
+            {transferOpen && (
+              <div className="account-transfer">
+                <p className="account-transfer-intro">
+                  Playing on a second device without signing in? A code moves
+                  this browser's progress there, or the reverse.
+                </p>
+
+                <div className="account-transfer-section">
+                  <p className="account-transfer-label">
+                    Send this device's progress elsewhere
+                  </p>
+                  {issuedCode ? (
+                    <p className="account-transfer-code">
+                      Enter <strong>{issuedCode}</strong> on the other device
+                      within 15 minutes.
+                    </p>
+                  ) : (
+                    <button
+                      className="cabinet-button"
+                      disabled={busy}
+                      onClick={() => void createTransferCode()}
+                    >
+                      Get a code
+                    </button>
+                  )}
+                </div>
+
+                <div className="account-transfer-section">
+                  <label
+                    className="account-transfer-label"
+                    htmlFor="transfer-code-input"
+                  >
+                    Bring another device's progress here
+                  </label>
+                  <div className="account-transfer-redeem">
+                    <input
+                      id="transfer-code-input"
+                      value={redeemInput}
+                      onChange={(event) => setRedeemInput(event.target.value)}
+                      placeholder="XXXX-XXXX"
+                    />
+                    <button
+                      className="cabinet-button"
+                      disabled={busy || !redeemInput.trim()}
+                      onClick={() => void redeemTransferCode()}
+                    >
+                      Redeem
+                    </button>
+                  </div>
+                </div>
+
+                {transferMessage && (
+                  <p className="account-error">{transferMessage}</p>
                 )}
               </div>
-
-              <div className="account-transfer-section">
-                <label
-                  className="account-transfer-label"
-                  htmlFor="transfer-code-input"
-                >
-                  Bring another device's progress here
-                </label>
-                <div className="account-transfer-redeem">
-                  <input
-                    id="transfer-code-input"
-                    value={redeemInput}
-                    onChange={(event) => setRedeemInput(event.target.value)}
-                    placeholder="XXXX-XXXX"
-                  />
-                  <button
-                    className="cabinet-button"
-                    disabled={busy || !redeemInput.trim()}
-                    onClick={() => void redeemTransferCode()}
-                  >
-                    Redeem
-                  </button>
-                </div>
-              </div>
-
-              {transferMessage && (
-                <p className="account-error">{transferMessage}</p>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
+            )}
+          </div>
+        )}
+      </div>
+    </>
   );
 }
 

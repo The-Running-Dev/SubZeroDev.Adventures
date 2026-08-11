@@ -456,26 +456,30 @@ export default function PlayApp() {
       </div>
     );
   }
-  // Unlisted operator page. Checked here rather than inside `PlayAppReady` so none of the
-  // play surface -- sessions, identity, theming -- mounts behind it.
-  if (new URLSearchParams(window.location.search).has("admin")) {
-    return (
-      <AdminPanel
-        demo={demo}
-        syncing={syncing}
-        syncError={syncError}
-        lastSyncedAt={syncedAt ?? "—"}
-        onSync={() => {
-          setSyncToken((token) => token + 1);
-        }}
-      />
-    );
-  }
-
-  return <PlayAppReady demo={demo} />;
+  return (
+    <PlayAppReady
+      demo={demo}
+      syncing={syncing}
+      syncError={syncError}
+      lastSyncedAt={syncedAt ?? "—"}
+      onSync={() => setSyncToken((token) => token + 1)}
+    />
+  );
 }
 
-function PlayAppReady({ demo }: { demo: BrowserDemo }) {
+function PlayAppReady({
+  demo,
+  syncing,
+  syncError,
+  lastSyncedAt,
+  onSync,
+}: {
+  readonly demo: BrowserDemo;
+  readonly syncing: boolean;
+  readonly syncError: string | undefined;
+  readonly lastSyncedAt: string;
+  readonly onSync: () => void;
+}) {
   const client = useMemo(() => new BrowserClient(demo.store), [demo.store]);
   const [state, setState] = useState<PlayState>();
   const [campaignId, setCampaignId] = useState<string>();
@@ -788,6 +792,9 @@ function PlayAppReady({ demo }: { demo: BrowserDemo }) {
       : `Type ${rangeLabel(state.actions.length)}, QUIT, or HELP.`;
   /** Any game-state change -- typed or mouse-driven -- hands focus back to the prompt. */
   const bbsFocusToken = `${selectedId ?? ""}|${campaignId ?? ""}|${sceneText ?? ""}|${ended}`;
+  // Content administration keeps the same header and archive shell as the main surface;
+  // it is an operator mode of the game, not a separate visual application.
+  const isAdminPage = new URLSearchParams(window.location.search).has("admin");
 
   return (
     <>
@@ -795,9 +802,9 @@ function PlayAppReady({ demo }: { demo: BrowserDemo }) {
       <main className="play-main">
         <div className="boot-flash" key={displayTheme} aria-hidden="true" />
         <Header
-          current={state ? "playing" : "shelf"}
-          playingTitle={selected?.title}
-          onSelectShelf={returnToShelf}
+          current={isAdminPage ? "shelf" : state ? "playing" : "shelf"}
+          playingTitle={isAdminPage ? undefined : selected?.title}
+          onSelectShelf={isAdminPage ? undefined : returnToShelf}
           theme={displayTheme}
           onThemeChange={changeTheme}
         >
@@ -812,7 +819,15 @@ function PlayAppReady({ demo }: { demo: BrowserDemo }) {
             />
           )}
         </Header>
-        {!state ? (
+        {isAdminPage ? (
+          <AdminPanel
+            demo={demo}
+            syncing={syncing}
+            syncError={syncError}
+            lastSyncedAt={lastSyncedAt}
+            onSync={onSync}
+          />
+        ) : !state ? (
           <section className="archive" aria-labelledby="shelf-title">
             <div className="archive-heading">
               {demo.apiUrl && platformStats && (

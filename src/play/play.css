@@ -2197,32 +2197,27 @@
   }
 }
 
-/*
- * The unlisted operator page (`AdminPanel.tsx`, reachable at `?admin`). Deliberately
- * plain: it is a maintenance surface, not part of the cabinet, so it borrows the page's
- * monospace and palette variables and none of its scanlines, glows, or accents.
- */
+/* The operator page (`AdminPanel.tsx`, reachable at `?admin`) intentionally lives inside
+   the same archive shell as the disk library: content control is part of this system, not
+   a visually separate maintenance application. */
 .admin {
-  max-width: 60rem;
+  max-width: 72rem;
 }
 
 .admin-title {
-  border-bottom: 1px solid var(--rule-strong);
-  font-size: 1.25rem;
-  letter-spacing: 0.08em;
-  margin: 0 0 0.5rem;
-  padding-bottom: 0.5rem;
-  text-transform: uppercase;
+  margin-bottom: 0.5rem;
 }
 
 .admin-note {
   color: var(--muted);
-  font-size: 0.8rem;
+  line-height: 1.6;
   margin: 0 0 2rem;
 }
 
 .admin-block {
-  border: 1px solid var(--rule);
+  background: var(--surface-sunken);
+  border: 2px solid var(--rule-strong);
+  box-shadow: inset 0 0 20px var(--inset-glow);
   margin-bottom: 1.5rem;
   padding: 1rem 1.25rem 1.25rem;
 }
@@ -2398,6 +2393,16 @@
 
 .admin-form input {
   flex: 1 1 12rem;
+}
+
+.admin-file-label,
+.admin-file-name {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.admin-file-name {
+  margin: 0.6rem 0 0;
 }
 
 .admin-paste {

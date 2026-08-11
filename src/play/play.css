@@ -2327,17 +2327,15 @@
   text-transform: uppercase;
 }
 
-/* One line, never wrapped -- the JS truncation keeps it short, and this keeps a long
-   unbroken token (a URL in a fetch error) from stretching the column anyway. `title`
-   carries the full text, which `cursor: help` is what advertises. */
-.admin-cell-error {
+/* A single glyph instead of truncated text -- the column now costs one character no
+   matter how long the underlying error is, which is what keeps the action column (Sync/
+   Remove) from needing a horizontal scroll to reach. `title` carries the full text,
+   `cursor: help` is what advertises it, and `role="img"`/`aria-label` on the element
+   (AdminPanel.tsx) give the same text to anyone who can't see or hover the glyph. */
+.admin-cell-error-icon {
   color: var(--danger-text);
   cursor: help;
-  display: inline-block;
-  max-width: 22rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-size: 1rem;
 }
 
 .admin-row-action {
@@ -2362,6 +2360,16 @@
 .admin-remove:disabled {
   cursor: progress;
   opacity: 0.6;
+}
+
+/* A failed Remove used to fail silently -- same row, same button text, no sign anything
+   happened. This is that failure surfaced, scoped to the row whose delete just failed. */
+.admin-cell-error-note {
+  color: var(--danger-text);
+  font-size: 0.7rem;
+  margin: 0.3rem 0 0;
+  max-width: 14rem;
+  white-space: normal;
 }
 
 .admin-subheading {

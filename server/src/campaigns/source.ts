@@ -53,3 +53,68 @@ export function createDiskCampaignSource(dir?: string): CampaignSource {
     },
   };
 }
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Content published without a redeploy, fetched over HTTP -- the delivery half of issue
+ * #27. Same interface as `createDiskCampaignSource`, so `composition.ts` and every route
+ * downstream of it never learn which one they got.
+ *
+ * A **partial fetch throws.** One file 404ing (or timing out past its retries) must never
+ * silently produce a smaller, perfectly-valid catalog -- that's #22's third failure mode,
+ * the one validation cannot catch on its own, because a shorter catalog is not invalid, it
+ * is merely wrong. `Promise.all` over every file's fetch gives that for free: any one
+ * rejection fails the whole `load()`, and `ContentCell.refresh()` (content-cell.ts) is what
+ * turns that into "the previous catalog keeps serving" rather than a partial swap.
+ */
+export function createHttpCampaignSource(
+  baseUrl: string,
+  options: { readonly timeoutMs?: number; readonly retries?: number } = {},
+): CampaignSource {
+  const base = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
+  const timeoutMs = options.timeoutMs ?? 10_000;
+  const retries = options.retries ?? 2;
+
+  async function fetchOnce(path: string): Promise<Response> {
+    const response = await fetch(new URL(path, base), {
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (!response.ok)
+      throw new Error(`fetching ${path} returned ${response.status}`);
+    return response;
+  }
+
+  async function fetchWithRetry(path: string): Promise<Response> {
+    let lastError: unknown;
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        return await fetchOnce(path);
+      } catch (error) {
+        lastError = error;
+        if (attempt < retries) await sleep(200 * 2 ** attempt);
+      }
+    }
+    throw new Error(
+      `failed to fetch ${path} after ${retries + 1} attempt(s): ${String(lastError)}`,
+    );
+  }
+
+  async function readJson<T>(path: string): Promise<T> {
+    const response = await fetchWithRetry(path);
+    return (await response.json()) as T;
+  }
+
+  return {
+    async load() {
+      const manifest = await readJson<PortableManifest>("manifest.json");
+      return Promise.all(
+        manifest.campaigns.map((fileName) =>
+          readJson<PortableCampaign>(fileName),
+        ),
+      );
+    },
+  };
+}

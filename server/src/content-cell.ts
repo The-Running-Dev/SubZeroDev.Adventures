@@ -10,6 +10,7 @@ import type { ServerDemo } from "./composition.js";
 
 export interface ContentStatus {
   readonly campaignCount: number;
+  readonly contentDigest: string | undefined;
   readonly lastSuccessAt: string | undefined;
   readonly lastFailureAt: string | undefined;
   readonly lastError: string | undefined;
@@ -79,6 +80,7 @@ export function createContentCell(build: () => Promise<ServerDemo>): {
     status() {
       return {
         campaignCount: demo?.all.length ?? 0,
+        contentDigest: demo?.contentDigest,
         lastSuccessAt,
         lastFailureAt,
         lastError,

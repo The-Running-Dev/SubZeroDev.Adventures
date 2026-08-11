@@ -4,6 +4,10 @@ import cors from "@fastify/cors";
 import type { Pool } from "pg";
 import { createServerDemo } from "./composition.js";
 import { createContentCell } from "./content-cell.js";
+import {
+  createDiskCampaignSource,
+  createHttpCampaignSource,
+} from "./campaigns/source.js";
 import { registerHealthRoute } from "./health.js";
 import { registerSessionRoutes } from "./routes/session.js";
 import { registerReplayRoutes } from "./routes/replay.js";
@@ -14,6 +18,7 @@ import { registerBadgeRoutes } from "./routes/badges.js";
 import { registerStatsRoutes } from "./routes/stats.js";
 import { registerProfileRoutes } from "./routes/profile.js";
 import { registerRankingRoutes } from "./routes/ranking.js";
+import { registerAdminRoutes } from "./routes/admin.js";
 import { loadIdentityProviders } from "./identity/registry.js";
 
 /** The one place this server reads deployment configuration from -- `index.ts` is the only
@@ -22,13 +27,23 @@ import { loadIdentityProviders } from "./identity/registry.js";
 export interface AppConfig {
   readonly siteUrl: string;
   readonly apiUrl: string;
+  /** Undefined means "read content from disk" (`createDiskCampaignSource`'s default) --
+   *  the only configuration every test and every non-deployed run needs. Set once content
+   *  is actually published somewhere this server can fetch it from. */
+  readonly contentBaseUrl?: string;
+  /** `provider:subject` pairs, matched against a signed-in principal's linked identities
+   *  (`identities` table) to gate `/api/admin/*`. No provider name is ever typed into this
+   *  file or `routes/admin.ts` -- these are opaque strings from configuration, the same
+   *  posture `identity/registry.ts` already takes (CLAUDE.md, "The Identity Seam"). Absent
+   *  or empty means nobody can pass the guard, not that the guard is skipped. */
+  readonly adminSubjects?: readonly string[];
 }
 
 /** Builds the wired Fastify instance without binding a port -- shared by `index.ts`
  *  (which calls `listen`) and the test suite (which uses `app.inject()`). */
 export async function buildApp(
   pool: Pool,
-  { siteUrl, apiUrl }: AppConfig,
+  { siteUrl, apiUrl, contentBaseUrl, adminSubjects = [] }: AppConfig,
 ): Promise<FastifyInstance> {
   const app = Fastify({ logger: process.env.NODE_ENV !== "test" });
 
@@ -74,7 +89,12 @@ export async function buildApp(
   // The cell owns the swap: `refresh()` builds a complete `ServerDemo` and only publishes
   // it on success, so a bad rebuild leaves the previous one serving (#22). Every route below
   // takes `cell`, not a `ServerDemo` snapshot, and re-reads `cell.current()` per request.
-  const { cell, ready } = createContentCell(() => createServerDemo(pool));
+  const campaignSource = contentBaseUrl
+    ? createHttpCampaignSource(contentBaseUrl)
+    : createDiskCampaignSource();
+  const { cell, ready } = createContentCell(() =>
+    createServerDemo(pool, campaignSource),
+  );
   await ready();
   registerHealthRoute(app, pool, cell);
   const identityProviders = await loadIdentityProviders();
@@ -87,6 +107,7 @@ export async function buildApp(
   registerStatsRoutes(app, pool);
   registerProfileRoutes(app, pool, cell);
   registerRankingRoutes(app, pool);
+  registerAdminRoutes(app, pool, cell, adminSubjects);
 
   return app;
 }

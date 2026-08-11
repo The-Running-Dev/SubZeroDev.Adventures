@@ -1,5 +1,5 @@
 {
-  "formatVersion": 1,
+  "formatVersion": 2,
   "catalog": {
     "title": "What Would Lucifer Do?",
     "description": "Based unfortunately on actual events. Twenty-six real incidents, adapted from the SubZeroDev Blog — predict what he actually did.",
@@ -15,9 +15,9 @@
   },
   "campaign": {
     "id": "what-would-lucifer-do",
-    "kindId": "story-graph",
     "version": "1.1.0",
     "titleKey": "wwld.campaign.title",
+    "kindId": "story-graph",
     "content": {
       "descriptionKey": "wwld.campaign.description",
       "variables": {
@@ -3228,10 +3228,10 @@
           "descriptionKey": "wwld.achievement_saw_the_thumbs_up.description"
         }
       ]
+    },
+    "migration": {
+      "fromVersion": "1.0.0"
     }
-  },
-  "migration": {
-    "fromVersion": "1.0.0"
   },
   "strings": {
     "wwld.achievement_brought_alan_watts_into_this.description": "Correctly predict five or more philosophical detours.",

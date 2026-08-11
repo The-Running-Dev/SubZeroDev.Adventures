@@ -1,5 +1,5 @@
 {
-  "formatVersion": 1,
+  "formatVersion": 2,
   "catalog": {
     "title": "The Bureaucracy",
     "description": "Municipal, cadastral, archive, notary, and translation routes through one determined folder.",
@@ -9,9 +9,9 @@
   },
   "campaign": {
     "id": "bulgaria-bureaucracy",
-    "kindId": "story-graph",
     "version": "2.0.0",
     "titleKey": "bureaucracy.campaign.title",
+    "kindId": "story-graph",
     "content": {
       "descriptionKey": "bureaucracy.campaign.description",
       "variables": {
@@ -995,16 +995,16 @@
           "descriptionKey": "bureaucracy.achievement_supervisor_route_event_2b.description"
         }
       ]
-    }
-  },
-  "migration": {
-    "fromVersion": "1.0.0",
-    "nodeMap": {
-      "clerk_review": "registry_route_event_1",
-      "expired": "registry_route_1",
-      "room_14": "registry_route_event_2",
-      "room_6": "registry_route_3",
-      "reward": "ending_ultimate_reward"
+    },
+    "migration": {
+      "fromVersion": "1.0.0",
+      "nodeMap": {
+        "clerk_review": "registry_route_event_1",
+        "expired": "registry_route_1",
+        "room_14": "registry_route_event_2",
+        "room_6": "registry_route_3",
+        "reward": "ending_ultimate_reward"
+      }
     }
   },
   "strings": {

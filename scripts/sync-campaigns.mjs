@@ -1,14 +1,19 @@
 /**
  * Regenerates public/campaigns/ from the pinned engine submodule.
  *
- * The engine's exporter (engine/src/engine/scripts/spike-export-campaigns.ts) writes to a
- * path hardcoded relative to itself: engine/site/public/campaigns/ -- that's the engine
- * repo's *own* site/, which ships inside the submodule alongside the package. Rather than
- * patching that path (a cross-repo change to a script explicitly marked a throwaway spike,
- * `plans/spike-notes.md`), this script runs the exporter as-is and copies its output here.
+ * The engine's exporter (engine/src/engine/scripts/export-campaigns.ts, graduated out of
+ * spike status) writes to a path hardcoded relative to itself: engine/site/public/campaigns/
+ * -- that's the engine repo's *own* site/, which ships inside the submodule alongside the
+ * package. Rather than patching that path, this script runs the exporter as-is and copies
+ * its output here.
  *
- * Run after bumping the submodule to a new engine commit, then diff the result: a change in
- * public/campaigns/ that wasn't reviewed is a silent content change shipping to players.
+ * `public/campaigns/` is not wired into any runtime path in this repo -- the server's only
+ * content source is `SubZeroDev.Adventures.Content` (`server/src/index.ts`), and the
+ * standalone browser build always sets `VITE_API_URL` (`deploy.yml`). What's synced here is
+ * a fixture set several tests import directly (`browser-client.test.ts`, `PlayApp.test.tsx`,
+ * the visual baselines) -- run this after bumping the submodule so those fixtures track the
+ * engine's current portable format, then diff the result and update the visual baselines if
+ * rendered output actually changed (CLAUDE.md, "Visual Baselines").
  */
 
 import { execFileSync } from "node:child_process";
@@ -35,7 +40,7 @@ if (!npmCli) {
 }
 
 console.log("Exporting campaigns from the pinned engine submodule...");
-execFileSync(process.execPath, [npmCli, "run", "spike:export"], {
+execFileSync(process.execPath, [npmCli, "run", "export:campaigns"], {
   cwd: enginePackagePath,
   stdio: "inherit",
 });

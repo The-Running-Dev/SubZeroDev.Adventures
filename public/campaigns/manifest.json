@@ -1,14 +1,60 @@
 {
-  "formatVersion": 1,
+  "formatVersion": 2,
   "campaigns": [
-    "what-would-lucifer-do.json",
-    "what-would-lucifer-do-engineers-cut.json",
-    "lucifer-chronicles.json",
-    "bulgaria-bureaucracy.json",
-    "bulgaria-return.json",
-    "bulgaria-driving.json",
-    "bulgaria-inheritance.json",
-    "bulgaria-enterprise.json",
-    "saki-quest-for-redemption.json"
-  ]
+    {
+      "file": "what-would-lucifer-do.json",
+      "id": "what-would-lucifer-do",
+      "version": "1.1.0",
+      "digest": "sha-256:335dd8fa8cfd1e9874b2a327a3d6c4f9d0b653f75e118f95b8afe9cbabe6ca64"
+    },
+    {
+      "file": "what-would-lucifer-do-engineers-cut.json",
+      "id": "what-would-lucifer-do-engineers-cut",
+      "version": "1.0.0",
+      "digest": "sha-256:d4e4799a816f27d2170391337c508812dd302c2be06a554456c9268ff2da7cf6"
+    },
+    {
+      "file": "lucifer-chronicles.json",
+      "id": "lucifer-chronicles",
+      "version": "2.0.0",
+      "digest": "sha-256:9f81fd007ec94b8ecdd580d07927950ed6514a3db664010048a031aab0296934"
+    },
+    {
+      "file": "bulgaria-bureaucracy.json",
+      "id": "bulgaria-bureaucracy",
+      "version": "2.0.0",
+      "digest": "sha-256:de58bc01087fc05b237582414cf7e96f2fa67c374fa414f95287b1a4efd476e2"
+    },
+    {
+      "file": "bulgaria-return.json",
+      "id": "bulgaria-return",
+      "version": "2.0.0",
+      "digest": "sha-256:951a1b638dd8050aaeabd501c7915b73e488c55083972a877c4b4c622a72110a"
+    },
+    {
+      "file": "bulgaria-driving.json",
+      "id": "bulgaria-driving",
+      "version": "2.0.0",
+      "digest": "sha-256:03255609bea40c8b07f6c37f4aafbaf3a99f8a3a722fdb6485728485a4483bb5"
+    },
+    {
+      "file": "bulgaria-inheritance.json",
+      "id": "bulgaria-inheritance",
+      "version": "2.0.0",
+      "digest": "sha-256:316c884f68d16fc02b5de5f2f2d007c4eddebe1bd8bbb13d2c5733975a15b633"
+    },
+    {
+      "file": "bulgaria-enterprise.json",
+      "id": "bulgaria-enterprise",
+      "version": "2.0.0",
+      "digest": "sha-256:05a3fd67eae92c75458dd85ad40ad6923d2e65b987d0e40980af211406ef282d"
+    },
+    {
+      "file": "saki-quest-for-redemption.json",
+      "id": "saki-quest-for-redemption",
+      "version": "1.0.0",
+      "digest": "sha-256:9b8e4b0cd93e421fd995232e52f36a408725e4a4194d6bc1a18f33b38eac46a3"
+    }
+  ],
+  "resolution": "sha-256:9b487629351b980c8499ae8b53c1048fbb59639ef72ebc32578635df2b27333d"
 }

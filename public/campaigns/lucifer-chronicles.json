@@ -1,5 +1,5 @@
 {
-  "formatVersion": 1,
+  "formatVersion": 2,
   "catalog": {
     "title": "Lucifer Chronicles: The Bulgarian Incident",
     "description": "A profane, cosmic support ticket through property, paperwork, cars, AI scope creep, and Hell.",
@@ -15,9 +15,9 @@
   },
   "campaign": {
     "id": "lucifer-chronicles",
-    "kindId": "story-graph",
     "version": "2.0.0",
     "titleKey": "lucifer.campaign.title",
+    "kindId": "story-graph",
     "content": {
       "descriptionKey": "lucifer.campaign.description",
       "variables": {
@@ -5483,53 +5483,53 @@
           "descriptionKey": "lucifer.achievement_cosmic_customer_support.description"
         }
       ]
-    }
-  },
-  "migration": {
-    "fromVersion": "1.0.0",
-    "nodeMap": {
-      "ben_ending_incident_resolved": "ben_ending_the_builder",
-      "ben_ending_it_builds_character": "ben_ending_the_builder",
-      "ben_ending_room_14_resident": "ben_ending_the_builder",
-      "ben_ending_tomato_jurisprudence": "ben_ending_the_builder",
-      "ben_ending_bought_some_land": "ben_ending_the_builder",
-      "ben_ending_permission_to_exist": "ben_ending_the_builder",
-      "ben_ending_future_me_unanswered": "ben_ending_the_builder",
-      "ben_ending_another_product": "ben_ending_the_builder",
-      "ben_ending_uncategorizable_ben": "ben_ending_the_builder",
-      "ben_ending_well_why_not": "ben_ending_the_builder",
-      "lucifer_ending_ticket_closed": "lucifer_ending_support_manager",
-      "lucifer_ending_customer_support": "lucifer_ending_support_manager",
-      "lucifer_ending_governor_of_alive": "lucifer_ending_support_manager",
-      "lucifer_ending_escape_hatch_missing": "lucifer_ending_support_manager",
-      "lucifer_ending_fly_treaty": "lucifer_ending_support_manager",
-      "lucifer_ending_fly_statistic": "lucifer_ending_support_manager",
-      "lucifer_ending_agents_failed": "lucifer_ending_support_manager",
-      "lucifer_ending_platform_outbreak": "lucifer_ending_support_manager",
-      "lucifer_ending_invites_ben": "lucifer_ending_support_manager",
-      "lucifer_ending_that_one_is_ours": "lucifer_ending_support_manager"
     },
-    "endingMap": {
-      "ben_incident_resolved": "ben_the_builder",
-      "ben_it_builds_character": "ben_the_builder",
-      "ben_room_14_resident": "ben_the_builder",
-      "ben_tomato_jurisprudence": "ben_the_builder",
-      "ben_bought_some_land": "ben_the_builder",
-      "ben_permission_to_exist": "ben_the_builder",
-      "ben_future_me_unanswered": "ben_the_builder",
-      "ben_another_product": "ben_the_builder",
-      "ben_uncategorizable_ben": "ben_the_builder",
-      "ben_well_why_not": "ben_the_builder",
-      "lucifer_ticket_closed": "lucifer_support_manager",
-      "lucifer_customer_support": "lucifer_support_manager",
-      "lucifer_governor_of_alive": "lucifer_support_manager",
-      "lucifer_escape_hatch_missing": "lucifer_support_manager",
-      "lucifer_fly_treaty": "lucifer_support_manager",
-      "lucifer_fly_statistic": "lucifer_support_manager",
-      "lucifer_agents_failed": "lucifer_support_manager",
-      "lucifer_platform_outbreak": "lucifer_support_manager",
-      "lucifer_invites_ben": "lucifer_support_manager",
-      "lucifer_that_one_is_ours": "lucifer_support_manager"
+    "migration": {
+      "fromVersion": "1.0.0",
+      "nodeMap": {
+        "ben_ending_incident_resolved": "ben_ending_the_builder",
+        "ben_ending_it_builds_character": "ben_ending_the_builder",
+        "ben_ending_room_14_resident": "ben_ending_the_builder",
+        "ben_ending_tomato_jurisprudence": "ben_ending_the_builder",
+        "ben_ending_bought_some_land": "ben_ending_the_builder",
+        "ben_ending_permission_to_exist": "ben_ending_the_builder",
+        "ben_ending_future_me_unanswered": "ben_ending_the_builder",
+        "ben_ending_another_product": "ben_ending_the_builder",
+        "ben_ending_uncategorizable_ben": "ben_ending_the_builder",
+        "ben_ending_well_why_not": "ben_ending_the_builder",
+        "lucifer_ending_ticket_closed": "lucifer_ending_support_manager",
+        "lucifer_ending_customer_support": "lucifer_ending_support_manager",
+        "lucifer_ending_governor_of_alive": "lucifer_ending_support_manager",
+        "lucifer_ending_escape_hatch_missing": "lucifer_ending_support_manager",
+        "lucifer_ending_fly_treaty": "lucifer_ending_support_manager",
+        "lucifer_ending_fly_statistic": "lucifer_ending_support_manager",
+        "lucifer_ending_agents_failed": "lucifer_ending_support_manager",
+        "lucifer_ending_platform_outbreak": "lucifer_ending_support_manager",
+        "lucifer_ending_invites_ben": "lucifer_ending_support_manager",
+        "lucifer_ending_that_one_is_ours": "lucifer_ending_support_manager"
+      },
+      "endingMap": {
+        "ben_incident_resolved": "ben_the_builder",
+        "ben_it_builds_character": "ben_the_builder",
+        "ben_room_14_resident": "ben_the_builder",
+        "ben_tomato_jurisprudence": "ben_the_builder",
+        "ben_bought_some_land": "ben_the_builder",
+        "ben_permission_to_exist": "ben_the_builder",
+        "ben_future_me_unanswered": "ben_the_builder",
+        "ben_another_product": "ben_the_builder",
+        "ben_uncategorizable_ben": "ben_the_builder",
+        "ben_well_why_not": "ben_the_builder",
+        "lucifer_ticket_closed": "lucifer_support_manager",
+        "lucifer_customer_support": "lucifer_support_manager",
+        "lucifer_governor_of_alive": "lucifer_support_manager",
+        "lucifer_escape_hatch_missing": "lucifer_support_manager",
+        "lucifer_fly_treaty": "lucifer_support_manager",
+        "lucifer_fly_statistic": "lucifer_support_manager",
+        "lucifer_agents_failed": "lucifer_support_manager",
+        "lucifer_platform_outbreak": "lucifer_support_manager",
+        "lucifer_invites_ben": "lucifer_support_manager",
+        "lucifer_that_one_is_ours": "lucifer_support_manager"
+      }
     }
   },
   "strings": {

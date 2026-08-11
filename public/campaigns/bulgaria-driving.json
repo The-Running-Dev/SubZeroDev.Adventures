@@ -1,5 +1,5 @@
 {
-  "formatVersion": 1,
+  "formatVersion": 2,
   "catalog": {
     "title": "Driving",
     "description": "Inspection, road trouble, insurance, towing, and mechanical optimism.",
@@ -9,9 +9,9 @@
   },
   "campaign": {
     "id": "bulgaria-driving",
-    "kindId": "story-graph",
     "version": "2.0.0",
     "titleKey": "driving.campaign.title",
+    "kindId": "story-graph",
     "content": {
       "descriptionKey": "driving.campaign.description",
       "variables": {
@@ -985,17 +985,17 @@
           "descriptionKey": "driving.achievement_escape_route_event_2b.description"
         }
       ]
-    }
-  },
-  "migration": {
-    "fromVersion": "1.0.0",
-    "nodeMap": {
-      "bmw_ownership": "repair_route_4",
-      "ending_trusting": "ending_trusting_the_mechanic",
-      "ending_skeptical": "ending_sold_car"
     },
-    "endingMap": {
-      "asked_for_a_second_opinion": "sold_car"
+    "migration": {
+      "fromVersion": "1.0.0",
+      "nodeMap": {
+        "bmw_ownership": "repair_route_4",
+        "ending_trusting": "ending_trusting_the_mechanic",
+        "ending_skeptical": "ending_sold_car"
+      },
+      "endingMap": {
+        "asked_for_a_second_opinion": "sold_car"
+      }
     }
   },
   "strings": {

@@ -1,6 +1,5 @@
 import { Pool } from "pg";
 import { buildApp } from "./app.js";
-import { createDiskCampaignSource } from "./campaigns/source.js";
 import { createMultiSourceCampaignSource } from "./campaigns/multi-source.js";
 
 const port = Number(process.env.PORT ?? 8787);
@@ -22,33 +21,25 @@ const pool = new Pool({ connectionString: databaseUrl });
 // It is not admin-editable and carries no `CAMPAIGNS_DIR`/env override: the way to point a
 // deployment somewhere else is to add another source, not to change this one.
 //
-// `The-Running-Dev/SubZeroDev.Adventures.Content` serves its manifest under a `v2/` path,
-// not at the repo root -- the root 404s. Its `fallback` is what keeps a bad URL here (or any
-// other failure) from making the whole server unpublishable: it degrades to the committed
-// disk snapshot -- the same content this URL is meant to serve -- and the refresh goes
-// through, so content an operator adds through the admin page actually goes live instead of
-// being saved behind a source that cannot succeed. The failure is still reported, on the
-// builtin's own row.
-//
+// `The-Running-Dev/SubZeroDev.Adventures.Content` serves its manifest at the repo root, not
+// under a `v2/` path -- an earlier commit here guessed `v2/` before the site had actually
+// finished publishing and got it wrong; verified live against the deployed Pages site before
+// fixing this. It is the one source of truth for campaign content now -- no disk fallback
+// stands behind it. `public/campaigns/` still exists in this repository, but only as a
+// fixture set the test suite imports directly; it is not wired into any runtime path, so it
+// cannot drift from what actually ships without a test catching it, and it also cannot
+// silently paper over this source being unreachable.
 const campaignSource = createMultiSourceCampaignSource(pool, {
   id: "builtin-default",
   label: "SubZeroDev.Adventures.Content",
   kind: "url",
-  url: "https://the-running-dev.github.io/SubZeroDev.Adventures.Content/v2/",
-  fallback: createDiskCampaignSource(),
+  url: "https://the-running-dev.github.io/SubZeroDev.Adventures.Content/",
 });
 
 const app = await buildApp(pool, {
   siteUrl,
   apiUrl,
   campaignSource,
-  // Boots from the snapshot when the first build off `campaignSource` fails for any reason
-  // -- including one that no source-level fallback can see, because it happens *after*
-  // every source has loaded: a pasted extension that collides with the campaign it extends
-  // fails validation of the merged registry, not a fetch. That is the failure that
-  // crash-looped this server in production, and it is why this guard lives at the cell and
-  // not on a source (`content-cell.ts`'s `ready`).
-  bootstrapSource: createDiskCampaignSource(),
   adminSubjects,
 });
 

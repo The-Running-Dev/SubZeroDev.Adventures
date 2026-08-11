@@ -5,9 +5,9 @@
 #   docker compose -f server/docker-compose.yml up -d --build
 #
 # Lives next to the Dockerfile it builds, but its build context is the *repository root*
-# (`context: ..`) -- the image needs engine/, shared/, public/campaigns/, and server/, the
-# same four things server/src/composition.ts and shared/campaign-registry.ts reach across
-# at runtime. See server/Dockerfile's header.
+# (`context: ..`) -- the image needs engine/, shared/, and server/, the same three things
+# server/src/composition.ts and shared/campaign-registry.ts reach across at runtime. See
+# server/Dockerfile's header.
 #
 # Credentials here are throwaway and deliberately hardcoded: this stack is disposable, and
 # a dev database that needs a secret to start is a dev database nobody starts. The
@@ -37,8 +37,7 @@ x-adventures-api-dev: &adventures-api-dev
   # location, one .env.example describing it. Optional here (unlike the deployment file,
   # where it is required) so a fresh clone can bring the stack up with no setup; only the
   # OAuth upgrade path needs OIDC_CLIENT_ID/SECRET, and the server treats both as absent
-  # when unset. CAMPAIGNS_DIR is deliberately left unset so this stack exercises
-  # composition.ts's default module-relative path, which is what `npm run start` uses too.
+  # when unset.
   env_file:
     - path: ../.env
       required: false

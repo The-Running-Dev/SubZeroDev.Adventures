@@ -1,5 +1,5 @@
 {
-  "formatVersion": 1,
+  "formatVersion": 2,
   "catalog": {
     "title": "Inheritance",
     "description": "Family property, evidence, neighbours, court, and tomato-adjacent law.",
@@ -9,9 +9,9 @@
   },
   "campaign": {
     "id": "bulgaria-inheritance",
-    "kindId": "story-graph",
     "version": "2.0.0",
     "titleKey": "inheritance.campaign.title",
+    "kindId": "story-graph",
     "content": {
       "descriptionKey": "inheritance.campaign.description",
       "variables": {
@@ -997,21 +997,21 @@
           "descriptionKey": "inheritance.achievement_police_route_event_2b.description"
         }
       ]
-    }
-  },
-  "migration": {
-    "fromVersion": "1.0.0",
-    "nodeMap": {
-      "village_life": "neighbour_route_1",
-      "family_meeting": "neighbour_route_4",
-      "ending_avoided": "ending_abandonment",
-      "ending_unresolved": "ending_family_war",
-      "ending_resolved": "ending_settlement"
     },
-    "endingMap": {
-      "avoided_the_inheritance": "abandonment",
-      "the_argument_continues": "family_war",
-      "the_documents_settle_it": "settlement"
+    "migration": {
+      "fromVersion": "1.0.0",
+      "nodeMap": {
+        "village_life": "neighbour_route_1",
+        "family_meeting": "neighbour_route_4",
+        "ending_avoided": "ending_abandonment",
+        "ending_unresolved": "ending_family_war",
+        "ending_resolved": "ending_settlement"
+      },
+      "endingMap": {
+        "avoided_the_inheritance": "abandonment",
+        "the_argument_continues": "family_war",
+        "the_documents_settle_it": "settlement"
+      }
     }
   },
   "strings": {

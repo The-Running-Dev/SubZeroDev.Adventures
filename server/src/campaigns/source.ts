@@ -10,11 +10,31 @@
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import type { PortableCampaign } from "@the-running-dev/game-engine";
+import {
+  digestPortableCampaign,
+  type PortableCampaign,
+} from "@the-running-dev/game-engine";
 import {
   type PortableExtension,
   type PortableManifestWithExtensions,
 } from "../../../shared/campaign-extension.js";
+
+/** `entry.digest` (`sha-256:<hex>` over the canonical JSON, per the engine's graduated
+ *  portable format) lets a source catch a manifest/file mismatch instead of silently
+ *  serving a campaign that does not match what the manifest promised. */
+async function readVerifiedCampaign(
+  entry: { readonly file: string; readonly digest: string },
+  readJson: <T>(path: string) => Promise<T>,
+): Promise<PortableCampaign> {
+  const portable = await readJson<PortableCampaign>(entry.file);
+  const digest = digestPortableCampaign(portable);
+  if (digest !== entry.digest) {
+    throw new Error(
+      `${entry.file}: fetched content does not match manifest digest (expected ${entry.digest}, got ${digest})`,
+    );
+  }
+  return portable;
+}
 
 export interface LoadedContent {
   readonly campaigns: readonly PortableCampaign[];
@@ -58,8 +78,8 @@ export function createDiskCampaignSource(dir?: string): CampaignSource {
         await readJson<PortableManifestWithExtensions>("manifest.json");
       const [campaigns, extensions] = await Promise.all([
         Promise.all(
-          manifest.campaigns.map((fileName) =>
-            readJson<PortableCampaign>(fileName),
+          manifest.campaigns.map((entry) =>
+            readVerifiedCampaign(entry, readJson),
           ),
         ),
         Promise.all(
@@ -132,8 +152,8 @@ export function createHttpCampaignSource(
         await readJson<PortableManifestWithExtensions>("manifest.json");
       const [campaigns, extensions] = await Promise.all([
         Promise.all(
-          manifest.campaigns.map((fileName) =>
-            readJson<PortableCampaign>(fileName),
+          manifest.campaigns.map((entry) =>
+            readVerifiedCampaign(entry, readJson),
           ),
         ),
         Promise.all(

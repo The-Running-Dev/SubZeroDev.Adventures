@@ -1,5 +1,5 @@
 {
-  "formatVersion": 1,
+  "formatVersion": 2,
   "catalog": {
     "title": "Enterprise",
     "description": "Clients, tax, hiring, growth, cashflow, and the price of one more opportunity.",
@@ -9,9 +9,9 @@
   },
   "campaign": {
     "id": "bulgaria-enterprise",
-    "kindId": "story-graph",
     "version": "2.0.0",
     "titleKey": "enterprise.campaign.title",
+    "kindId": "story-graph",
     "content": {
       "descriptionKey": "enterprise.campaign.description",
       "variables": {
@@ -991,16 +991,16 @@
           "descriptionKey": "enterprise.achievement_pressure_route_event_2b.description"
         }
       ]
-    }
-  },
-  "migration": {
-    "fromVersion": "1.0.0",
-    "nodeMap": {
-      "entrepreneur": "consultant_route_2",
-      "ending": "ending_consultant"
     },
-    "endingMap": {
-      "a_permanent_line_item": "bankruptcy"
+    "migration": {
+      "fromVersion": "1.0.0",
+      "nodeMap": {
+        "entrepreneur": "consultant_route_2",
+        "ending": "ending_consultant"
+      },
+      "endingMap": {
+        "a_permanent_line_item": "bankruptcy"
+      }
     }
   },
   "strings": {

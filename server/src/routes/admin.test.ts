@@ -8,7 +8,10 @@ import { createServer, type Server } from "node:http";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Pool } from "pg";
 import type { FastifyInstance } from "fastify";
-import type { PortableCampaign } from "@the-running-dev/game-engine";
+import {
+  digestPortableCampaign,
+  type PortableCampaign,
+} from "@the-running-dev/game-engine";
 import { buildApp } from "../app.js";
 import { createMultiSourceCampaignSource } from "../campaigns/multi-source.js";
 
@@ -30,7 +33,7 @@ function cookieFrom(response: { headers: Record<string, unknown> }): string {
  *  parameterized by id so each mock server below can serve a distinct one. */
 function minimalPortableCampaign(id: string) {
   return {
-    formatVersion: 1,
+    formatVersion: 2,
     catalog: {
       title: id,
       description: "d",
@@ -79,15 +82,19 @@ function minimalPortableCampaign(id: string) {
 function startCampaignServer(
   campaignIds: readonly string[],
 ): Promise<{ server: Server; url: string }> {
-  const files: Record<string, unknown> = {
-    "/manifest.json": {
-      formatVersion: 1,
-      campaigns: campaignIds.map((id) => `${id}.json`),
-    },
-  };
+  const files: Record<string, unknown> = {};
   for (const id of campaignIds) {
     files[`/${id}.json`] = minimalPortableCampaign(id);
   }
+  files["/manifest.json"] = {
+    formatVersion: 2,
+    campaigns: campaignIds.map((id) => ({
+      file: `${id}.json`,
+      id,
+      version: "1.0.0",
+      digest: digestPortableCampaign(files[`/${id}.json`]),
+    })),
+  };
   return new Promise((resolve) => {
     const server = createServer((request, response) => {
       const body = files[request.url ?? "/"];
@@ -526,10 +533,12 @@ describeIfDb("/api/admin/content/sources", () => {
   });
 });
 
-// The deployed shape: the builtin URL does not resolve (SubZeroDev.Adventures.Content does
-// not exist yet) and carries the committed snapshot as its fallback. Without that fallback
+// The old deployed shape, kept as a regression test for the fallback *mechanism* itself
+// (`SourceEntry.fallback`, multi-source.ts) even though `server/src/index.ts` no longer
+// wires a fallback onto the real builtin -- an unreachable builtin with no fallback would
+// just fail every refresh, so this constructs one inline instead. Without a fallback here
 // this whole suite is one assertion -- "nothing can ever be published" -- since the builtin
-// is unremovable and would fail every refresh forever.
+// is unremovable.
 describeIfDb("/api/admin/content/sources with an unreachable builtin", () => {
   let pool: Pool;
   let app: FastifyInstance;

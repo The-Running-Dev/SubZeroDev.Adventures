@@ -26,7 +26,7 @@ import { buildCatalog, KINDS } from "./campaign-registry.js";
 
 function fixture(): PortableCampaign {
   return {
-    formatVersion: 1,
+    formatVersion: 2,
     catalog: {
       title: "Test Campaign",
       description: "A minimal story-graph campaign for merge tests.",

@@ -5,7 +5,25 @@
  */
 import { createServer, type Server } from "node:http";
 import { afterEach, describe, expect, it } from "vitest";
+import { digestPortableCampaign } from "@the-running-dev/game-engine";
 import { createHttpCampaignSource } from "./source.js";
+
+/** A manifest entry with a digest that actually matches `campaign` -- `source.ts` now
+ *  verifies every fetched campaign against its manifest entry (the engine's graduated
+ *  portable format), so a fixture with a stale or omitted digest fails for a reason
+ *  unrelated to what each test below is actually exercising. */
+function manifestEntry(
+  file: string,
+  id: string,
+  campaign: unknown,
+): { file: string; id: string; version: string; digest: string } {
+  return {
+    file,
+    id,
+    version: "1.0.0",
+    digest: digestPortableCampaign(campaign),
+  };
+}
 
 interface Handler {
   (path: string): { status: number; body?: unknown; delayMs?: number };
@@ -42,11 +60,19 @@ describe("createHttpCampaignSource", () => {
   });
 
   it("loads every campaign the manifest lists", async () => {
-    const manifest = { formatVersion: 1, campaigns: ["a.json", "b.json"] };
+    const campaignA = { campaign: { id: "a" } };
+    const campaignB = { campaign: { id: "b" } };
+    const manifest = {
+      formatVersion: 2,
+      campaigns: [
+        manifestEntry("a.json", "a", campaignA),
+        manifestEntry("b.json", "b", campaignB),
+      ],
+    };
     const campaigns: Record<string, unknown> = {
       "/manifest.json": manifest,
-      "/a.json": { campaign: { id: "a" } },
-      "/b.json": { campaign: { id: "b" } },
+      "/a.json": campaignA,
+      "/b.json": campaignB,
     };
     const started = await startServer((path) => ({
       status: 200,
@@ -57,15 +83,12 @@ describe("createHttpCampaignSource", () => {
     const source = createHttpCampaignSource(started.url);
     const loaded = await source.load();
 
-    expect(loaded.campaigns).toEqual([
-      { campaign: { id: "a" } },
-      { campaign: { id: "b" } },
-    ]);
+    expect(loaded.campaigns).toEqual([campaignA, campaignB]);
     expect(loaded.extensions).toEqual([]);
   });
 
   it("loads no extensions when the manifest declares none", async () => {
-    const manifest = { formatVersion: 1, campaigns: [] };
+    const manifest = { formatVersion: 2, campaigns: [] };
     const started = await startServer((path) =>
       path === "/manifest.json"
         ? { status: 200, body: manifest }
@@ -79,7 +102,7 @@ describe("createHttpCampaignSource", () => {
 
   it("loads every extension the manifest lists", async () => {
     const manifest = {
-      formatVersion: 1,
+      formatVersion: 2,
       campaigns: [],
       extensions: ["ext-a.json"],
     };
@@ -106,14 +129,19 @@ describe("createHttpCampaignSource", () => {
   });
 
   it("throws rather than returning a partial catalog when one file 404s", async () => {
+    const campaignA = { campaign: { id: "a" } };
     const manifest = {
-      formatVersion: 1,
-      campaigns: ["a.json", "missing.json"],
+      formatVersion: 2,
+      campaigns: [
+        manifestEntry("a.json", "a", campaignA),
+        manifestEntry("missing.json", "missing", {
+          campaign: { id: "missing" },
+        }),
+      ],
     };
     const started = await startServer((path) => {
       if (path === "/manifest.json") return { status: 200, body: manifest };
-      if (path === "/a.json")
-        return { status: 200, body: { campaign: { id: "a" } } };
+      if (path === "/a.json") return { status: 200, body: campaignA };
       return { status: 404 };
     });
     server = started.server;
@@ -123,14 +151,18 @@ describe("createHttpCampaignSource", () => {
   });
 
   it("retries a transient failure and still succeeds", async () => {
-    const manifest = { formatVersion: 1, campaigns: ["a.json"] };
+    const campaignA = { campaign: { id: "a" } };
+    const manifest = {
+      formatVersion: 2,
+      campaigns: [manifestEntry("a.json", "a", campaignA)],
+    };
     let attempts = 0;
     const started = await startServer((path) => {
       if (path === "/manifest.json") return { status: 200, body: manifest };
       attempts += 1;
       // Fails the first attempt, succeeds on the retry.
       if (attempts === 1) return { status: 503 };
-      return { status: 200, body: { campaign: { id: "a" } } };
+      return { status: 200, body: campaignA };
     });
     server = started.server;
 
@@ -140,12 +172,15 @@ describe("createHttpCampaignSource", () => {
     });
     const loaded = await source.load();
 
-    expect(loaded.campaigns).toEqual([{ campaign: { id: "a" } }]);
+    expect(loaded.campaigns).toEqual([campaignA]);
     expect(attempts).toBe(2);
   });
 
   it("gives up and throws once retries are exhausted", async () => {
-    const manifest = { formatVersion: 1, campaigns: ["a.json"] };
+    const manifest = {
+      formatVersion: 2,
+      campaigns: [manifestEntry("a.json", "a", { campaign: { id: "a" } })],
+    };
     const started = await startServer((path) =>
       path === "/manifest.json"
         ? { status: 200, body: manifest }
@@ -158,11 +193,15 @@ describe("createHttpCampaignSource", () => {
   });
 
   it("times out a request that never responds", async () => {
-    const manifest = { formatVersion: 1, campaigns: ["a.json"] };
+    const campaignA = { campaign: { id: "a" } };
+    const manifest = {
+      formatVersion: 2,
+      campaigns: [manifestEntry("a.json", "a", campaignA)],
+    };
     const started = await startServer((path) =>
       path === "/manifest.json"
         ? { status: 200, body: manifest }
-        : { status: 200, body: { campaign: { id: "a" } }, delayMs: 500 },
+        : { status: 200, body: campaignA, delayMs: 500 },
     );
     server = started.server;
 

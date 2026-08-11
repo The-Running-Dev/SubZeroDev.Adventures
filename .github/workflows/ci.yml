@@ -43,11 +43,6 @@ jobs:
           path: .vitest-attachments/
           if-no-files-found: ignore
 
-      - name: Verify campaign content is not stale
-        run: |
-          npm run sync:campaigns
-          git diff --exit-code -- public/campaigns
-
   # The Node API (server/) -- a separate npm project, not part of the `ci` job above,
   # which stays exactly as it was. Needs a real Postgres for the port-conformance and
   # replay-verify tests in server/src/api.test.ts, provided as a service container rather

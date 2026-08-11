@@ -113,10 +113,10 @@ function shortPreview(text: string, max = 60): string {
 /**
  * What an Add & Sync actually did. Three outcomes, not two, because a refresh is fail-closed
  * across *every* source: the add can succeed and the refresh still fail on a source the
- * operator never touched (the hardcoded default 404s until `SubZeroDev.Adventures.Content`
- * exists to serve it). Reporting that as one red "added, but the refresh failed" reads as
- * "your paste was rejected", which is the opposite of what happened -- the row is saved,
- * validated, and takes effect the moment the *other* source stops failing.
+ * operator never touched (a network blip against `SubZeroDev.Adventures.Content`, say).
+ * Reporting that as one red "added, but the refresh failed" reads as "your paste was
+ * rejected", which is the opposite of what happened -- the row is saved, validated, and
+ * takes effect the moment the *other* source stops failing.
  */
 interface AddOutcome {
   readonly tone: "ok" | "warn" | "error";

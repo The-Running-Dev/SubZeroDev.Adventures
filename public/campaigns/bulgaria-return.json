@@ -1,5 +1,5 @@
 {
-  "formatVersion": 1,
+  "formatVersion": 2,
   "catalog": {
     "title": "The Return",
     "description": "Return to Bulgaria through city, village, or temporary-home routes.",
@@ -9,9 +9,9 @@
   },
   "campaign": {
     "id": "bulgaria-return",
-    "kindId": "story-graph",
     "version": "2.0.0",
     "titleKey": "return.campaign.title",
+    "kindId": "story-graph",
     "content": {
       "descriptionKey": "return.campaign.description",
       "variables": {
@@ -973,12 +973,12 @@
           "descriptionKey": "return.achievement_temporary_return_event_2b.description"
         }
       ]
-    }
-  },
-  "migration": {
-    "fromVersion": "1.0.0",
-    "nodeMap": {
-      "home_again": "ending_home_again"
+    },
+    "migration": {
+      "fromVersion": "1.0.0",
+      "nodeMap": {
+        "home_again": "ending_home_again"
+      }
     }
   },
   "strings": {

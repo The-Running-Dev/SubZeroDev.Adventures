@@ -1,9 +1,11 @@
 # syntax=docker/dockerfile:1
 #
 # Build context is the repository root -- server/docker-compose.yml sets `context: ..` and
-# deploy-api.yml sets `context: .`. This image needs engine/, shared/, public/campaigns/,
-# and server/: the same four things server/src/composition.ts and
-# shared/campaign-registry.ts reach across at runtime.
+# deploy-api.yml sets `context: .`. This image needs engine/, shared/, and server/: the same
+# three things server/src/composition.ts and shared/campaign-registry.ts reach across at
+# runtime. public/campaigns/ is not among them -- it is test-fixture content only
+# (server/src/index.ts's only content source is SubZeroDev.Adventures.Content), so it is
+# deliberately not copied into either target below.
 #
 # Two targets the compose files pick between:
 #   dev      -- server/docker-compose.yml. TypeScript straight through tsx, full
@@ -85,7 +87,6 @@ COPY server/vendor server/vendor
 RUN npm ci --prefix server
 COPY package.json package.json
 COPY shared shared
-COPY public/campaigns public/campaigns
 COPY server server
 # Node resolves a module's dependencies by walking node_modules up through its *ancestor*
 # directories. /app/shared and /app/server are siblings, so server/node_modules is never on
@@ -98,8 +99,6 @@ WORKDIR /app/server
 ENV PATH=/app/server/node_modules/.bin:$PATH
 ENV ADVENTURES_SERVE_CMD="tsx src/index.ts"
 ENV ADVENTURES_MAINTAIN_CMD="tsx src/maintenance-cli.ts"
-# CAMPAIGNS_DIR is deliberately unset: this target runs composition.ts from its source
-# location, where the module-relative default already resolves to /app/public/campaigns.
 COPY server/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 EXPOSE 8787
@@ -131,7 +130,6 @@ COPY --from=build /app/server/dist server/dist
 # "type": "module" is what makes Node treat the emitted tree as ESM rather than CommonJS.
 COPY server/package.json server/package.json
 COPY server/migrations server/migrations
-COPY public/campaigns public/campaigns
 
 COPY server/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
@@ -146,9 +144,6 @@ ENV PATH=/app/server/node_modules/.bin:$PATH
 # property of the image and never leaks into either compose file.
 ENV ADVENTURES_SERVE_CMD="node dist/server/src/index.js"
 ENV ADVENTURES_MAINTAIN_CMD="node dist/server/src/maintenance-cli.js"
-# Required, not optional: composition.ts's module-relative default is computed from
-# dist/server/src/ here, which is not where the campaign JSON went.
-ENV CAMPAIGNS_DIR=/app/public/campaigns
 
 # The base image's existing uid-1000 `node` user. Everything above is root-owned and only
 # ever read, and this process writes nothing to disk -- all state is in Postgres.

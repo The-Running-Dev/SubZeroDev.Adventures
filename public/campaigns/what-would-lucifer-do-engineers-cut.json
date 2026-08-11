@@ -1,5 +1,5 @@
 {
-  "formatVersion": 1,
+  "formatVersion": 2,
   "catalog": {
     "title": "What Would Lucifer Do? — Engineer's Cut",
     "description": "The sixteen predictions What Would Lucifer Do? relocated for a general audience — thirteen technical, three software-career — told here in their original wording: the real rubric, the real pipelines, the real policy.",
@@ -10,9 +10,9 @@
   },
   "campaign": {
     "id": "what-would-lucifer-do-engineers-cut",
-    "kindId": "story-graph",
     "version": "1.0.0",
     "titleKey": "wwldx.campaign.title",
+    "kindId": "story-graph",
     "content": {
       "descriptionKey": "wwldx.campaign.description",
       "variables": {

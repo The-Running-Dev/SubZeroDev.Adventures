@@ -1,5 +1,5 @@
 {
-  "formatVersion": 1,
+  "formatVersion": 2,
   "catalog": {
     "title": "Saki: Quest for Redemption",
     "description": "A private five-act arc through consultations, tribunals, and unsolicited grand gestures.",
@@ -10,9 +10,9 @@
   },
   "campaign": {
     "id": "saki-quest-for-redemption",
-    "kindId": "story-graph",
     "version": "1.0.0",
     "titleKey": "saki.campaign.title",
+    "kindId": "story-graph",
     "content": {
       "descriptionKey": "saki.campaign.description",
       "variables": {

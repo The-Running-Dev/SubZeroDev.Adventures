@@ -6,7 +6,10 @@
  */
 import { createServer, type Server } from "node:http";
 import { afterEach, describe, expect, it } from "vitest";
-import type { PortableCampaign } from "@the-running-dev/game-engine";
+import {
+  digestPortableCampaign,
+  type PortableCampaign,
+} from "@the-running-dev/game-engine";
 import type { PortableExtension } from "../../../shared/campaign-extension.js";
 import {
   classifyPastedPayload,
@@ -136,10 +139,21 @@ describe("loadAllSources", () => {
   });
 
   it("fetches a url entry over HTTP like createHttpCampaignSource does directly", async () => {
-    const manifest = { formatVersion: 1, campaigns: ["a.json"] };
+    const campaignA = { campaign: { id: "a" } };
+    const manifest = {
+      formatVersion: 2,
+      campaigns: [
+        {
+          file: "a.json",
+          id: "a",
+          version: "1.0.0",
+          digest: digestPortableCampaign(campaignA),
+        },
+      ],
+    };
     const files: Record<string, unknown> = {
       "/manifest.json": manifest,
-      "/a.json": { campaign: { id: "a" } },
+      "/a.json": campaignA,
     };
     const started = await startServer((path) => ({
       status: 200,
@@ -152,7 +166,7 @@ describe("loadAllSources", () => {
     ]);
 
     expect(result.ok).toBe(true);
-    expect(result.campaigns).toEqual([{ campaign: { id: "a" } }]);
+    expect(result.campaigns).toEqual([campaignA]);
   });
 
   it("degrades an entry with a fallback instead of failing the refresh, and still reports why", async () => {

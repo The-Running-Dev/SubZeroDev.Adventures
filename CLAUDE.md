@@ -18,7 +18,7 @@ is the one going forward.
 ```
 engine/                 git submodule, the whole SubZeroDev.GameEngine repo, pinned by commit
   src/engine/            the npm package this site depends on (file:./engine/src/engine)
-public/campaigns/       generated campaign JSON, committed — see "Campaign content" below
+public/campaigns/       test-fixture campaign JSON, committed — see "Campaign content" below
 src/
   main.tsx, index.css, site.css, shared.tsx    app shell
   play/                  the game itself: PlayApp.tsx, composition.ts, browser-client.ts, play.css
@@ -40,30 +40,40 @@ docker-compose.yml      the deployment stack — see "The Two Compose Files" bel
   `npm run sync:campaigns` and diff `public/campaigns/` for unreviewed content changes, and
   run the full `npm run check` gate — an engine change can change campaign content, validation
   behavior, or (per the browser-portability gate in `scripts/verify-build.mjs`) reintroduce a
-  Node-only import into a browser bundle.
-- **Two of the exports this repo depends on are marked non-contract upstream**:
-  `fromPortable` and the `Portable*` types, in `engine/src/engine/src/index.ts` (comment:
-  `// SPIKE: runtime campaign loading … not a contract export`). A submodule bump can change
-  or remove either without an upstream deprecation cycle. If a bump breaks
-  `src/play/composition.ts` on this boundary, that is expected risk, not a bug to route
-  upstream as-is — check whether the upstream shape genuinely changed before assuming this
-  repo regressed.
+  Node-only import into a browser bundle. It can also change the rendered UI enough to need
+  new visual baselines — see "Visual Baselines" below.
+- **The portable campaign format graduated out of spike status** (engine `0.6.0`):
+  `fromPortable`, `digestPortableCampaign`, and the `Portable*` types are now real exports
+  from `engine/src/engine/src/index.ts`, not disclaimed ones. `formatVersion` is `2`:
+  `campaign.content` is a `kindId`-discriminated union instead of `unknown`, a manifest's
+  `campaigns` entries carry `{file, id, version, digest}` instead of a bare filename, and
+  `migration` moved from a sibling of `campaign` into the story-graph arm of the union. Both
+  `server/src/campaigns/source.ts` and `src/play/composition.ts` verify each fetched
+  campaign against its manifest entry's digest (`digestPortableCampaign`) before trusting it.
 
 ## Campaign Content
 
-`public/campaigns/*.json` (9 campaigns + `manifest.json`) is **generated, but committed** —
-the site fetches it at runtime (`src/play/composition.ts`), it is not bundled. Regenerate with:
+`public/campaigns/*.json` (9 campaigns + `manifest.json`) is **test-fixture content, not a
+runtime source.** The deployed server's only campaign source is
+[`The-Running-Dev/SubZeroDev.Adventures.Content`](https://github.com/The-Running-Dev/SubZeroDev.Adventures.Content)
+(hardcoded in `server/src/index.ts`, served over GitHub Pages), and the deployed site always
+sets `VITE_API_URL` so the browser never falls back to local files either (`src/play/composition.ts`).
+What lives here backs `browser-client.test.ts`, `PlayApp.test.tsx` (both import these files as
+fetch-stub fixtures), the visual-regression baselines, and `buildApp`'s disk-backed default
+`campaignSource` (`server/src/app.ts`) that the rest of the server test suite runs against.
+Regenerate with:
 
 ```bash
 npm run sync:campaigns
 ```
 
-This runs the engine submodule's own exporter (`engine/src/engine/scripts/spike-export-campaigns.ts`,
-itself marked a throwaway spike upstream) and copies its output here — see
+This runs the engine submodule's own exporter (`engine/src/engine/scripts/export-campaigns.ts`,
+graduated out of spike status alongside the portable format) and copies its output here — see
 `scripts/sync-campaigns.mjs` for why it copies rather than pointing the exporter's hardcoded
-output path at this repo. CI runs this and fails the build if it produces a diff
-(`.github/workflows/ci.yml`, "Verify campaign content is not stale") — a silent content
-change shipping to players is exactly the failure mode that check exists to catch.
+output path at this repo. Nothing enforces that this stays in lockstep with the engine or with
+`SubZeroDev.Adventures.Content` — it is a fixture snapshot now, not shipped content, so it is
+free to drift until a test actually needs the refresh. Diff the result after running it, and
+regenerate the visual baselines (below) if rendered output changed.
 
 ## The Two Compose Files
 
@@ -75,9 +85,8 @@ mirrors how `SubZeroDev.com` and `SubZeroDev.Blog/tools/blog-mcp` are laid out.
   (copy `.env.example`) and a pre-existing external `proxy-net` network — TLS and public
   routing belong to whatever reverse proxy already lives on that network, not to this repo.
 - **`server/docker-compose.yml` is the dev stack.** `build: context: ..` — the context is
-  the repo root, because the image needs `engine/`, `shared/`, `public/campaigns/`, and
-  `server/`. Its image is tagged `subzerodev-adventures-api:dev`, deliberately never the
-  GHCR name.
+  the repo root, because the image needs `engine/`, `shared/`, and `server/`. Its image is
+  tagged `subzerodev-adventures-api:dev`, deliberately never the GHCR name.
 
 ```bash
 docker compose -f server/docker-compose.yml up -d --build
@@ -104,10 +113,9 @@ than flattening it, for two reasons that are easy to break and hard to diagnose:
   same line for the same reason. The `runtime` target needs no symlink only because it puts
   `dist/` _under_ `server/`, making `server/node_modules` a genuine ancestor.
 
-Campaign JSON is the exception: `server/src/campaigns/source.ts`'s disk-backed
-`CampaignSource` finds it module-relative by default, which stops being true once tsc moves
-the module, so the `runtime` target sets `CAMPAIGNS_DIR` to an absolute path instead of
-contorting its layout to match.
+`public/campaigns/` is not copied into either image target — the deployed server has no disk
+content source (see "Campaign Content"), so there is nothing there for `CAMPAIGNS_DIR` to
+point at.
 
 ## Visual Baselines — The One Real Gotcha
 

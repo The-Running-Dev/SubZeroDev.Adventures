@@ -1,6 +1,7 @@
 import {
   createEngine,
   createInMemorySessionStore,
+  digestPortableCampaign,
   type CampaignSummary,
   type PortableCampaign,
   type SessionPersistence,
@@ -120,7 +121,15 @@ async function loadPortableCampaigns(): Promise<readonly PortableCampaign[]> {
   const manifest =
     await fetchJson<PortableManifestWithExtensions>("manifest.json");
   return Promise.all(
-    manifest.campaigns.map((fileName) => fetchJson<PortableCampaign>(fileName)),
+    manifest.campaigns.map(async (entry) => {
+      const portable = await fetchJson<PortableCampaign>(entry.file);
+      const digest = digestPortableCampaign(portable);
+      if (digest !== entry.digest)
+        throw new Error(
+          `${entry.file}: fetched content does not match manifest digest (expected ${entry.digest}, got ${digest})`,
+        );
+      return portable;
+    }),
   );
 }
 

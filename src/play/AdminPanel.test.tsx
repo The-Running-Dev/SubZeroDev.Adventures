@@ -151,6 +151,48 @@ describe("AdminPanel authorization", () => {
     expect(screen.queryByText(/no longer authorized/i)).not.toBeInTheDocument();
   });
 
+  it("uploads a JSON file through the same pasted-source request", async () => {
+    const onSync = vi.fn();
+    const fetchMock = vi.fn((input: RequestInfo | URL, _init?: RequestInit) =>
+      Promise.resolve(
+        input.toString().endsWith("/status")
+          ? response(status(true))
+          : response({ refresh: { ok: true } }, 201),
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    const file = new File(["unused"], "bulgarian-adventures.json", {
+      type: "application/json",
+    });
+    Object.defineProperty(file, "text", {
+      value: () => Promise.resolve('{"campaign":{"id":"from-file"}}'),
+    });
+
+    renderPanel(onSync);
+    const input = await screen.findByLabelText("JSON file");
+    await waitFor(() => expect(input).toBeEnabled());
+    fireEvent.change(input, { target: { files: [file] } });
+
+    expect(
+      await screen.findByText("Selected: bulgarian-adventures.json"),
+    ).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Upload & Sync" }));
+
+    expect(
+      await screen.findByText("Added. The catalog rebuilt and is now live."),
+    ).toBeVisible();
+    const sourceCall = fetchMock.mock.calls.find(([request]) =>
+      request.toString().endsWith("/sources"),
+    );
+    expect(sourceCall).toBeDefined();
+    expect(JSON.parse(String(sourceCall?.[1]?.body))).toEqual({
+      kind: "pasted",
+      payload: { campaign: { id: "from-file" } },
+    });
+    expect(onSync).toHaveBeenCalledOnce();
+  });
+
   it("keeps non-authorization failures distinct", async () => {
     vi.stubGlobal(
       "fetch",

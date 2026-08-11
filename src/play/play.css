@@ -2395,6 +2395,16 @@
   flex: 1 1 12rem;
 }
 
+.admin-file-label,
+.admin-file-name {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.admin-file-name {
+  margin: 0.6rem 0 0;
+}
+
 .admin-paste {
   font-size: 0.8rem;
   margin-bottom: 0.5rem;

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { BrowserDemo } from "./composition";
 
 interface AdminPanelProps {
@@ -193,6 +193,11 @@ export function AdminPanel({
   const [addingPaste, setAddingPaste] = useState(false);
   const [pasteOutcome, setPasteOutcome] = useState<AddOutcome>();
 
+  const fileInput = useRef<HTMLInputElement>(null);
+  const [selectedFile, setSelectedFile] = useState<File>();
+  const [addingFile, setAddingFile] = useState(false);
+  const [fileOutcome, setFileOutcome] = useState<AddOutcome>();
+
   const [removingId, setRemovingId] = useState<string>();
   const [removeError, setRemoveError] = useState<{
     readonly id: string;
@@ -297,6 +302,33 @@ export function AdminPanel({
       });
     } finally {
       setAddingPaste(false);
+    }
+  }
+
+  async function handleAddFile(): Promise<void> {
+    if (!selectedFile) return;
+    setAddingFile(true);
+    setFileOutcome(undefined);
+    try {
+      let payload: unknown;
+      try {
+        payload = JSON.parse(await selectedFile.text());
+      } catch {
+        throw new Error(`${selectedFile.name} isn't valid JSON`);
+      }
+      const outcome = await postSource({ kind: "pasted", payload });
+      setSelectedFile(undefined);
+      if (fileInput.current) fileInput.current.value = "";
+      setFileOutcome(outcome);
+      setSourcesToken((t) => t + 1);
+      if (outcome.tone === "ok") onSync();
+    } catch (error) {
+      setFileOutcome({
+        tone: "error",
+        text: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setAddingFile(false);
     }
   }
 
@@ -591,6 +623,42 @@ export function AdminPanel({
               </button>
             </div>
             {pasteOutcome && <AddOutcomeNote outcome={pasteOutcome} />}
+          </div>
+
+          <div className="admin-form">
+            <h3 className="admin-subheading">
+              Upload a campaign or extension JSON
+            </h3>
+            <div className="admin-form-row">
+              <label className="admin-file-label" htmlFor="admin-json-file">
+                JSON file
+              </label>
+              <input
+                ref={fileInput}
+                id="admin-json-file"
+                type="file"
+                accept="application/json,.json"
+                onChange={(event) => {
+                  setSelectedFile(event.target.files?.[0]);
+                  setFileOutcome(undefined);
+                }}
+                disabled={!canManageSources || addingFile}
+              />
+              <button
+                type="button"
+                className="admin-sync"
+                onClick={() => void handleAddFile()}
+                disabled={!selectedFile || !canManageSources || addingFile}
+              >
+                {addingFile ? "Uploading…" : "Upload & Sync"}
+              </button>
+            </div>
+            {selectedFile && (
+              <p className="admin-file-name" role="status">
+                Selected: {selectedFile.name}
+              </p>
+            )}
+            {fileOutcome && <AddOutcomeNote outcome={fileOutcome} />}
           </div>
         </section>
       )}

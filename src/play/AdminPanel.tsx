@@ -177,6 +177,12 @@ export function AdminPanel({
     refetch: refetchStatus,
   } = useAdminContentStatus(demo.apiUrl, `${lastSyncedAt}:${sourcesToken}`);
   const listed = demo.catalog.length;
+  // The status response is only a snapshot: signing out or losing an identity in another
+  // tab can invalidate it before this operator clicks Add or Remove. Until the server has
+  // positively said this session is an admin, do not offer a write that is guaranteed to
+  // fail -- the top-level Sync stays available because its browser-catalog half is useful
+  // without admin access.
+  const canManageSources = adminStatus?.isAdmin === true;
 
   const [urlLabel, setUrlLabel] = useState("");
   const [urlValue, setUrlValue] = useState("");
@@ -210,6 +216,14 @@ export function AdminPanel({
         }
       | undefined;
     if (!response.ok) {
+      if (response.status === 403 && json?.error?.code === "forbidden") {
+        // A write is authoritative over the earlier status snapshot. Re-read it so the
+        // page stops saying "Allowed" after a session changed elsewhere.
+        refetchStatus();
+        throw new Error(
+          "Your admin session is no longer authorized. The campaign was not added. Sign in again from the main page, then reload ?admin.",
+        );
+      }
       throw new Error(
         json?.error?.code
           ? `${response.status} (${json.error.code})`
@@ -301,9 +315,16 @@ export function AdminPanel({
         // silently here, which reads identically to the button doing nothing at all.
         const json = (await response.json().catch(() => undefined)) as
           { error?: { code?: string } } | undefined;
+        const code = json?.error?.code;
+        if (response.status === 403 && code === "forbidden") {
+          refetchStatus();
+          throw new Error(
+            "Your admin session is no longer authorized. Nothing was removed. Sign in again from the main page, then reload ?admin.",
+          );
+        }
         throw new Error(
-          json?.error?.code
-            ? `${response.status} (${json.error.code})`
+          code
+            ? `${response.status} (${code})`
             : `request failed: ${response.status}`,
         );
       }
@@ -319,12 +340,17 @@ export function AdminPanel({
   }
 
   return (
-    <main className="play-main admin">
-      <h1 className="admin-title">Content admin</h1>
-      <p className="admin-note">
-        Unlisted. Nothing links here — this page exists at <code>?admin</code>{" "}
-        only.
-      </p>
+    <section className="archive admin" aria-labelledby="admin-title">
+      <div className="archive-heading">
+        <p className="eyebrow">SUBZERO STORY SYSTEM // CONTENT CONTROL</p>
+        <h1 id="admin-title" className="admin-title">
+          Content admin
+        </h1>
+        <p className="admin-note">
+          Unlisted. Nothing links here — this page exists at <code>?admin</code>{" "}
+          only.
+        </p>
+      </div>
 
       <section className="admin-block">
         <h2 className="admin-heading">Source</h2>
@@ -401,6 +427,13 @@ export function AdminPanel({
           {statusError !== undefined && (
             <p className="admin-error" role="alert">
               Could not read server status: {statusError}
+            </p>
+          )}
+          {adminStatus && !adminStatus.isAdmin && (
+            <p className="admin-notice admin-notice-warn" role="status">
+              Source management needs an authorized session.{" "}
+              <a href="/">Sign in on the main page</a>, then reload{" "}
+              <code>?admin</code>.
             </p>
           )}
         </section>
@@ -482,7 +515,9 @@ export function AdminPanel({
                           type="button"
                           className="admin-remove admin-row-action"
                           onClick={() => void handleRemove(source.id)}
-                          disabled={removingId === source.id}
+                          disabled={
+                            removingId === source.id || !canManageSources
+                          }
                         >
                           {removingId === source.id ? "Removing…" : "Remove"}
                         </button>
@@ -512,18 +547,22 @@ export function AdminPanel({
                 placeholder="Label"
                 value={urlLabel}
                 onChange={(event) => setUrlLabel(event.target.value)}
+                disabled={!canManageSources}
               />
               <input
                 type="text"
                 placeholder="https://…/campaigns/"
                 value={urlValue}
                 onChange={(event) => setUrlValue(event.target.value)}
+                disabled={!canManageSources}
               />
               <button
                 type="button"
                 className="admin-sync"
                 onClick={() => void handleAddUrl()}
-                disabled={addingUrl || !urlLabel || !urlValue}
+                disabled={
+                  addingUrl || !urlLabel || !urlValue || !canManageSources
+                }
               >
                 {addingUrl ? "Adding…" : "Add & Sync"}
               </button>
@@ -539,13 +578,14 @@ export function AdminPanel({
               value={pasteText}
               onChange={(event) => setPasteText(event.target.value)}
               rows={6}
+              disabled={!canManageSources}
             />
             <div className="admin-form-row">
               <button
                 type="button"
                 className="admin-sync"
                 onClick={() => void handleAddPaste()}
-                disabled={addingPaste || !pasteText.trim()}
+                disabled={addingPaste || !pasteText.trim() || !canManageSources}
               >
                 {addingPaste ? "Adding…" : "Add & Sync"}
               </button>
@@ -614,6 +654,6 @@ export function AdminPanel({
           </div>
         </section>
       )}
-    </main>
+    </section>
   );
 }

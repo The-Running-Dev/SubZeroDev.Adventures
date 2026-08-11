@@ -9,7 +9,7 @@ import {
   type StoredSessionRecord,
 } from "@the-running-dev/game-engine";
 import { KINDS } from "../../../shared/campaign-registry.js";
-import type { ServerDemo } from "../composition.js";
+import type { ContentCell } from "../content-cell.js";
 import { requirePrincipal } from "../principal.js";
 import { createPostgresPersistence } from "../persistence.js";
 import { assertSessionOwned } from "../store/ownedStore.js";
@@ -37,7 +37,7 @@ async function loadSessionRow(
 export function registerReplayRoutes(
   app: FastifyInstance,
   pool: Pool,
-  demo: ServerDemo,
+  cell: ContentCell,
 ): void {
   const auth = requirePrincipal(pool);
 
@@ -49,6 +49,7 @@ export function registerReplayRoutes(
       request.principal.playerId,
       "replay",
     );
+    const demo = cell.current();
     const result = replay(demo.engine, demo.createReplayEngine, record.blob);
     return { sessionId: id, steps: result.steps };
   });
@@ -64,6 +65,7 @@ export function registerReplayRoutes(
         request.principal.playerId,
         "replay",
       );
+      const demo = cell.current();
       return verifyReplay(
         demo.engine,
         demo.createReplayEngine,
@@ -97,6 +99,7 @@ export function registerReplayRoutes(
         request.principal.playerId,
         "branch",
       );
+      const demo = cell.current();
       const result = replay(
         demo.engine,
         demo.createReplayEngine,

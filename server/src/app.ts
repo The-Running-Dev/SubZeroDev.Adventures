@@ -3,6 +3,7 @@ import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
 import type { Pool } from "pg";
 import { createServerDemo } from "./composition.js";
+import { createContentCell } from "./content-cell.js";
 import { registerHealthRoute } from "./health.js";
 import { registerSessionRoutes } from "./routes/session.js";
 import { registerReplayRoutes } from "./routes/replay.js";
@@ -70,18 +71,21 @@ export async function buildApp(
     }
   });
 
-  registerHealthRoute(app, pool);
-
-  const demo = await createServerDemo(pool);
+  // The cell owns the swap: `refresh()` builds a complete `ServerDemo` and only publishes
+  // it on success, so a bad rebuild leaves the previous one serving (#22). Every route below
+  // takes `cell`, not a `ServerDemo` snapshot, and re-reads `cell.current()` per request.
+  const { cell, ready } = createContentCell(() => createServerDemo(pool));
+  await ready();
+  registerHealthRoute(app, pool, cell);
   const identityProviders = await loadIdentityProviders();
-  registerSessionRoutes(app, pool, demo, identityProviders);
-  registerReplayRoutes(app, pool, demo);
+  registerSessionRoutes(app, pool, cell, identityProviders);
+  registerReplayRoutes(app, pool, cell);
   registerIdentityRoutes(app, pool, identityProviders, { siteUrl, apiUrl });
-  registerProgressRoutes(app, pool, demo);
+  registerProgressRoutes(app, pool, cell);
   registerTransferRoutes(app, pool);
-  registerBadgeRoutes(app, pool, demo);
+  registerBadgeRoutes(app, pool, cell);
   registerStatsRoutes(app, pool);
-  registerProfileRoutes(app, pool, demo);
+  registerProfileRoutes(app, pool, cell);
   registerRankingRoutes(app, pool);
 
   return app;

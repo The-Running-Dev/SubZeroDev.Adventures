@@ -9,9 +9,8 @@ import type { Pool } from "pg";
 import {
   SessionStoreError,
   type ActionParams,
-  type SessionStore,
 } from "@the-running-dev/game-engine";
-import type { ServerDemo } from "../composition.js";
+import type { ContentCell } from "../content-cell.js";
 import { requirePrincipal, resolvePrincipal, logout } from "../principal.js";
 import { listSavesForPlayer } from "../persistence.js";
 import { OwnershipError, ownedStore } from "../store/ownedStore.js";
@@ -38,25 +37,32 @@ function statusFor(code: string): number {
  * principal (`store/ownedStore.ts`) so every route below reaches session/save data only
  * through a store that already enforces ownership, rather than through a check a route
  * has to remember to attach for itself.
+ *
+ * Resolves `cell.current().store` *inside* the handler, not once at registration -- a
+ * refresh (#21) swaps the whole `ServerDemo`, engine included, and a request in flight
+ * against the old engine would otherwise never see the swap.
  */
-function attachStore(pool: Pool, store: SessionStore) {
+function attachStore(pool: Pool, cell: ContentCell) {
   return async (request: FastifyRequest): Promise<void> => {
-    request.store = ownedStore(store, pool, request.principal.playerId);
+    request.store = ownedStore(
+      cell.current().store,
+      pool,
+      request.principal.playerId,
+    );
   };
 }
 
 export function registerSessionRoutes(
   app: FastifyInstance,
   pool: Pool,
-  demo: ServerDemo,
+  cell: ContentCell,
   identityProviders: ReadonlyMap<string, IdentityProvider>,
 ): void {
-  const store: SessionStore = demo.store;
   const auth = requirePrincipal(pool);
   // Read-only: resolves an existing session but never mints a guest row, so a bare GET
   // from a crawler or a logged-out browser doesn't grow the `players` table.
   const resolve = resolvePrincipal(pool);
-  const owned = attachStore(pool, store);
+  const owned = attachStore(pool, cell);
 
   app.setErrorHandler((error, request, reply) => {
     if (error instanceof OwnershipError) {
@@ -91,10 +97,10 @@ export function registerSessionRoutes(
   // `summaries` backs `SessionStore.listCampaigns()`, which the contract requires to be
   // synchronous too (04-core.md) -- the browser's `RemoteSessionStore` cannot fetch it
   // lazily, so it rides along in the same response `createRemoteDemo` already awaits.
-  app.get("/api/campaigns", async () => ({
-    campaigns: demo.all,
-    summaries: store.listCampaigns(),
-  }));
+  app.get("/api/campaigns", async () => {
+    const demo = cell.current();
+    return { campaigns: demo.all, summaries: demo.store.listCampaigns() };
+  });
 
   // `signInProvider` is the name `/api/auth/:provider/start` is actually registered under
   // (identity/registry.ts), read here rather than assumed by the frontend -- issue #16.
@@ -133,7 +139,7 @@ export function registerSessionRoutes(
 
   app.post("/api/sessions", { preHandler: auth }, async (request) => {
     const body = request.body as { campaignId: string; seed?: string };
-    return store.createSession({
+    return cell.current().store.createSession({
       campaignId: body.campaignId,
       ...(body.seed !== undefined ? { seed: body.seed } : {}),
       audience: "player",

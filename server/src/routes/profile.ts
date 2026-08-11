@@ -18,7 +18,7 @@ import type { Pool } from "pg";
 import { requirePrincipal, resolvePrincipal } from "../principal.js";
 import { computeRecords } from "../records.js";
 import { maskDisplayName } from "../display-name.js";
-import type { ServerDemo } from "../composition.js";
+import type { ContentCell } from "../content-cell.js";
 
 function mintSlug(): string {
   return randomBytes(16).toString("base64url");
@@ -29,7 +29,7 @@ const UNIQUE_VIOLATION = "23505";
 export function registerProfileRoutes(
   app: FastifyInstance,
   pool: Pool,
-  demo: ServerDemo,
+  cell: ContentCell,
 ): void {
   const resolve = resolvePrincipal(pool);
   const auth = requirePrincipal(pool);
@@ -139,7 +139,7 @@ export function registerProfileRoutes(
       sessionsStarted: stats.total,
       sessionsFinished: stats.finished,
       campaignsPlayed: stats.campaigns,
-      campaignsTotal: demo.catalog.length,
+      campaignsTotal: cell.current().catalog.length,
       stepsTaken: stats.steps,
       endingsFound: stats.endings,
       achievementsUnlocked: achievementsResult.rows[0]!.n,

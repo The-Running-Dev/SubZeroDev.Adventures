@@ -17,12 +17,12 @@ import type { Pool } from "pg";
 import { resolvePrincipal } from "../principal.js";
 import { evaluateBadges } from "../badges.js";
 import { computeRecords } from "../records.js";
-import type { ServerDemo } from "../composition.js";
+import type { ContentCell } from "../content-cell.js";
 
 export function registerBadgeRoutes(
   app: FastifyInstance,
   pool: Pool,
-  demo: ServerDemo,
+  cell: ContentCell,
 ): void {
   const resolve = resolvePrincipal(pool);
 
@@ -30,7 +30,7 @@ export function registerBadgeRoutes(
     const principal = request.principalOrNull;
     if (!principal) return { badges: [], records: null };
     const [badges, records] = await Promise.all([
-      evaluateBadges(pool, demo, principal.playerId),
+      evaluateBadges(pool, cell.current(), principal.playerId),
       computeRecords(pool, principal.playerId),
     ]);
     return { badges, records };

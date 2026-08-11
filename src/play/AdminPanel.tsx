@@ -188,6 +188,10 @@ export function AdminPanel({
   const [pasteOutcome, setPasteOutcome] = useState<AddOutcome>();
 
   const [removingId, setRemovingId] = useState<string>();
+  const [removeError, setRemoveError] = useState<{
+    readonly id: string;
+    readonly text: string;
+  }>();
 
   /** Throws only when nothing was created. A 201 always means the row exists, so every
    *  outcome from here on is a report about a source that is already saved. */
@@ -285,16 +289,31 @@ export function AdminPanel({
   async function handleRemove(id: string): Promise<void> {
     if (!demo.apiUrl) return;
     setRemovingId(id);
+    setRemoveError(undefined);
     try {
       const response = await fetch(
         `${demo.apiUrl}/api/admin/content/sources/${id}`,
         { method: "DELETE", credentials: "include" },
       );
-      if (!response.ok) throw new Error(`${response.status}`);
+      if (!response.ok) {
+        // Surface *why* the delete didn't happen -- a 403 (session isn't actually admin
+        // anymore), a 404 (already gone), or a network failure all used to be swallowed
+        // silently here, which reads identically to the button doing nothing at all.
+        const json = (await response.json().catch(() => undefined)) as
+          | { error?: { code?: string } }
+          | undefined;
+        throw new Error(
+          json?.error?.code
+            ? `${response.status} (${json.error.code})`
+            : `request failed: ${response.status}`,
+        );
+      }
       refetchStatus();
-    } catch {
-      // Nothing removed; the row's own state is unchanged, so there's nothing new to show
-      // beyond what a retry click already communicates.
+    } catch (error) {
+      setRemoveError({
+        id,
+        text: error instanceof Error ? error.message : String(error),
+      });
     } finally {
       setRemovingId(undefined);
     }
@@ -428,15 +447,19 @@ export function AdminPanel({
                     <td>{formatTimestamp(source.lastSyncedAt)}</td>
                     <td>
                       {source.lastError ? (
-                        // Truncated hard: these are stacked fetch/validation messages, and a
-                        // full one turns this row into a paragraph. The whole text stays one
-                        // hover away, and the same error is shown unabridged under "Server
-                        // content" above when it's the one that failed the last refresh.
+                        // Icon, not text: the full message is stacked fetch/validation
+                        // output, and even a truncated preview was wide enough to force the
+                        // horizontal scroll that hid the Remove button. The whole text stays
+                        // one hover (or tap, via title) away, and is shown unabridged under
+                        // "Server content" above when it's the one that failed the last
+                        // refresh.
                         <span
-                          className="admin-cell-error"
+                          className="admin-cell-error-icon"
                           title={source.lastError}
+                          role="img"
+                          aria-label={`Error: ${source.lastError}`}
                         >
-                          {shortPreview(source.lastError, 40)}
+                          ⚠
                         </span>
                       ) : (
                         "—"
@@ -464,6 +487,11 @@ export function AdminPanel({
                         >
                           {removingId === source.id ? "Removing…" : "Remove"}
                         </button>
+                      )}
+                      {removeError?.id === source.id && (
+                        <p className="admin-cell-error-note" role="alert">
+                          {removeError.text}
+                        </p>
                       )}
                     </td>
                   </tr>

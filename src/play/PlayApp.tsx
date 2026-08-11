@@ -16,6 +16,7 @@ import {
 } from "../theme";
 import type { ThemeId } from "../theme";
 import { AccountPanel } from "./AccountPanel";
+import { AdminPanel } from "./AdminPanel";
 import { BbsPrompt } from "./BbsPrompt";
 import { BrowserClient, type PlayState } from "./browser-client";
 import {
@@ -368,21 +369,40 @@ function useIsPhone(): boolean {
 export default function PlayApp() {
   const [demo, setDemo] = useState<BrowserDemo>();
   const [loadError, setLoadError] = useState<string>();
+  // Bumped by the admin page's "Sync" to re-run the loader below. `demo` is deliberately
+  // *not* cleared while a re-sync is in flight -- clearing it would drop the caller back
+  // to the "Loading catalog…" gate and unmount the page that asked for the sync.
+  const [syncToken, setSyncToken] = useState(0);
+  const [syncing, setSyncing] = useState(false);
+  const [syncError, setSyncError] = useState<string>();
+  const [syncedAt, setSyncedAt] = useState<string>();
 
   useEffect(() => {
     let cancelled = false;
+    if (syncToken > 0) {
+      setSyncing(true);
+      setSyncError(undefined);
+    }
     createBrowserDemo()
       .then((loaded) => {
-        if (!cancelled) setDemo(loaded);
+        if (cancelled) return;
+        setDemo(loaded);
+        setSyncedAt(new Date().toLocaleTimeString());
+        setSyncing(false);
       })
       .catch((error: unknown) => {
-        if (!cancelled)
-          setLoadError(error instanceof Error ? error.message : String(error));
+        if (cancelled) return;
+        const message = error instanceof Error ? error.message : String(error);
+        setSyncing(false);
+        // A failed *re-sync* keeps the catalog already on screen and reports itself on
+        // the admin page; only a failed first load has nothing to fall back to.
+        if (syncToken > 0) setSyncError(message);
+        else setLoadError(message);
       });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [syncToken]);
 
   if (loadError) {
     return (
@@ -398,6 +418,22 @@ export default function PlayApp() {
       </div>
     );
   }
+  // Unlisted operator page. Checked here rather than inside `PlayAppReady` so none of the
+  // play surface -- sessions, identity, theming -- mounts behind it.
+  if (new URLSearchParams(window.location.search).has("admin")) {
+    return (
+      <AdminPanel
+        demo={demo}
+        syncing={syncing}
+        syncError={syncError}
+        lastSyncedAt={syncedAt ?? "—"}
+        onSync={() => {
+          setSyncToken((token) => token + 1);
+        }}
+      />
+    );
+  }
+
   return <PlayAppReady demo={demo} />;
 }
 

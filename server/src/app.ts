@@ -83,7 +83,16 @@ export async function buildApp(
   );
 
   await app.register(cookie);
-  await app.register(cors, { origin: siteUrl, credentials: true });
+  // `@fastify/cors`'s own default `methods` is `GET,HEAD,POST` -- unlike the vanilla `cors`
+  // package it's modeled on, it does not include DELETE. Left implicit, that silently blocks
+  // the preflight for `DELETE /api/admin/content/sources/:id` (admin.ts) with no error this
+  // server ever sees -- the browser refuses to send the real request at all. Listed
+  // explicitly here so it tracks the methods this API actually exposes, not the plugin's.
+  await app.register(cors, {
+    origin: siteUrl,
+    credentials: true,
+    methods: ["GET", "HEAD", "POST", "DELETE"],
+  });
 
   // `SameSite=Lax` only blocks a cross-*site* cookie send -- a sibling subdomain like the
   // blog on *.subzerodev.com is same-site, so its POST would still carry this player's

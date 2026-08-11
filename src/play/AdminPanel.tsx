@@ -124,6 +124,11 @@ function shortPreview(text: string, max = 60): string {
  * in isolation, since every source's content only ever ships as one merged, validated
  * catalog. `PlayApp.tsx`'s `onSync` handler is what sequences the two; every "Sync" button
  * on this page, including each source row's own, calls that same handler.
+ *
+ * Which is why a row whose last attempt *failed* offers no Sync button of its own: clicking
+ * it would re-run the identical full refresh the page-level button already offers, and the
+ * one thing it cannot do is fix the row it sits on. Fix or remove the source instead -- the
+ * page-level Sync is still right there once you have.
  */
 export function AdminPanel({
   demo,
@@ -313,10 +318,11 @@ export function AdminPanel({
         <section className="admin-block">
           <h2 className="admin-heading">Content sources</h2>
           <p className="admin-note">
-            Every source below merges into the one catalog above -- there is no
+            Every source below merges into the one catalog above — there is no
             such thing as syncing a single row in isolation, so each row's Sync
             button triggers the same full refresh as the one at the top of the
-            page.
+            page. A row that failed its last attempt has no Sync button for that
+            reason: fix or remove it, then sync the catalog.
           </p>
           <div className="admin-table-scroll">
             <table className="admin-table">
@@ -347,21 +353,34 @@ export function AdminPanel({
                     </td>
                     <td>{formatTimestamp(source.lastSyncedAt)}</td>
                     <td>
-                      {source.lastError
-                        ? shortPreview(source.lastError, 80)
-                        : "—"}
+                      {source.lastError ? (
+                        // Truncated hard: these are stacked fetch/validation messages, and a
+                        // full one turns this row into a paragraph. The whole text stays one
+                        // hover away, and the same error is shown unabridged under "Server
+                        // content" above when it's the one that failed the last refresh.
+                        <span
+                          className="admin-cell-error"
+                          title={source.lastError}
+                        >
+                          {shortPreview(source.lastError, 40)}
+                        </span>
+                      ) : (
+                        "—"
+                      )}
                     </td>
                     <td>{source.campaignCount ?? "—"}</td>
                     <td>{source.extensionCount ?? "—"}</td>
                     <td>
-                      <button
-                        type="button"
-                        className="admin-sync admin-row-action"
-                        onClick={onSync}
-                        disabled={syncing}
-                      >
-                        Sync
-                      </button>
+                      {!source.lastError && (
+                        <button
+                          type="button"
+                          className="admin-sync admin-row-action"
+                          onClick={onSync}
+                          disabled={syncing}
+                        >
+                          Sync
+                        </button>
+                      )}
                       {source.removable && (
                         <button
                           type="button"

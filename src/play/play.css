@@ -2310,6 +2310,19 @@
   text-transform: uppercase;
 }
 
+/* One line, never wrapped -- the JS truncation keeps it short, and this keeps a long
+   unbroken token (a URL in a fetch error) from stretching the column anyway. `title`
+   carries the full text, which `cursor: help` is what advertises. */
+.admin-cell-error {
+  color: var(--danger-text);
+  cursor: help;
+  display: inline-block;
+  max-width: 22rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .admin-row-action {
   font-size: 0.7rem;
   margin: 0 0.35rem 0.35rem 0;

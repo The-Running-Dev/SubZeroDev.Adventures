@@ -34,6 +34,10 @@ export interface CatalogEntry {
    *  server's `multiclass` badge (server/src/badges.ts) and available to any client that
    *  wants to group or filter by kind. */
   readonly kindId: string;
+  /** The published content version -- a submodule bump's or an extension's contribution to
+   *  it isn't visible anywhere else on this type, so the admin page (`AdminPanel.tsx`)
+   *  reads it here rather than the server growing a second, admin-only projection. */
+  readonly version: string;
   readonly title: string;
   readonly description: string;
   readonly duration: string;
@@ -152,6 +156,7 @@ export function buildCatalog(
   const all = hydrated.map(({ built, catalog }) => ({
     campaignId: built.campaign.id,
     kindId: built.campaign.kindId,
+    version: built.campaign.version,
     title:
       registry.value!.strings.get(built.campaign.titleKey) ?? catalog.title,
     description: catalog.description,

@@ -65,6 +65,14 @@ export interface ServerDemo {
    * so a no-op pull is visibly a no-op rather than looking like a fresh publish.
    */
   readonly contentDigest: string;
+  /** Every extension `campaignSource.loadExtensions()` returned, in the order they were
+   *  applied -- if this list is non-empty, `mergeExtensions` (campaign-extension.ts) did
+   *  not throw, so every one of them landed. Read only by the admin page to show which
+   *  extensions applied to which base campaign; nothing gameplay-facing needs it. */
+  readonly appliedExtensions: readonly {
+    readonly id: string;
+    readonly extends: string;
+  }[];
 }
 
 function digestOf(portables: readonly unknown[]): string {
@@ -90,6 +98,10 @@ export async function createServerDemo(
   return {
     all,
     contentDigest: digestOf([portables, extensions]),
+    appliedExtensions: extensions.map((extension) => ({
+      id: extension.id,
+      extends: extension.extends,
+    })),
     catalog: all.filter((campaign) => !campaign.hidden),
     findCampaign: (campaignId) =>
       all.find((campaign) => campaign.campaignId === campaignId),

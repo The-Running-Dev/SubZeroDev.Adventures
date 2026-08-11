@@ -76,8 +76,10 @@ export function registerAdminRoutes(
           campaignId: campaign.campaignId,
           title: campaign.title,
           kindId: campaign.kindId,
+          version: campaign.version,
           endingCount: campaign.endingCount,
         })),
+        extensions: demo.appliedExtensions,
       };
     },
   );

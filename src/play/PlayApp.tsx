@@ -376,29 +376,67 @@ export default function PlayApp() {
   const [syncing, setSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string>();
   const [syncedAt, setSyncedAt] = useState<string>();
+  // Read inside the syncToken effect below without making `demo` itself a dependency --
+  // `apiUrl` is fixed for the life of the session (createBrowserDemo picks local vs.
+  // remote once, at startup), so this only exists to dodge the effect-retriggers-itself
+  // loop that adding `demo` as a dependency would cause (it's set by this same effect).
+  const demoRef = useRef<BrowserDemo | undefined>(undefined);
+  demoRef.current = demo;
 
   useEffect(() => {
     let cancelled = false;
-    if (syncToken > 0) {
-      setSyncing(true);
-      setSyncError(undefined);
-    }
-    createBrowserDemo()
-      .then((loaded) => {
+
+    async function run(): Promise<void> {
+      if (syncToken > 0) {
+        setSyncing(true);
+        setSyncError(undefined);
+      }
+
+      // In remote mode, a re-sync asks the server to rebuild its own catalog first
+      // (issue #27) -- otherwise "Sync" would only ever refetch whatever the server was
+      // already serving. A rejected or failed refresh (not an admin, network error) does
+      // not abort the sync: the local refetch below still runs, so the affordance never
+      // regresses to doing nothing just because this session can't trigger a server-side
+      // rebuild. Its message rides along as `syncError` instead.
+      let refreshError: string | undefined;
+      const apiUrl = demoRef.current?.apiUrl;
+      if (syncToken > 0 && apiUrl) {
+        try {
+          const response = await fetch(`${apiUrl}/api/admin/content/refresh`, {
+            method: "POST",
+            credentials: "include",
+          });
+          if (!response.ok) {
+            const body = (await response.json().catch(() => undefined)) as
+              { error?: { code?: string } } | undefined;
+            refreshError = `server refresh failed: ${response.status}${
+              body?.error?.code ? ` (${body.error.code})` : ""
+            }`;
+          }
+        } catch (error) {
+          refreshError = error instanceof Error ? error.message : String(error);
+        }
+      }
+
+      try {
+        const loaded = await createBrowserDemo();
         if (cancelled) return;
         setDemo(loaded);
         setSyncedAt(new Date().toLocaleTimeString());
         setSyncing(false);
-      })
-      .catch((error: unknown) => {
+        if (syncToken > 0) setSyncError(refreshError);
+      } catch (error) {
         if (cancelled) return;
         const message = error instanceof Error ? error.message : String(error);
         setSyncing(false);
         // A failed *re-sync* keeps the catalog already on screen and reports itself on
         // the admin page; only a failed first load has nothing to fall back to.
-        if (syncToken > 0) setSyncError(message);
+        if (syncToken > 0) setSyncError(refreshError ?? message);
         else setLoadError(message);
-      });
+      }
+    }
+
+    void run();
     return () => {
       cancelled = true;
     };

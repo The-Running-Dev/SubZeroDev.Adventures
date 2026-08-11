@@ -20,6 +20,7 @@ import {
 import {
   addPastedSource,
   addUrlSource,
+  getContentSource,
   listContentSources,
   removeContentSource,
   type ContentSourceRow,
@@ -175,10 +176,15 @@ export function registerAdminRoutes(
   );
 
   // Adding a source immediately refreshes -- "paste and submit" is meant to be one action,
-  // not a paste followed by a separate trip to the Sync button. The created row's own
-  // status (lastSyncedAt/lastError) already reflects that refresh's outcome by the time
-  // this responds, since `createMultiSourceCampaignSource.load()` persists it before
-  // throwing on failure.
+  // not a paste followed by a separate trip to the Sync button.
+  //
+  // `source` in the response is deliberately re-read *after* that refresh rather than being
+  // the insert's own `returning` row: `createMultiSourceCampaignSource.load()` persists
+  // every source's outcome before throwing, so the re-read carries this source's own
+  // `lastError` (or its campaign/extension counts). That is the whole difference between
+  // "what you just pasted is broken" and "what you just pasted is fine, some *other*
+  // source is broken" -- a refresh is fail-closed across all sources, so `refresh.ok` alone
+  // cannot tell an operator which of those two just happened.
   app.post(
     "/api/admin/content/sources",
     { preHandler: admin },
@@ -203,10 +209,13 @@ export function registerAdminRoutes(
           reply.code(400);
           return { error: { operation: "admin", code: "invalid_url" } };
         }
-        const source = await addUrlSource(pool, body.label, body.url);
+        const created = await addUrlSource(pool, body.label, body.url);
         const refresh = await cell.refresh();
         reply.code(201);
-        return { source, refresh };
+        return {
+          source: (await getContentSource(pool, created.id)) ?? created,
+          refresh,
+        };
       }
 
       if (body.kind === "pasted") {
@@ -225,10 +234,13 @@ export function registerAdminRoutes(
           body.label ||
           (kind === "campaign" ? payload.campaign?.id : payload.id) ||
           "pasted content";
-        const source = await addPastedSource(pool, label, body.payload);
+        const created = await addPastedSource(pool, label, body.payload);
         const refresh = await cell.refresh();
         reply.code(201);
-        return { source, refresh };
+        return {
+          source: (await getContentSource(pool, created.id)) ?? created,
+          refresh,
+        };
       }
 
       reply.code(400);

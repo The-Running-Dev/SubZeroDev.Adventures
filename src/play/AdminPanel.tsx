@@ -110,6 +110,38 @@ function shortPreview(text: string, max = 60): string {
 }
 
 /**
+ * What an Add & Sync actually did. Three outcomes, not two, because a refresh is fail-closed
+ * across *every* source: the add can succeed and the refresh still fail on a source the
+ * operator never touched (the hardcoded default 404s until `SubZeroDev.Adventures.Content`
+ * exists to serve it). Reporting that as one red "added, but the refresh failed" reads as
+ * "your paste was rejected", which is the opposite of what happened -- the row is saved,
+ * validated, and takes effect the moment the *other* source stops failing.
+ */
+interface AddOutcome {
+  readonly tone: "ok" | "warn" | "error";
+  readonly text: string;
+}
+
+/** `role="alert"` only for a real failure -- "added, and the catalog is live" interrupting a
+ *  screen reader would be the same overstatement in audio that the red box was in colour. */
+function AddOutcomeNote({ outcome }: { readonly outcome: AddOutcome }) {
+  return (
+    <p
+      className={
+        outcome.tone === "error"
+          ? "admin-error"
+          : outcome.tone === "warn"
+            ? "admin-notice admin-notice-warn"
+            : "admin-notice"
+      }
+      role={outcome.tone === "error" ? "alert" : "status"}
+    >
+      {outcome.text}
+    </p>
+  );
+}
+
+/**
  * An unlisted operator page, reachable only by adding `?admin` to the URL -- the same
  * door a hidden campaign uses (`PlayApp.tsx`'s `?campaign=` effect), and for the same
  * reason: this app has no router, so "a page nothing links to" is a query parameter and
@@ -124,6 +156,11 @@ function shortPreview(text: string, max = 60): string {
  * in isolation, since every source's content only ever ships as one merged, validated
  * catalog. `PlayApp.tsx`'s `onSync` handler is what sequences the two; every "Sync" button
  * on this page, including each source row's own, calls that same handler.
+ *
+ * Which is why a row whose last attempt *failed* offers no Sync button of its own: clicking
+ * it would re-run the identical full refresh the page-level button already offers, and the
+ * one thing it cannot do is fix the row it sits on. Fix or remove the source instead -- the
+ * page-level Sync is still right there once you have.
  */
 export function AdminPanel({
   demo,
@@ -143,16 +180,17 @@ export function AdminPanel({
   const [urlLabel, setUrlLabel] = useState("");
   const [urlValue, setUrlValue] = useState("");
   const [addingUrl, setAddingUrl] = useState(false);
-  const [urlError, setUrlError] = useState<string>();
+  const [urlOutcome, setUrlOutcome] = useState<AddOutcome>();
 
   const [pasteText, setPasteText] = useState("");
   const [addingPaste, setAddingPaste] = useState(false);
-  const [pasteError, setPasteError] = useState<string>();
+  const [pasteOutcome, setPasteOutcome] = useState<AddOutcome>();
 
   const [removingId, setRemovingId] = useState<string>();
 
-  async function postSource(body: unknown): Promise<void> {
-    if (!demo.apiUrl) return;
+  /** Throws only when nothing was created. A 201 always means the row exists, so every
+   *  outcome from here on is a report about a source that is already saved. */
+  async function postSource(body: unknown): Promise<AddOutcome> {
     const response = await fetch(`${demo.apiUrl}/api/admin/content/sources`, {
       method: "POST",
       credentials: "include",
@@ -160,7 +198,11 @@ export function AdminPanel({
       body: JSON.stringify(body),
     });
     const json = (await response.json().catch(() => undefined)) as
-      | { error?: { code?: string }; refresh?: { ok: boolean; error?: string } }
+      | {
+          error?: { code?: string };
+          refresh?: { ok: boolean; error?: string };
+          source?: { label?: string; lastError?: string };
+        }
       | undefined;
     if (!response.ok) {
       throw new Error(
@@ -169,25 +211,46 @@ export function AdminPanel({
           : `${response.status}`,
       );
     }
-    if (json?.refresh && !json.refresh.ok) {
-      // The row was still added -- only the automatic refresh that followed it failed
-      // (e.g. the pasted content doesn't validate). Surfaced, but not thrown: the source
-      // now exists and shows its own `lastError`, same as any other row that failed a Sync.
-      throw new Error(`added, but the refresh failed: ${json.refresh.error}`);
+    if (!json?.refresh || json.refresh.ok) {
+      return {
+        tone: "ok",
+        text: "Added. The catalog rebuilt and is now live.",
+      };
     }
+    if (json.source?.lastError) {
+      return {
+        tone: "error",
+        text: `Added, but this source failed to load: ${json.source.lastError}. It is saved, so you can fix the origin and Sync, or remove the row.`,
+      };
+    }
+    // The added source loaded cleanly and something else didn't. Saying so is the point:
+    // a refresh only publishes when every source succeeds, so this row is fine and simply
+    // isn't live yet.
+    return {
+      tone: "warn",
+      text: `Added, and this source itself loaded cleanly — but the catalog was not republished, because the refresh failed: ${json.refresh.error}. Fix or remove the failing source above, then Sync; this row takes effect then.`,
+    };
   }
 
   async function handleAddUrl(): Promise<void> {
     setAddingUrl(true);
-    setUrlError(undefined);
+    setUrlOutcome(undefined);
     try {
-      await postSource({ kind: "url", label: urlLabel, url: urlValue });
+      const outcome = await postSource({
+        kind: "url",
+        label: urlLabel,
+        url: urlValue,
+      });
       setUrlLabel("");
       setUrlValue("");
+      setUrlOutcome(outcome);
       setSourcesToken((t) => t + 1);
-      onSync();
+      if (outcome.tone === "ok") onSync();
     } catch (error) {
-      setUrlError(error instanceof Error ? error.message : String(error));
+      setUrlOutcome({
+        tone: "error",
+        text: error instanceof Error ? error.message : String(error),
+      });
     } finally {
       setAddingUrl(false);
     }
@@ -195,7 +258,7 @@ export function AdminPanel({
 
   async function handleAddPaste(): Promise<void> {
     setAddingPaste(true);
-    setPasteError(undefined);
+    setPasteOutcome(undefined);
     try {
       let payload: unknown;
       try {
@@ -203,12 +266,16 @@ export function AdminPanel({
       } catch {
         throw new Error("that isn't valid JSON");
       }
-      await postSource({ kind: "pasted", payload });
+      const outcome = await postSource({ kind: "pasted", payload });
       setPasteText("");
+      setPasteOutcome(outcome);
       setSourcesToken((t) => t + 1);
-      onSync();
+      if (outcome.tone === "ok") onSync();
     } catch (error) {
-      setPasteError(error instanceof Error ? error.message : String(error));
+      setPasteOutcome({
+        tone: "error",
+        text: error instanceof Error ? error.message : String(error),
+      });
     } finally {
       setAddingPaste(false);
     }
@@ -313,10 +380,11 @@ export function AdminPanel({
         <section className="admin-block">
           <h2 className="admin-heading">Content sources</h2>
           <p className="admin-note">
-            Every source below merges into the one catalog above -- there is no
+            Every source below merges into the one catalog above — there is no
             such thing as syncing a single row in isolation, so each row's Sync
             button triggers the same full refresh as the one at the top of the
-            page.
+            page. A row that failed its last attempt has no Sync button for that
+            reason: fix or remove it, then sync the catalog.
           </p>
           <div className="admin-table-scroll">
             <table className="admin-table">
@@ -347,21 +415,34 @@ export function AdminPanel({
                     </td>
                     <td>{formatTimestamp(source.lastSyncedAt)}</td>
                     <td>
-                      {source.lastError
-                        ? shortPreview(source.lastError, 80)
-                        : "—"}
+                      {source.lastError ? (
+                        // Truncated hard: these are stacked fetch/validation messages, and a
+                        // full one turns this row into a paragraph. The whole text stays one
+                        // hover away, and the same error is shown unabridged under "Server
+                        // content" above when it's the one that failed the last refresh.
+                        <span
+                          className="admin-cell-error"
+                          title={source.lastError}
+                        >
+                          {shortPreview(source.lastError, 40)}
+                        </span>
+                      ) : (
+                        "—"
+                      )}
                     </td>
                     <td>{source.campaignCount ?? "—"}</td>
                     <td>{source.extensionCount ?? "—"}</td>
                     <td>
-                      <button
-                        type="button"
-                        className="admin-sync admin-row-action"
-                        onClick={onSync}
-                        disabled={syncing}
-                      >
-                        Sync
-                      </button>
+                      {!source.lastError && (
+                        <button
+                          type="button"
+                          className="admin-sync admin-row-action"
+                          onClick={onSync}
+                          disabled={syncing}
+                        >
+                          Sync
+                        </button>
+                      )}
                       {source.removable && (
                         <button
                           type="button"
@@ -408,11 +489,7 @@ export function AdminPanel({
                 {addingUrl ? "Adding…" : "Add & Sync"}
               </button>
             </div>
-            {urlError !== undefined && (
-              <p className="admin-error" role="alert">
-                {urlError}
-              </p>
-            )}
+            {urlOutcome && <AddOutcomeNote outcome={urlOutcome} />}
           </div>
 
           <div className="admin-form">
@@ -434,11 +511,7 @@ export function AdminPanel({
                 {addingPaste ? "Adding…" : "Add & Sync"}
               </button>
             </div>
-            {pasteError !== undefined && (
-              <p className="admin-error" role="alert">
-                {pasteError}
-              </p>
-            )}
+            {pasteOutcome && <AddOutcomeNote outcome={pasteOutcome} />}
           </div>
         </section>
       )}

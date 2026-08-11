@@ -8,6 +8,7 @@ import { createServer, type Server } from "node:http";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Pool } from "pg";
 import type { FastifyInstance } from "fastify";
+import type { PortableCampaign } from "@the-running-dev/game-engine";
 import { buildApp } from "../app.js";
 import { createMultiSourceCampaignSource } from "../campaigns/multi-source.js";
 
@@ -325,6 +326,49 @@ describeIfDb("/api/admin/content/sources", () => {
     }
   });
 
+  // The difference an operator has to be able to see: a refresh is fail-closed across every
+  // source, so a perfectly good paste lands on a failed refresh whenever some *other* source
+  // is broken. `source.lastError` is what distinguishes that from "your paste is broken" --
+  // it must be absent here even though `refresh.ok` is false.
+  it("reports the added source's own outcome, not just the whole refresh's", async () => {
+    const admin = await adminCookie();
+    const broken = await app.inject({
+      method: "POST",
+      url: "/api/admin/content/sources",
+      headers: { cookie: admin },
+      payload: {
+        kind: "url",
+        label: "unreachable",
+        url: "http://127.0.0.1:1/",
+      },
+    });
+    expect(broken.statusCode).toBe(201);
+    const brokenBody = broken.json() as {
+      source: { lastError?: string };
+      refresh: { ok: boolean };
+    };
+    expect(brokenBody.refresh.ok).toBe(false);
+    expect(brokenBody.source.lastError).toBeDefined();
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/admin/content/sources",
+      headers: { cookie: admin },
+      payload: {
+        kind: "pasted",
+        payload: minimalPortableCampaign("late-campaign"),
+      },
+    });
+    expect(response.statusCode).toBe(201);
+    const body = response.json() as {
+      source: { lastError?: string; campaignCount?: number };
+      refresh: { ok: boolean; error?: string };
+    };
+    expect(body.refresh.ok).toBe(false);
+    expect(body.source.lastError).toBeUndefined();
+    expect(body.source.campaignCount).toBe(1);
+  });
+
   it("adds a pasted campaign with an auto-derived label", async () => {
     const admin = await adminCookie();
     const payload = minimalPortableCampaign("pasted-campaign");
@@ -468,5 +512,105 @@ describeIfDb("/api/admin/content/sources", () => {
       headers: { cookie: guest },
     });
     expect(removeResponse.statusCode).toBe(403);
+  });
+});
+
+// The deployed shape: the builtin URL does not resolve (SubZeroDev.Adventures.Content does
+// not exist yet) and carries the committed snapshot as its fallback. Without that fallback
+// this whole suite is one assertion -- "nothing can ever be published" -- since the builtin
+// is unremovable and would fail every refresh forever.
+describeIfDb("/api/admin/content/sources with an unreachable builtin", () => {
+  let pool: Pool;
+  let app: FastifyInstance;
+
+  beforeAll(async () => {
+    pool = new Pool({ connectionString: databaseUrl });
+    app = await buildApp(pool, {
+      siteUrl: "http://localhost:5173",
+      apiUrl: "http://localhost:8787",
+      adminSubjects: [ADMIN_SUBJECT],
+      campaignSource: createMultiSourceCampaignSource(pool, {
+        id: "builtin-default",
+        label: "unreachable builtin",
+        kind: "url",
+        url: "http://127.0.0.1:1/",
+        fallback: {
+          load: async () => ({
+            campaigns: [
+              minimalPortableCampaign(
+                "snapshot-campaign",
+              ) as unknown as PortableCampaign,
+            ],
+            extensions: [],
+          }),
+        },
+      }),
+    });
+  });
+
+  afterAll(async () => {
+    await app.close();
+    await pool.end();
+  });
+
+  beforeEach(async () => {
+    await pool.query(
+      "truncate content_sources, badges, achievements, identities, auth_sessions, saves, sessions, players restart identity cascade",
+    );
+  });
+
+  async function adminCookie(): Promise<string> {
+    const c = cookieFrom(
+      await app.inject({ method: "POST", url: "/api/admin/content/refresh" }),
+    );
+    const me = await app.inject({
+      method: "GET",
+      url: "/api/me",
+      headers: { cookie: c },
+    });
+    const { playerId } = me.json() as { playerId: string };
+    const [provider, subject] = ADMIN_SUBJECT.split(":");
+    await pool.query(
+      `insert into identities (provider, subject, player_id) values ($1, $2, $3)`,
+      [provider, subject, playerId],
+    );
+    return c;
+  }
+
+  it("publishes a pasted campaign anyway, and says the builtin is serving its snapshot", async () => {
+    const admin = await adminCookie();
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/admin/content/sources",
+      headers: { cookie: admin },
+      payload: {
+        kind: "pasted",
+        payload: minimalPortableCampaign("published-anyway"),
+      },
+    });
+
+    expect(response.statusCode).toBe(201);
+    expect((response.json() as { refresh: { ok: boolean } }).refresh.ok).toBe(
+      true,
+    );
+
+    const status = await app.inject({
+      method: "GET",
+      url: "/api/admin/content/status",
+    });
+    const body = status.json() as {
+      campaigns: { campaignId: string }[];
+      sources: { id: string; lastError?: string; campaignCount?: number }[];
+    };
+    // Whole catalog, not a smaller one: the snapshot the builtin stands in for, plus what
+    // was just pasted -- which is playable now rather than after the content host exists.
+    expect(body.campaigns.map((c) => c.campaignId).sort()).toEqual([
+      "published-anyway",
+      "snapshot-campaign",
+    ]);
+    const builtin = body.sources.find((s) => s.id === "builtin-default")!;
+    expect(builtin.lastError).toMatch(/serving the committed snapshot instead/);
+    expect(builtin.campaignCount).toBe(1);
   });
 });

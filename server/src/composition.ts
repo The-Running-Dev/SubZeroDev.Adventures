@@ -3,6 +3,7 @@
  * `createBrowserDemo`, but reading campaign JSON off disk instead of over `fetch`, and
  * handed a Postgres-backed `SessionPersistence` instead of `localPersistence()`.
  */
+import { createHash } from "node:crypto";
 import type { Pool } from "pg";
 import {
   createEngine,
@@ -57,19 +58,47 @@ export interface ServerDemo {
    * no store operation for it yet; this only closes the id-minting half.
    */
   readonly recordIds: RecordIdSource;
+  /**
+   * A digest over exactly the content `campaignSource.load()` returned, for the admin page
+   * (`routes/admin.ts`) and `/healthz` to show *what* is currently serving without dumping
+   * the whole catalog -- two refreshes against unchanged content produce the same digest,
+   * so a no-op pull is visibly a no-op rather than looking like a fresh publish.
+   */
+  readonly contentDigest: string;
+  /** Every extension `campaignSource.loadExtensions()` returned, in the order they were
+   *  applied -- if this list is non-empty, `mergeExtensions` (campaign-extension.ts) did
+   *  not throw, so every one of them landed. Read only by the admin page to show which
+   *  extensions applied to which base campaign; nothing gameplay-facing needs it. */
+  readonly appliedExtensions: readonly {
+    readonly id: string;
+    readonly extends: string;
+  }[];
+}
+
+function digestOf(portables: readonly unknown[]): string {
+  // Portable order is manifest order (`Promise.all` preserves input order regardless of
+  // resolution order), so this is stable across two loads of the same content -- it is not
+  // trying to be stable across a *reordering* of an unchanged manifest, which would be a
+  // different content publish anyway.
+  return createHash("sha256").update(JSON.stringify(portables)).digest("hex");
 }
 
 export async function createServerDemo(
   pool: Pool,
   campaignSource: CampaignSource = createDiskCampaignSource(),
 ): Promise<ServerDemo> {
-  const portables = await campaignSource.load();
-  const { registry, all } = buildCatalog(portables);
+  const { campaigns: portables, extensions } = await campaignSource.load();
+  const { registry, all } = buildCatalog(portables, extensions);
   const engine = createEngine({ kinds: KINDS, registry });
   const recordIds = defaultRecordIdSource;
 
   return {
     all,
+    contentDigest: digestOf([portables, extensions]),
+    appliedExtensions: extensions.map((extension) => ({
+      id: extension.id,
+      extends: extension.extends,
+    })),
     catalog: all.filter((campaign) => !campaign.hidden),
     findCampaign: (campaignId) =>
       all.find((campaign) => campaign.campaignId === campaignId),

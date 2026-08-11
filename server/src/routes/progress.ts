@@ -13,18 +13,19 @@
 import type { FastifyInstance } from "fastify";
 import type { Pool } from "pg";
 import { resolvePrincipal } from "../principal.js";
-import type { ServerDemo } from "../composition.js";
+import type { ContentCell } from "../content-cell.js";
 
 export function registerProgressRoutes(
   app: FastifyInstance,
   pool: Pool,
-  demo: ServerDemo,
+  cell: ContentCell,
 ): void {
   const resolve = resolvePrincipal(pool);
 
   app.get("/api/progress", { preHandler: resolve }, async (request) => {
     const principal = request.principalOrNull;
     if (!principal) return { progress: [] };
+    const demo = cell.current();
 
     // `latest` picks the most-recently-touched session per campaign for status/step
     // count -- a player can have several sessions per campaign (retries, branches), and

@@ -17,13 +17,16 @@ export default defineConfig({
     // (src/play/composition.ts) into remote mode, sending unstubbed fetches. Force local mode
     // for the suite itself rather than relying on the environment not to have that file.
     env: { VITE_API_URL: "" },
-    // Constrained to this repo's own src/ rather than excluding engine/ by name -- the
-    // submodule carries its own test suite (and its own vitest config), which is not this
-    // repo's to run. Real-browser specs (ported from the engine repo's W65) live alongside
-    // these under src/**/*.browser.test.* and run only via vitest.browser.config.ts's
+    // Constrained to this repo's own src/ and shared/ rather than excluding engine/ by
+    // name -- the submodule carries its own test suite (and its own vitest config), which
+    // is not this repo's to run. shared/ is environment-neutral code both compositions
+    // import (CLAUDE.md's Structure table); it has no browser-only surface to test under
+    // vitest.browser.config.ts, so it runs here instead of being orphaned. Real-browser
+    // specs (ported from the engine repo's W65) live alongside src/ under
+    // src/**/*.browser.test.* and run only via vitest.browser.config.ts's
     // `npm run test:browser` -- jsdom performs no layout, so they'd fail here for the wrong
     // reason.
-    include: ["src/**/*.test.{ts,tsx}"],
+    include: ["src/**/*.test.{ts,tsx}", "shared/**/*.test.{ts,tsx}"],
     exclude: ["**/*.browser.test.{ts,tsx}"],
   },
 });

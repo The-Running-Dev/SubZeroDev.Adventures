@@ -16,6 +16,10 @@ import {
   type ContentRegistry,
   type PortableCampaign,
 } from "@the-running-dev/game-engine";
+import {
+  mergeExtensions,
+  type PortableExtension,
+} from "./campaign-extension.js";
 
 /** The declared clamp range of one visible int stat, for rendering it as a meter rather than a bare number. */
 export interface StatBounds {
@@ -30,6 +34,10 @@ export interface CatalogEntry {
    *  server's `multiclass` badge (server/src/badges.ts) and available to any client that
    *  wants to group or filter by kind. */
   readonly kindId: string;
+  /** The published content version -- a submodule bump's or an extension's contribution to
+   *  it isn't visible anywhere else on this type, so the admin page (`AdminPanel.tsx`)
+   *  reads it here rather than the server growing a second, admin-only projection. */
+  readonly version: string;
   readonly title: string;
   readonly description: string;
   readonly duration: string;
@@ -125,11 +133,16 @@ export interface BuiltCatalog {
 
 /** Hydrates portable campaigns, validates the registry, and projects the catalog entries a
  *  client needs to render a dossier — the environment-neutral half of what
- *  `createBrowserDemo` used to do inline. */
+ *  `createBrowserDemo` used to do inline. `extensions` (issue #27) are merged into their
+ *  base campaign here, strictly before hydration and validation — see
+ *  `campaign-extension.ts`'s header for why the merge has to happen at this point rather
+ *  than after. */
 export function buildCatalog(
   portables: readonly PortableCampaign[],
+  extensions: readonly PortableExtension[] = [],
 ): BuiltCatalog {
-  const hydrated = portables.map((portable) => fromPortable(portable));
+  const merged = mergeExtensions(portables, extensions);
+  const hydrated = merged.map((portable) => fromPortable(portable));
 
   const registry = buildValidatedContentRegistry(
     hydrated.map((h) => h.built),
@@ -143,6 +156,7 @@ export function buildCatalog(
   const all = hydrated.map(({ built, catalog }) => ({
     campaignId: built.campaign.id,
     kindId: built.campaign.kindId,
+    version: built.campaign.version,
     title:
       registry.value!.strings.get(built.campaign.titleKey) ?? catalog.title,
     description: catalog.description,

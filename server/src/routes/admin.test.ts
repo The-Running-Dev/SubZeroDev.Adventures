@@ -614,3 +614,135 @@ describeIfDb("/api/admin/content/sources with an unreachable builtin", () => {
     expect(builtin.campaignCount).toBe(1);
   });
 });
+
+// The production crash loop, end to end: an extension row already in the database collides
+// with the campaign it extends, so the *first* build fails -- after every source has loaded,
+// inside validation, where no source-level fallback can see it. Before `ready`'s fallback
+// this exited the process before it bound a port, and the API that could delete the row was
+// the API that never started. The recovery below is only possible because it boots.
+describeIfDb("a stored source that cannot be merged", () => {
+  let pool: Pool;
+  let app: FastifyInstance;
+
+  beforeAll(async () => {
+    pool = new Pool({ connectionString: databaseUrl });
+    await pool.query(
+      "truncate content_sources, badges, achievements, identities, auth_sessions, saves, sessions, players restart identity cascade",
+    );
+    // `end` is already a node on every `minimalPortableCampaign`, so applying this throws
+    // inside `buildValidatedContentRegistry` rather than failing any source's load.
+    await pool.query(
+      `insert into content_sources (source_id, kind, label, payload)
+       values ('00000000-0000-4000-8000-00000000c011', 'pasted', 'colliding-ext', $1)`,
+      [
+        JSON.stringify({
+          formatVersion: 1,
+          id: "colliding-ext",
+          extends: "base-campaign",
+          nodes: {
+            end: {
+              id: "end",
+              kind: "ending",
+              textKey: "x.end.text",
+              endingId: "end",
+            },
+          },
+          strings: { "x.end.text": "collides" },
+        }),
+      ],
+    );
+
+    app = await buildApp(pool, {
+      siteUrl: "http://localhost:5173",
+      apiUrl: "http://localhost:8787",
+      adminSubjects: [ADMIN_SUBJECT],
+      campaignSource: createMultiSourceCampaignSource(pool, {
+        id: "builtin-default",
+        label: "builtin",
+        kind: "url",
+        url: "http://127.0.0.1:1/",
+        fallback: {
+          load: async () => ({
+            campaigns: [
+              minimalPortableCampaign(
+                "base-campaign",
+              ) as unknown as PortableCampaign,
+            ],
+            extensions: [],
+          }),
+        },
+      }),
+      bootstrapSource: {
+        load: async () => ({
+          campaigns: [
+            minimalPortableCampaign(
+              "snapshot-campaign",
+            ) as unknown as PortableCampaign,
+          ],
+          extensions: [],
+        }),
+      },
+    });
+  });
+
+  afterAll(async () => {
+    await app.close();
+    await pool.end();
+  });
+
+  it("boots anyway, says it is on the snapshot, and lets an admin delete the row and recover", async () => {
+    const beforeFix = await app.inject({
+      method: "GET",
+      url: "/api/admin/content/status",
+    });
+    const before = beforeFix.json() as {
+      status: { bootstrapFallback: boolean; lastError?: string };
+      campaigns: { campaignId: string }[];
+    };
+    expect(before.status.bootstrapFallback).toBe(true);
+    expect(before.status.lastError).toMatch(/already exists on campaign/);
+    expect(before.campaigns.map((c) => c.campaignId)).toEqual([
+      "snapshot-campaign",
+    ]);
+
+    // Exactly the recovery an operator has through the admin page, with no psql involved.
+    const cookie = cookieFrom(
+      await app.inject({ method: "POST", url: "/api/admin/content/refresh" }),
+    );
+    const me = await app.inject({
+      method: "GET",
+      url: "/api/me",
+      headers: { cookie },
+    });
+    const [provider, subject] = ADMIN_SUBJECT.split(":");
+    await pool.query(
+      `insert into identities (provider, subject, player_id) values ($1, $2, $3)`,
+      [provider, subject, (me.json() as { playerId: string }).playerId],
+    );
+
+    const removed = await app.inject({
+      method: "DELETE",
+      url: "/api/admin/content/sources/00000000-0000-4000-8000-00000000c011",
+      headers: { cookie },
+    });
+    expect(removed.statusCode).toBe(200);
+
+    const refreshed = await app.inject({
+      method: "POST",
+      url: "/api/admin/content/refresh",
+      headers: { cookie },
+    });
+    expect(refreshed.json()).toEqual({ ok: true });
+
+    const afterFix = await app.inject({
+      method: "GET",
+      url: "/api/admin/content/status",
+    });
+    const after = afterFix.json() as {
+      status: { bootstrapFallback: boolean };
+      campaigns: { campaignId: string }[];
+    };
+    expect(after.status.bootstrapFallback).toBe(false);
+    expect(after.campaigns.map((c) => c.campaignId)).toEqual(["base-campaign"]);
+  });
+});

@@ -464,6 +464,34 @@ describe("PlayApp display theme", () => {
   });
 });
 
+describe("PlayApp admin shell", () => {
+  const originalLocation = window.location.href;
+
+  afterEach(() => {
+    window.history.pushState({}, "", originalLocation);
+    localStorage.removeItem(THEME_STORAGE_KEY);
+    delete document.documentElement.dataset.theme;
+  });
+
+  it("keeps the shared header and archive presentation on the admin page", async () => {
+    window.history.pushState({}, "", "/?admin");
+    render(<PlayApp />);
+
+    expect(
+      await screen.findByRole("heading", { name: "Content admin" }),
+    ).toBeVisible();
+    expect(screen.getByRole("navigation", { name: "Primary" })).toBeVisible();
+    expect(screen.getByRole("link", { name: "Disk library" })).toHaveAttribute(
+      "href",
+      "/",
+    );
+    expect(
+      screen.getByRole("combobox", { name: "DISPLAY MODE" }),
+    ).toBeVisible();
+    expect(document.querySelector("section.archive.admin")).toBeInTheDocument();
+  });
+});
+
 describe("PlayApp BBS Terminal prompt", () => {
   afterEach(() => {
     localStorage.removeItem(THEME_STORAGE_KEY);

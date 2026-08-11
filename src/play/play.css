@@ -2197,32 +2197,27 @@
   }
 }
 
-/*
- * The unlisted operator page (`AdminPanel.tsx`, reachable at `?admin`). Deliberately
- * plain: it is a maintenance surface, not part of the cabinet, so it borrows the page's
- * monospace and palette variables and none of its scanlines, glows, or accents.
- */
+/* The operator page (`AdminPanel.tsx`, reachable at `?admin`) intentionally lives inside
+   the same archive shell as the disk library: content control is part of this system, not
+   a visually separate maintenance application. */
 .admin {
-  max-width: 60rem;
+  max-width: 72rem;
 }
 
 .admin-title {
-  border-bottom: 1px solid var(--rule-strong);
-  font-size: 1.25rem;
-  letter-spacing: 0.08em;
-  margin: 0 0 0.5rem;
-  padding-bottom: 0.5rem;
-  text-transform: uppercase;
+  margin-bottom: 0.5rem;
 }
 
 .admin-note {
   color: var(--muted);
-  font-size: 0.8rem;
+  line-height: 1.6;
   margin: 0 0 2rem;
 }
 
 .admin-block {
-  border: 1px solid var(--rule);
+  background: var(--surface-sunken);
+  border: 2px solid var(--rule-strong);
+  box-shadow: inset 0 0 20px var(--inset-glow);
   margin-bottom: 1.5rem;
   padding: 1rem 1.25rem 1.25rem;
 }
@@ -2327,17 +2322,15 @@
   text-transform: uppercase;
 }
 
-/* One line, never wrapped -- the JS truncation keeps it short, and this keeps a long
-   unbroken token (a URL in a fetch error) from stretching the column anyway. `title`
-   carries the full text, which `cursor: help` is what advertises. */
-.admin-cell-error {
+/* A single glyph instead of truncated text -- the column now costs one character no
+   matter how long the underlying error is, which is what keeps the action column (Sync/
+   Remove) from needing a horizontal scroll to reach. `title` carries the full text,
+   `cursor: help` is what advertises it, and `role="img"`/`aria-label` on the element
+   (AdminPanel.tsx) give the same text to anyone who can't see or hover the glyph. */
+.admin-cell-error-icon {
   color: var(--danger-text);
   cursor: help;
-  display: inline-block;
-  max-width: 22rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-size: 1rem;
 }
 
 .admin-row-action {
@@ -2362,6 +2355,16 @@
 .admin-remove:disabled {
   cursor: progress;
   opacity: 0.6;
+}
+
+/* A failed Remove used to fail silently -- same row, same button text, no sign anything
+   happened. This is that failure surfaced, scoped to the row whose delete just failed. */
+.admin-cell-error-note {
+  color: var(--danger-text);
+  font-size: 0.7rem;
+  margin: 0.3rem 0 0;
+  max-width: 14rem;
+  white-space: normal;
 }
 
 .admin-subheading {
@@ -2390,6 +2393,16 @@
 
 .admin-form input {
   flex: 1 1 12rem;
+}
+
+.admin-file-label,
+.admin-file-name {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.admin-file-name {
+  margin: 0.6rem 0 0;
 }
 
 .admin-paste {

@@ -150,6 +150,44 @@ export function useIdentity(
   return { identity, loading };
 }
 
+/**
+ * Answers the one authorization question the browser needs to expose the unlisted content
+ * operator surface. It deliberately reuses the status endpoint instead of duplicating the
+ * server's identity allowlist in browser code, and re-runs whenever the current player
+ * changes after sign-in, sign-out, or a device transfer.
+ */
+export function useAdminAccess(
+  apiUrl: string | undefined,
+  playerId: string | null,
+): boolean {
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    if (!apiUrl) {
+      setIsAdmin(false);
+      return;
+    }
+    let cancelled = false;
+    fetch(`${apiUrl}/api/admin/content/status`, { credentials: "include" })
+      .then((response) =>
+        response.ok
+          ? (response.json() as Promise<{ isAdmin?: boolean }>)
+          : { isAdmin: false },
+      )
+      .then((body) => {
+        if (!cancelled) setIsAdmin(body.isAdmin === true);
+      })
+      .catch(() => {
+        if (!cancelled) setIsAdmin(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [apiUrl, playerId]);
+
+  return isAdmin;
+}
+
 /** Progress is keyed by campaignId; a campaign with no session yet simply has no entry.
  *  `apiUrl` is `undefined` in local mode -- called unconditionally either way, it just
  *  never fetches. */

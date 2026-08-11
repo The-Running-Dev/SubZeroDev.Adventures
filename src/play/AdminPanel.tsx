@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { BrowserDemo } from "./composition";
 
 interface AdminPanelProps {
@@ -177,6 +177,12 @@ export function AdminPanel({
     refetch: refetchStatus,
   } = useAdminContentStatus(demo.apiUrl, `${lastSyncedAt}:${sourcesToken}`);
   const listed = demo.catalog.length;
+  // The status response is only a snapshot: signing out or losing an identity in another
+  // tab can invalidate it before this operator clicks Add or Remove. Until the server has
+  // positively said this session is an admin, do not offer a write that is guaranteed to
+  // fail -- the top-level Sync stays available because its browser-catalog half is useful
+  // without admin access.
+  const canManageSources = adminStatus?.isAdmin === true;
 
   const [urlLabel, setUrlLabel] = useState("");
   const [urlValue, setUrlValue] = useState("");
@@ -187,7 +193,16 @@ export function AdminPanel({
   const [addingPaste, setAddingPaste] = useState(false);
   const [pasteOutcome, setPasteOutcome] = useState<AddOutcome>();
 
+  const fileInput = useRef<HTMLInputElement>(null);
+  const [selectedFile, setSelectedFile] = useState<File>();
+  const [addingFile, setAddingFile] = useState(false);
+  const [fileOutcome, setFileOutcome] = useState<AddOutcome>();
+
   const [removingId, setRemovingId] = useState<string>();
+  const [removeError, setRemoveError] = useState<{
+    readonly id: string;
+    readonly text: string;
+  }>();
 
   /** Throws only when nothing was created. A 201 always means the row exists, so every
    *  outcome from here on is a report about a source that is already saved. */
@@ -206,6 +221,14 @@ export function AdminPanel({
         }
       | undefined;
     if (!response.ok) {
+      if (response.status === 403 && json?.error?.code === "forbidden") {
+        // A write is authoritative over the earlier status snapshot. Re-read it so the
+        // page stops saying "Allowed" after a session changed elsewhere.
+        refetchStatus();
+        throw new Error(
+          "Your admin session is no longer authorized. The campaign was not added. Sign in again from the main page, then reload ?admin.",
+        );
+      }
       throw new Error(
         json?.error?.code
           ? `${response.status} (${json.error.code})`
@@ -282,31 +305,84 @@ export function AdminPanel({
     }
   }
 
+  async function handleAddFile(): Promise<void> {
+    if (!selectedFile) return;
+    setAddingFile(true);
+    setFileOutcome(undefined);
+    try {
+      let payload: unknown;
+      try {
+        payload = JSON.parse(await selectedFile.text());
+      } catch {
+        throw new Error(`${selectedFile.name} isn't valid JSON`);
+      }
+      const outcome = await postSource({ kind: "pasted", payload });
+      setSelectedFile(undefined);
+      if (fileInput.current) fileInput.current.value = "";
+      setFileOutcome(outcome);
+      setSourcesToken((t) => t + 1);
+      if (outcome.tone === "ok") onSync();
+    } catch (error) {
+      setFileOutcome({
+        tone: "error",
+        text: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setAddingFile(false);
+    }
+  }
+
   async function handleRemove(id: string): Promise<void> {
     if (!demo.apiUrl) return;
     setRemovingId(id);
+    setRemoveError(undefined);
     try {
       const response = await fetch(
         `${demo.apiUrl}/api/admin/content/sources/${id}`,
         { method: "DELETE", credentials: "include" },
       );
-      if (!response.ok) throw new Error(`${response.status}`);
+      if (!response.ok) {
+        // Surface *why* the delete didn't happen -- a 403 (session isn't actually admin
+        // anymore), a 404 (already gone), or a network failure all used to be swallowed
+        // silently here, which reads identically to the button doing nothing at all.
+        const json = (await response.json().catch(() => undefined)) as
+          { error?: { code?: string } } | undefined;
+        const code = json?.error?.code;
+        if (response.status === 403 && code === "forbidden") {
+          refetchStatus();
+          throw new Error(
+            "Your admin session is no longer authorized. Nothing was removed. Sign in again from the main page, then reload ?admin.",
+          );
+        }
+        throw new Error(
+          code
+            ? `${response.status} (${code})`
+            : `request failed: ${response.status}`,
+        );
+      }
       refetchStatus();
-    } catch {
-      // Nothing removed; the row's own state is unchanged, so there's nothing new to show
-      // beyond what a retry click already communicates.
+    } catch (error) {
+      setRemoveError({
+        id,
+        text: error instanceof Error ? error.message : String(error),
+      });
     } finally {
       setRemovingId(undefined);
     }
   }
 
   return (
-    <main className="play-main admin">
-      <h1 className="admin-title">Content admin</h1>
-      <p className="admin-note">
-        Unlisted. Nothing links here — this page exists at <code>?admin</code>{" "}
-        only.
-      </p>
+    <section className="archive admin" aria-labelledby="admin-title">
+      <div className="archive-heading">
+        <p className="eyebrow">SUBZERO STORY SYSTEM // CONTENT CONTROL</p>
+        <h1 id="admin-title" className="admin-title">
+          Content admin
+        </h1>
+        <p className="admin-note">
+          Unlisted. Nothing links here — this page exists at <code>?admin</code>{" "}
+          only.
+        </p>
+      </div>
 
       <section className="admin-block">
         <h2 className="admin-heading">Source</h2>
@@ -385,6 +461,13 @@ export function AdminPanel({
               Could not read server status: {statusError}
             </p>
           )}
+          {adminStatus && !adminStatus.isAdmin && (
+            <p className="admin-notice admin-notice-warn" role="status">
+              Source management needs an authorized session.{" "}
+              <a href="/">Sign in on the main page</a>, then reload{" "}
+              <code>?admin</code>.
+            </p>
+          )}
         </section>
       )}
 
@@ -428,15 +511,19 @@ export function AdminPanel({
                     <td>{formatTimestamp(source.lastSyncedAt)}</td>
                     <td>
                       {source.lastError ? (
-                        // Truncated hard: these are stacked fetch/validation messages, and a
-                        // full one turns this row into a paragraph. The whole text stays one
-                        // hover away, and the same error is shown unabridged under "Server
-                        // content" above when it's the one that failed the last refresh.
+                        // Icon, not text: the full message is stacked fetch/validation
+                        // output, and even a truncated preview was wide enough to force the
+                        // horizontal scroll that hid the Remove button. The whole text stays
+                        // one hover (or tap, via title) away, and is shown unabridged under
+                        // "Server content" above when it's the one that failed the last
+                        // refresh.
                         <span
-                          className="admin-cell-error"
+                          className="admin-cell-error-icon"
                           title={source.lastError}
+                          role="img"
+                          aria-label={`Error: ${source.lastError}`}
                         >
-                          {shortPreview(source.lastError, 40)}
+                          ⚠
                         </span>
                       ) : (
                         "—"
@@ -460,10 +547,17 @@ export function AdminPanel({
                           type="button"
                           className="admin-remove admin-row-action"
                           onClick={() => void handleRemove(source.id)}
-                          disabled={removingId === source.id}
+                          disabled={
+                            removingId === source.id || !canManageSources
+                          }
                         >
                           {removingId === source.id ? "Removing…" : "Remove"}
                         </button>
+                      )}
+                      {removeError?.id === source.id && (
+                        <p className="admin-cell-error-note" role="alert">
+                          {removeError.text}
+                        </p>
                       )}
                     </td>
                   </tr>
@@ -485,18 +579,22 @@ export function AdminPanel({
                 placeholder="Label"
                 value={urlLabel}
                 onChange={(event) => setUrlLabel(event.target.value)}
+                disabled={!canManageSources}
               />
               <input
                 type="text"
                 placeholder="https://…/campaigns/"
                 value={urlValue}
                 onChange={(event) => setUrlValue(event.target.value)}
+                disabled={!canManageSources}
               />
               <button
                 type="button"
                 className="admin-sync"
                 onClick={() => void handleAddUrl()}
-                disabled={addingUrl || !urlLabel || !urlValue}
+                disabled={
+                  addingUrl || !urlLabel || !urlValue || !canManageSources
+                }
               >
                 {addingUrl ? "Adding…" : "Add & Sync"}
               </button>
@@ -512,18 +610,55 @@ export function AdminPanel({
               value={pasteText}
               onChange={(event) => setPasteText(event.target.value)}
               rows={6}
+              disabled={!canManageSources}
             />
             <div className="admin-form-row">
               <button
                 type="button"
                 className="admin-sync"
                 onClick={() => void handleAddPaste()}
-                disabled={addingPaste || !pasteText.trim()}
+                disabled={addingPaste || !pasteText.trim() || !canManageSources}
               >
                 {addingPaste ? "Adding…" : "Add & Sync"}
               </button>
             </div>
             {pasteOutcome && <AddOutcomeNote outcome={pasteOutcome} />}
+          </div>
+
+          <div className="admin-form">
+            <h3 className="admin-subheading">
+              Upload a campaign or extension JSON
+            </h3>
+            <div className="admin-form-row">
+              <label className="admin-file-label" htmlFor="admin-json-file">
+                JSON file
+              </label>
+              <input
+                ref={fileInput}
+                id="admin-json-file"
+                type="file"
+                accept="application/json,.json"
+                onChange={(event) => {
+                  setSelectedFile(event.target.files?.[0]);
+                  setFileOutcome(undefined);
+                }}
+                disabled={!canManageSources || addingFile}
+              />
+              <button
+                type="button"
+                className="admin-sync"
+                onClick={() => void handleAddFile()}
+                disabled={!selectedFile || !canManageSources || addingFile}
+              >
+                {addingFile ? "Uploading…" : "Upload & Sync"}
+              </button>
+            </div>
+            {selectedFile && (
+              <p className="admin-file-name" role="status">
+                Selected: {selectedFile.name}
+              </p>
+            )}
+            {fileOutcome && <AddOutcomeNote outcome={fileOutcome} />}
           </div>
         </section>
       )}
@@ -587,6 +722,6 @@ export function AdminPanel({
           </div>
         </section>
       )}
-    </main>
+    </section>
   );
 }

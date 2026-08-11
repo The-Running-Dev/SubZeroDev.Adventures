@@ -4,7 +4,8 @@
  * everything outside this file depends on, with exactly one implementation here reading a
  * real filesystem, so composition.ts can be handed a different source (an in-memory one in
  * a test, or one backed by something other than a local disk) without composition.ts
- * itself changing (issue #12).
+ * itself changing (issue #12). `multi-source.ts` is the other implementation, fanning out
+ * to several of these.
  */
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
@@ -15,11 +16,16 @@ import {
   type PortableManifestWithExtensions,
 } from "../../../shared/campaign-extension.js";
 
+export interface LoadedContent {
+  readonly campaigns: readonly PortableCampaign[];
+  readonly extensions: readonly PortableExtension[];
+}
+
 export interface CampaignSource {
-  load(): Promise<readonly PortableCampaign[]>;
-  /** Extension JSON (issue #27) -- absent from the manifest means none, returned as `[]`
-   *  rather than the caller having to treat "no extensions" as a special case. */
-  loadExtensions(): Promise<readonly PortableExtension[]>;
+  /** One combined fetch for campaigns and extensions -- not two separate methods, so a
+   *  source fanning out to several origins (`multi-source.ts`) never fetches the same
+   *  manifest twice for one refresh. */
+  load(): Promise<LoadedContent>;
 }
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -50,20 +56,19 @@ export function createDiskCampaignSource(dir?: string): CampaignSource {
     async load() {
       const manifest =
         await readJson<PortableManifestWithExtensions>("manifest.json");
-      return Promise.all(
-        manifest.campaigns.map((fileName) =>
-          readJson<PortableCampaign>(fileName),
+      const [campaigns, extensions] = await Promise.all([
+        Promise.all(
+          manifest.campaigns.map((fileName) =>
+            readJson<PortableCampaign>(fileName),
+          ),
         ),
-      );
-    },
-    async loadExtensions() {
-      const manifest =
-        await readJson<PortableManifestWithExtensions>("manifest.json");
-      return Promise.all(
-        (manifest.extensions ?? []).map((fileName) =>
-          readJson<PortableExtension>(fileName),
+        Promise.all(
+          (manifest.extensions ?? []).map((fileName) =>
+            readJson<PortableExtension>(fileName),
+          ),
         ),
-      );
+      ]);
+      return { campaigns, extensions };
     },
   };
 }
@@ -125,20 +130,19 @@ export function createHttpCampaignSource(
     async load() {
       const manifest =
         await readJson<PortableManifestWithExtensions>("manifest.json");
-      return Promise.all(
-        manifest.campaigns.map((fileName) =>
-          readJson<PortableCampaign>(fileName),
+      const [campaigns, extensions] = await Promise.all([
+        Promise.all(
+          manifest.campaigns.map((fileName) =>
+            readJson<PortableCampaign>(fileName),
+          ),
         ),
-      );
-    },
-    async loadExtensions() {
-      const manifest =
-        await readJson<PortableManifestWithExtensions>("manifest.json");
-      return Promise.all(
-        (manifest.extensions ?? []).map((fileName) =>
-          readJson<PortableExtension>(fileName),
+        Promise.all(
+          (manifest.extensions ?? []).map((fileName) =>
+            readJson<PortableExtension>(fileName),
+          ),
         ),
-      );
+      ]);
+      return { campaigns, extensions };
     },
   };
 }

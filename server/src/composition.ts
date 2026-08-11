@@ -87,10 +87,7 @@ export async function createServerDemo(
   pool: Pool,
   campaignSource: CampaignSource = createDiskCampaignSource(),
 ): Promise<ServerDemo> {
-  const [portables, extensions] = await Promise.all([
-    campaignSource.load(),
-    campaignSource.loadExtensions(),
-  ]);
+  const { campaigns: portables, extensions } = await campaignSource.load();
   const { registry, all } = buildCatalog(portables, extensions);
   const engine = createEngine({ kinds: KINDS, registry });
   const recordIds = defaultRecordIdSource;

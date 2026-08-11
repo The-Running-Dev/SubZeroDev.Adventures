@@ -6,7 +6,7 @@ import { createServerDemo } from "./composition.js";
 import { createContentCell } from "./content-cell.js";
 import {
   createDiskCampaignSource,
-  createHttpCampaignSource,
+  type CampaignSource,
 } from "./campaigns/source.js";
 import { registerHealthRoute } from "./health.js";
 import { registerSessionRoutes } from "./routes/session.js";
@@ -27,10 +27,14 @@ import { loadIdentityProviders } from "./identity/registry.js";
 export interface AppConfig {
   readonly siteUrl: string;
   readonly apiUrl: string;
-  /** Undefined means "read content from disk" (`createDiskCampaignSource`'s default) --
-   *  the only configuration every test and every non-deployed run needs. Set once content
-   *  is actually published somewhere this server can fetch it from. */
-  readonly contentBaseUrl?: string;
+  /** Undefined means `createDiskCampaignSource()` -- the only configuration every test and
+   *  every non-deployed run needs, and it never touches the network or the
+   *  `content_sources` table. `index.ts` is the only caller that passes something else: a
+   *  multi-source `CampaignSource` (`campaigns/multi-source.ts`) built around the hardcoded
+   *  default plus whatever an admin has added (issue #27). Injectable for the same reason
+   *  `createServerDemo`'s own `campaignSource` parameter is (#12) -- so this file never
+   *  has to know which kind it got. */
+  readonly campaignSource?: CampaignSource;
   /** `provider:subject` pairs, matched against a signed-in principal's linked identities
    *  (`identities` table) to gate `/api/admin/*`. No provider name is ever typed into this
    *  file or `routes/admin.ts` -- these are opaque strings from configuration, the same
@@ -43,7 +47,12 @@ export interface AppConfig {
  *  (which calls `listen`) and the test suite (which uses `app.inject()`). */
 export async function buildApp(
   pool: Pool,
-  { siteUrl, apiUrl, contentBaseUrl, adminSubjects = [] }: AppConfig,
+  {
+    siteUrl,
+    apiUrl,
+    campaignSource = createDiskCampaignSource(),
+    adminSubjects = [],
+  }: AppConfig,
 ): Promise<FastifyInstance> {
   const app = Fastify({ logger: process.env.NODE_ENV !== "test" });
 
@@ -89,9 +98,6 @@ export async function buildApp(
   // The cell owns the swap: `refresh()` builds a complete `ServerDemo` and only publishes
   // it on success, so a bad rebuild leaves the previous one serving (#22). Every route below
   // takes `cell`, not a `ServerDemo` snapshot, and re-reads `cell.current()` per request.
-  const campaignSource = contentBaseUrl
-    ? createHttpCampaignSource(contentBaseUrl)
-    : createDiskCampaignSource();
   const { cell, ready } = createContentCell(() =>
     createServerDemo(pool, campaignSource),
   );
@@ -107,7 +113,7 @@ export async function buildApp(
   registerStatsRoutes(app, pool);
   registerProfileRoutes(app, pool, cell);
   registerRankingRoutes(app, pool);
-  registerAdminRoutes(app, pool, cell, adminSubjects);
+  registerAdminRoutes(app, pool, cell, campaignSource, adminSubjects);
 
   return app;
 }

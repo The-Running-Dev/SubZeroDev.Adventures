@@ -57,10 +57,11 @@ describe("createHttpCampaignSource", () => {
     const source = createHttpCampaignSource(started.url);
     const loaded = await source.load();
 
-    expect(loaded).toEqual([
+    expect(loaded.campaigns).toEqual([
       { campaign: { id: "a" } },
       { campaign: { id: "b" } },
     ]);
+    expect(loaded.extensions).toEqual([]);
   });
 
   it("loads no extensions when the manifest declares none", async () => {
@@ -73,7 +74,7 @@ describe("createHttpCampaignSource", () => {
     server = started.server;
 
     const source = createHttpCampaignSource(started.url);
-    expect(await source.loadExtensions()).toEqual([]);
+    expect((await source.load()).extensions).toEqual([]);
   });
 
   it("loads every extension the manifest lists", async () => {
@@ -99,7 +100,9 @@ describe("createHttpCampaignSource", () => {
     server = started.server;
 
     const source = createHttpCampaignSource(started.url);
-    expect(await source.loadExtensions()).toEqual([extension]);
+    const loaded = await source.load();
+    expect(loaded.campaigns).toEqual([]);
+    expect(loaded.extensions).toEqual([extension]);
   });
 
   it("throws rather than returning a partial catalog when one file 404s", async () => {
@@ -137,7 +140,7 @@ describe("createHttpCampaignSource", () => {
     });
     const loaded = await source.load();
 
-    expect(loaded).toEqual([{ campaign: { id: "a" } }]);
+    expect(loaded.campaigns).toEqual([{ campaign: { id: "a" } }]);
     expect(attempts).toBe(2);
   });
 

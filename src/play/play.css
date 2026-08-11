@@ -2196,3 +2196,116 @@
     outline-offset: 2px;
   }
 }
+
+/*
+ * The unlisted operator page (`AdminPanel.tsx`, reachable at `?admin`). Deliberately
+ * plain: it is a maintenance surface, not part of the cabinet, so it borrows the page's
+ * monospace and palette variables and none of its scanlines, glows, or accents.
+ */
+.admin {
+  max-width: 60rem;
+}
+
+.admin-title {
+  border-bottom: 1px solid var(--rule-strong);
+  font-size: 1.25rem;
+  letter-spacing: 0.08em;
+  margin: 0 0 0.5rem;
+  padding-bottom: 0.5rem;
+  text-transform: uppercase;
+}
+
+.admin-note {
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin: 0 0 2rem;
+}
+
+.admin-block {
+  border: 1px solid var(--rule);
+  margin-bottom: 1.5rem;
+  padding: 1rem 1.25rem 1.25rem;
+}
+
+.admin-heading {
+  color: var(--cyan);
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  margin: 0 0 1rem;
+  text-transform: uppercase;
+}
+
+.admin-facts {
+  display: grid;
+  gap: 0.4rem 1.5rem;
+  grid-template-columns: max-content 1fr;
+  margin: 0 0 1.25rem;
+}
+
+.admin-facts dt {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.admin-facts dd {
+  font-size: 0.8rem;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.admin-sync {
+  background: var(--cyan);
+  border: none;
+  color: var(--on-cyan);
+  cursor: pointer;
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  padding: 0.5rem 1.25rem;
+  text-transform: uppercase;
+}
+
+.admin-sync:hover:not(:disabled) {
+  background: var(--cyan-hover);
+  color: var(--on-cyan-hover);
+}
+
+.admin-sync:disabled {
+  cursor: progress;
+  opacity: 0.6;
+}
+
+.admin-error {
+  background: var(--danger-bg);
+  border-left: 3px solid var(--danger-border);
+  color: var(--danger-text);
+  font-size: 0.8rem;
+  margin: 1rem 0 0;
+  padding: 0.6rem 0.9rem;
+}
+
+/* The table is the one thing here that can outgrow a narrow viewport, so it scrolls
+   inside its own box rather than widening the page. */
+.admin-table-scroll {
+  overflow-x: auto;
+}
+
+.admin-table {
+  border-collapse: collapse;
+  font-size: 0.8rem;
+  min-width: 34rem;
+  width: 100%;
+}
+
+.admin-table th,
+.admin-table td {
+  border-bottom: 1px solid var(--rule-soft);
+  padding: 0.45rem 0.75rem 0.45rem 0;
+  text-align: left;
+}
+
+.admin-table th {
+  color: var(--muted);
+  font-weight: normal;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}

@@ -1,0 +1,44 @@
+name: Update visual baselines
+
+# Manual only -- this regenerates and uploads the `chromium-linux` visual-regression
+# baselines (CLAUDE.md, "Visual Baselines") for a maintainer to review and commit. It
+# mirrors ci.yml's `ci` job setup exactly, so the Chromium build it renders with is the
+# same one that job's `npm run check` compares against, then runs the browser suite with
+# `--update` instead of asserting, and uploads the resulting PNGs as an artifact rather
+# than committing anything itself.
+on:
+  workflow_dispatch: {}
+
+jobs:
+  update-baselines:
+    name: update-baselines
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (with submodules)
+        uses: actions/checkout@v5
+        with:
+          submodules: true
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      - name: Build engine submodule
+        run: npm run setup
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Regenerate visual baselines
+        run: npm run test:browser:update
+
+      - name: Upload regenerated baselines
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-baselines
+          path: src/play/browser/__screenshots__/visual-baseline.browser.test.tsx/
+          if-no-files-found: error

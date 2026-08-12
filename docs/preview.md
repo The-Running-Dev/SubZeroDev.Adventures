@@ -12,12 +12,25 @@ CI round-trip cheap when you do have to take it.
 Nothing here changes how the site deploys. `deploy.yml` is untouched, and no preview build
 can become the deployed one — different host, different stack, different bundle.
 
+Everything below is wrapped by `scripts/dev.ps1`, which is usually what you want to type:
+
+```powershell
+.\scripts\dev.ps1 -Status
+```
+
+`-Dev [-SignIn]`, `-Tunnel`, `-Deploy`, `-Baselines`, `-Check`, `-Down`. Each mode is only a
+wrapper — every underlying command is documented here too, so a wrong assumption baked into
+that script is never the only way to do the thing.
+
 ## The two loops
 
-|                                             | latency         | real domain | signed-in session | needs           |
-| ------------------------------------------- | --------------- | ----------- | ----------------- | --------------- |
-| **Tunnel** (`npm run dev` + a tunnel)       | HMR, sub-second | yes         | yes               | a tunnel client |
-| **Preview host** (`npm run deploy:preview`) | ~25s            | yes         | yes               | a VPS container |
+|                                             | latency         | real domain | signed-in session | needs                                |
+| ------------------------------------------- | --------------- | ----------- | ----------------- | ------------------------------------ |
+| **Tunnel** (`npm run dev` + a tunnel)       | HMR, sub-second | yes         | yes               | a _named_ tunnel on a real subdomain |
+| **Preview host** (`npm run deploy:preview`) | ~25s            | yes         | yes               | a VPS container                      |
+
+Both "signed-in session" cells depend on the hostname being under `subzerodev.com` — a quick
+tunnel or a Tailscale funnel gets you the URL but not the session. See Loop 1 for why.
 
 Use the tunnel while you are actively editing. Use the preview host when you want a URL
 that stays up after you close the laptop — showing someone, testing on a phone you don't
@@ -65,15 +78,27 @@ Run the dev server against the deployed API:
 VITE_API_URL=https://adventures-api.subzerodev.com npm run dev
 ```
 
-Then expose it at the preview hostname. Either client works; both give you a stable name
-without opening a port on your machine:
+Then expose it at the preview hostname. **The hostname has to be under `subzerodev.com`**,
+which rules out the two convenient options: a `cloudflared` quick tunnel lands on a random
+`trycloudflare.com` name, and `tailscale funnel` on a `*.ts.net` one. Both are cross-site to
+the API, so the session cookie is not sent and you get anonymous play — the same limitation
+as `localhost`, just on a public URL. They are fine for showing someone a layout, useless
+for anything behind sign-in.
+
+For a signed-in preview, create a named tunnel once and route it to a real subdomain:
 
 ```bash
-cloudflared tunnel --url http://localhost:5173 --hostname dev.adventures.subzerodev.com
+cloudflared tunnel create adventures-preview
 ```
 
 ```bash
-tailscale funnel 5173
+cloudflared tunnel route dns adventures-preview dev.adventures.subzerodev.com
+```
+
+Then, per session:
+
+```bash
+cloudflared tunnel run --url http://localhost:5173 adventures-preview
 ```
 
 Add `--host` to the Vite command if the tunnel client cannot reach a loopback-bound server.
@@ -115,12 +140,13 @@ PREVIEW_API_URL=https://adventures-api.subzerodev.com
 `PREVIEW_SSH_HOST` is anything `ssh` accepts — a `Host` alias from `~/.ssh/config` is the
 better answer, since it keeps the key path and port out of this repo. The optional rest:
 
-| variable                    | default                   |                                                            |
-| --------------------------- | ------------------------- | ---------------------------------------------------------- |
-| `PREVIEW_REMOTE_ROOT`       | `/srv/adventures-preview` | must match the bind mount in `preview/docker-compose.yml`  |
-| `PREVIEW_KEEP_RELEASES`     | `5`                       | previous releases left on the VPS for a manual roll-back   |
-| `PREVIEW_SUPABASE_URL`      | unset                     | leave unset to preview the "identity not configured" state |
-| `PREVIEW_SUPABASE_ANON_KEY` | unset                     |                                                            |
+| variable                    | default                   |                                                                 |
+| --------------------------- | ------------------------- | --------------------------------------------------------------- |
+| `PREVIEW_REMOTE_ROOT`       | `/srv/adventures-preview` | must match the bind mount in `preview/docker-compose.yml`       |
+| `PREVIEW_KEEP_RELEASES`     | `5`                       | previous releases left on the VPS for a manual roll-back        |
+| `PREVIEW_SUPABASE_URL`      | unset                     | leave unset to preview the "identity not configured" state      |
+| `PREVIEW_SUPABASE_ANON_KEY` | unset                     |                                                                 |
+| `PREVIEW_TUNNEL_NAME`       | unset                     | read by `scripts/dev.ps1 -Tunnel` so you can omit `-TunnelName` |
 
 ### Then, for every iteration
 

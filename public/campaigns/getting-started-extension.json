@@ -1,0 +1,63 @@
+{
+  "formatVersion": 1,
+  "id": "getting-started-side-quest",
+  "extends": "getting-started",
+  "nodes": {
+    "side_quest_landing": {
+      "id": "side_quest_landing",
+      "kind": "choice",
+      "textKey": "getting-started.ext.side_quest_landing.text",
+      "choices": [
+        {
+          "id": "proceed",
+          "labelKey": "getting-started.ext.side_quest_landing.choice_proceed",
+          "goto": "side_quest_end"
+        }
+      ]
+    },
+    "side_quest_end": {
+      "id": "side_quest_end",
+      "kind": "choice",
+      "textKey": "getting-started.ext.side_quest_end.text",
+      "choices": [
+        {
+          "id": "continue",
+          "labelKey": "getting-started.ext.side_quest_end.choice_continue",
+          "goto": "campaign_shapes"
+        }
+      ]
+    }
+  },
+  "addChoices": [
+    {
+      "nodeId": "content_composition_intro",
+      "choice": {
+        "id": "what_was_that",
+        "labelKey": "getting-started.ext.choice_what_was_that",
+        "goto": "side_quest_landing"
+      }
+    }
+  ],
+  "achievements": [
+    {
+      "id": "off_the_beaten_graph",
+      "nameKey": "getting-started.ext.achievement_side_quest.name",
+      "descriptionKey": "getting-started.ext.achievement_side_quest.description",
+      "hidden": true,
+      "condition": {
+        "field": "visited.side_quest_landing",
+        "operator": "greater_or_equal",
+        "value": 1
+      }
+    }
+  ],
+  "strings": {
+    "getting-started.ext.choice_what_was_that": "—wait, what was that?",
+    "getting-started.ext.side_quest_landing.text": "SIDE QUEST DETECTED.\n\nA completely unnecessary mini-path has appeared. It exists only to prove that content composition works — this entire node, and the choice that got you here, live in a separate file that was grafted onto the campaign you're playing. Nothing about the original file changed.",
+    "getting-started.ext.side_quest_landing.choice_proceed": "Proceed anyway.",
+    "getting-started.ext.side_quest_end.text": "Anyway, where were we?",
+    "getting-started.ext.side_quest_end.choice_continue": "Back to it.",
+    "getting-started.ext.achievement_side_quest.name": "Off The Beaten Graph",
+    "getting-started.ext.achievement_side_quest.description": "Wandered into content that wasn't even supposed to be here. That's the platform working as intended."
+  }
+}

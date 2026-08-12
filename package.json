@@ -16,6 +16,8 @@
     "test": "vitest run",
     "test:browser": "vitest run --config vitest.browser.config.ts",
     "test:browser:update": "vitest run --config vitest.browser.config.ts --update",
+    "baselines:update": "node scripts/update-baselines-docker.mjs",
+    "deploy:preview": "node scripts/deploy-preview.mjs",
     "test:build": "npm run build && node scripts/verify-build.mjs",
     "typecheck": "tsc -b",
     "sync:campaigns": "node scripts/sync-campaigns.mjs"

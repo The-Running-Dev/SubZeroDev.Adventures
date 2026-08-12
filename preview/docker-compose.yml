@@ -1,0 +1,52 @@
+# The preview stack -- a static file server for the rapid UI loop (docs/preview.md), and
+# the third standalone compose file in this repo. Like the other two it is read
+# top-to-bottom on its own and is not an override layer over either of them:
+#
+#   ../docker-compose.yml        the deployment stack (pulls the API image, builds nothing)
+#   ../server/docker-compose.yml the dev stack (builds the API from source)
+#   this file                    the preview stack (serves whatever was last uploaded)
+#
+# It shares nothing with them: no database, no API, no image of this repo's building. All
+# it does is serve the directory `scripts/deploy-preview.mjs` uploads to. The preview site
+# talks to the *deployed* API, which is the point -- it is a different front end over the
+# same back end, not a second environment.
+#
+#   docker compose -f preview/docker-compose.yml up -d
+#
+# Operator prerequisites:
+#   - `proxy-net` must already exist, same as the deployment stack. Whatever terminates TLS
+#     on that network routes dev.adventures.subzerodev.com to `adventures-preview:8080` by
+#     container name.
+#   - The host directory below must exist and be writable by the SSH user that
+#     `deploy-preview.mjs` connects as: `mkdir -p /srv/adventures-preview/releases`.
+#     Nothing here creates it -- a bind mount would be silently created as root-owned and
+#     every deploy would then fail on permissions.
+#   - A dev.adventures.subzerodev.com DNS record.
+#   - The API's PREVIEW_ORIGINS must list https://dev.adventures.subzerodev.com, or the
+#     preview loads and then fails every call it makes (server/src/app.ts).
+#
+# Deliberately NOT part of the deployment stack's compose file: this serves unreviewed,
+# possibly broken builds that never went through CI. Keeping it a separate stack means
+# `docker compose down` on either one cannot take the other with it, and there is no
+# arrangement of environment variables that makes the deployment stack serve a preview
+# build by accident.
+
+name: subzerodev-adventures-preview
+
+services:
+  preview:
+    image: caddy:2-alpine
+    container_name: adventures-preview
+    restart: unless-stopped
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # `current` inside is a symlink to a directory under `releases/`, which is why the
+      # whole root is mounted rather than just `current` -- a bind mount of the symlink
+      # itself would resolve to a path that does not exist inside the container.
+      - "${PREVIEW_ROOT:-/srv/adventures-preview}:/srv:ro"
+    networks:
+      - proxy-net
+
+networks:
+  proxy-net:
+    external: true

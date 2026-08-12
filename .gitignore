@@ -30,6 +30,10 @@ dist-ssr/
 
 # Env / secrets
 .env
+# Also covers `.env.preview` (scripts/deploy-preview.mjs's configuration, docs/preview.md),
+# which names a host you can SSH into and so is never committed. Its variables are
+# documented in docs/preview.md rather than in a `.env.preview.example`, which the pattern
+# below would swallow anyway -- the `!` exception is for that one exact filename.
 .env.*
 # ...except the committed template. `.env.*` above would otherwise swallow it, and a
 # .env.example that silently never gets committed is worse than none at all.

@@ -25,7 +25,8 @@ src/
   test/                  jsdom + real-browser test setup and shared assertion helpers
 shared/                 code both compositions import — environment-neutral, no DOM, no Node
 server/                 the hosted Node API: its own npm project, its own Dockerfile
-docker-compose.yml      the deployment stack — see "The Two Compose Files" below
+preview/                the preview static host — see "The Three Compose Files" below
+docker-compose.yml      the deployment stack — see "The Three Compose Files" below
 ```
 
 ## The Engine Submodule — What Not to Forget
@@ -75,9 +76,9 @@ output path at this repo. Nothing enforces that this stays in lockstep with the 
 free to drift until a test actually needs the refresh. Diff the result after running it, and
 regenerate the visual baselines (below) if rendered output changed.
 
-## The Two Compose Files
+## The Three Compose Files
 
-There are two, they are independent, and neither is an override layer over the other. This
+There are three, they are independent, and none is an override layer over another. This
 mirrors how `SubZeroDev.com` and `SubZeroDev.Blog/tools/blog-mcp` are laid out.
 
 - **`docker-compose.yml` (root) is the deployment stack.** It pulls
@@ -87,6 +88,13 @@ mirrors how `SubZeroDev.com` and `SubZeroDev.Blog/tools/blog-mcp` are laid out.
 - **`server/docker-compose.yml` is the dev stack.** `build: context: ..` — the context is
   the repo root, because the image needs `engine/`, `shared/`, and `server/`. Its image is
   tagged `subzerodev-adventures-api:dev`, deliberately never the GHCR name.
+- **`preview/docker-compose.yml` is the preview stack** — a Caddy static file server for
+  the rapid UI loop (`docs/preview.md`), serving whatever `npm run deploy:preview` last
+  uploaded to `/srv/adventures-preview`. It has no database and no API of its own: a
+  preview build talks to the _deployed_ API, which is why that API needs `PREVIEW_ORIGINS`
+  set before any of it works. Kept separate from the deployment stack because it serves
+  unreviewed builds that never went through CI, and no arrangement of environment
+  variables should be able to make the deployment stack serve one by accident.
 
 ```bash
 docker compose -f server/docker-compose.yml up -d --build
@@ -136,23 +144,28 @@ Windows (there is no other set to regenerate) by running it inside a Linux conta
 pixels actually match what CI will compare against:
 
 ```bash
-npm run test:browser:update
+npm run baselines:update
 ```
 
-**Use a plain `node:24` image with `playwright install --with-deps`, not the
-`mcr.microsoft.com/playwright` image** — its bundled Chromium build renders text a few
+That wraps the container invocation (`scripts/update-baselines-docker.mjs`) rather than
+leaving it to be hand-typed, because two details in it are load-bearing and easy to get
+wrong. **It uses a plain `node:24` image with `playwright install --with-deps`, not the
+`mcr.microsoft.com/playwright` image** — that image's bundled Chromium renders text a few
 pixels taller at every non-320px width than the Chromium `playwright install --with-deps`
 downloads on `ubuntu-latest`, which is exactly the mismatch that broke this repo's first CI
-run (baselines that passed locally under the Microsoft image failed in CI). Match what the
-workflow actually does:
-
-```bash
-docker run --rm -v "${PWD}:/w" -w /w node:24 \
-  bash -c "npm ci && npx playwright install --with-deps chromium && npm run test:browser:update"
-```
+run (baselines that passed locally under the Microsoft image failed in CI). And it shadows
+both `node_modules` trees with anonymous volumes, so a bind-mounted `npm ci` cannot replace
+the host checkout's Windows-native binaries with Linux ones.
 
 Commit both the regenerated PNGs and the source change together — a screenshot diff with no
 accompanying code change, or vice versa, is a review red flag.
+
+If CI is the first thing to catch it, the **Update visual baselines** workflow
+(`workflow_dispatch`) regenerates and commits the set back to the branch, rather than
+handing back an artifact to copy in by hand.
+
+For iterating on UI without pushing at all, see `docs/preview.md` — a tunnelled `npm run
+dev` or `npm run deploy:preview` against the deployed API.
 
 ## The Identity Seam — A Contract Platform Is Building From
 

@@ -31,6 +31,8 @@ import bulgariaDrivingJson from "../../public/campaigns/bulgaria-driving.json";
 import bulgariaInheritanceJson from "../../public/campaigns/bulgaria-inheritance.json";
 import bulgariaEnterpriseJson from "../../public/campaigns/bulgaria-enterprise.json";
 import sakiQuestJson from "../../public/campaigns/saki-quest-for-redemption.json";
+import gettingStartedJson from "../../public/campaigns/getting-started.json";
+import gettingStartedExtensionJson from "../../public/campaigns/getting-started-extension.json";
 
 const SEED = "bureaucracy-seed-3";
 
@@ -51,6 +53,8 @@ const exportedCampaigns: Readonly<Record<string, unknown>> = {
   "bulgaria-inheritance.json": bulgariaInheritanceJson,
   "bulgaria-enterprise.json": bulgariaEnterpriseJson,
   "saki-quest-for-redemption.json": sakiQuestJson,
+  "getting-started.json": gettingStartedJson,
+  "getting-started-extension.json": gettingStartedExtensionJson,
 };
 const originalFetch = globalThis.fetch;
 

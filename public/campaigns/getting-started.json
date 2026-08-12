@@ -1,0 +1,502 @@
+{
+  "formatVersion": 2,
+  "catalog": {
+    "title": "Getting Started: What The Fuck Is This?",
+    "description": "An interactive orientation that explains Adventures by making you play it. Skipping is a valid choice. So is not skipping.",
+    "duration": "~4 min (or ~4 seconds if you skip)",
+    "contentNotice": "Self-aware nonsense. Occasional profanity. No real danger.",
+    "featured": true
+  },
+  "campaign": {
+    "id": "getting-started",
+    "version": "1.0.0",
+    "titleKey": "getting-started.campaign.title",
+    "kindId": "story-graph",
+    "content": {
+      "descriptionKey": "getting-started.campaign.description",
+      "startNodeId": "start",
+      "variables": {
+        "started": {
+          "type": "bool",
+          "initial": false
+        },
+        "first_take": {
+          "type": "enum",
+          "initial": "powerful",
+          "values": [
+            "powerful",
+            "complicated"
+          ],
+          "visible": true,
+          "labelKey": "getting-started.var_first_take.label"
+        }
+      },
+      "achievements": [
+        {
+          "id": "never_reads_manual",
+          "nameKey": "getting-started.achievement_never.name",
+          "descriptionKey": "getting-started.achievement_never.description",
+          "hidden": false,
+          "condition": {
+            "all": [
+              {
+                "field": "ending",
+                "operator": "equals",
+                "value": "skip"
+              },
+              {
+                "field": "var.started",
+                "operator": "equals",
+                "value": false
+              }
+            ]
+          }
+        },
+        {
+          "id": "tried_reading_manual",
+          "nameKey": "getting-started.achievement_tried.name",
+          "descriptionKey": "getting-started.achievement_tried.description",
+          "hidden": false,
+          "condition": {
+            "all": [
+              {
+                "field": "ending",
+                "operator": "equals",
+                "value": "skip"
+              },
+              {
+                "field": "var.started",
+                "operator": "equals",
+                "value": true
+              }
+            ]
+          }
+        },
+        {
+          "id": "actually_reads_manual",
+          "nameKey": "getting-started.achievement_actually.name",
+          "descriptionKey": "getting-started.achievement_actually.description",
+          "hidden": false,
+          "condition": {
+            "field": "ending",
+            "operator": "equals",
+            "value": "complete"
+          }
+        },
+        {
+          "id": "achievement_unlocked",
+          "nameKey": "getting-started.achievement_meta.name",
+          "descriptionKey": "getting-started.achievement_meta.description",
+          "hidden": false,
+          "condition": {
+            "field": "visited.achievements_explained",
+            "operator": "greater_or_equal",
+            "value": 1
+          }
+        },
+        {
+          "id": "the_escalation_path",
+          "nameKey": "getting-started.achievement_escalation.name",
+          "descriptionKey": "getting-started.achievement_escalation.description",
+          "hidden": true,
+          "condition": {
+            "field": "ending",
+            "operator": "equals",
+            "value": "escalation"
+          }
+        }
+      ],
+      "nodes": {
+        "start": {
+          "id": "start",
+          "kind": "choice",
+          "textKey": "getting-started.start.text",
+          "choices": [
+            {
+              "id": "explain",
+              "labelKey": "getting-started.start.choice_explain",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "started",
+                  "value": true
+                }
+              ],
+              "goto": "explain_engine"
+            },
+            {
+              "id": "skip",
+              "labelKey": "getting-started.start.choice_skip",
+              "goto": "skip_ending"
+            }
+          ]
+        },
+        "explain_engine": {
+          "id": "explain_engine",
+          "kind": "choice",
+          "textKey": "getting-started.explain_engine.text",
+          "choices": [
+            {
+              "id": "continue",
+              "labelKey": "getting-started.explain_engine.choice_continue",
+              "goto": "branching_demo"
+            },
+            {
+              "id": "skip",
+              "labelKey": "getting-started.explain_engine.choice_skip",
+              "goto": "skip_ending"
+            }
+          ]
+        },
+        "branching_demo": {
+          "id": "branching_demo",
+          "kind": "choice",
+          "textKey": "getting-started.branching_demo.text",
+          "choices": [
+            {
+              "id": "powerful",
+              "labelKey": "getting-started.branching_demo.choice_powerful",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "first_take",
+                  "value": "powerful"
+                }
+              ],
+              "goto": "branch_converge"
+            },
+            {
+              "id": "complicated",
+              "labelKey": "getting-started.branching_demo.choice_complicated",
+              "effects": [
+                {
+                  "op": "set",
+                  "var": "first_take",
+                  "value": "complicated"
+                }
+              ],
+              "goto": "branch_converge"
+            },
+            {
+              "id": "skip",
+              "labelKey": "getting-started.branching_demo.choice_skip",
+              "goto": "skip_ending"
+            }
+          ]
+        },
+        "branch_converge": {
+          "id": "branch_converge",
+          "kind": "choice",
+          "textKey": "getting-started.branch_converge.text",
+          "choices": [
+            {
+              "id": "continue",
+              "labelKey": "getting-started.branch_converge.choice_continue",
+              "goto": "node_kinds"
+            },
+            {
+              "id": "skip",
+              "labelKey": "getting-started.branch_converge.choice_skip",
+              "goto": "skip_ending"
+            }
+          ]
+        },
+        "node_kinds": {
+          "id": "node_kinds",
+          "kind": "auto",
+          "textKey": "getting-started.node_kinds.text",
+          "goto": "achievements_intro"
+        },
+        "achievements_intro": {
+          "id": "achievements_intro",
+          "kind": "choice",
+          "textKey": "getting-started.achievements_intro.text",
+          "choices": [
+            {
+              "id": "what",
+              "labelKey": "getting-started.achievements_intro.choice_what",
+              "goto": "achievements_explained"
+            },
+            {
+              "id": "skip",
+              "labelKey": "getting-started.achievements_intro.choice_skip",
+              "goto": "skip_ending"
+            }
+          ]
+        },
+        "achievements_explained": {
+          "id": "achievements_explained",
+          "kind": "choice",
+          "textKey": "getting-started.achievements_explained.text",
+          "choices": [
+            {
+              "id": "continue",
+              "labelKey": "getting-started.achievements_explained.choice_continue",
+              "goto": "content_composition_intro"
+            },
+            {
+              "id": "skip",
+              "labelKey": "getting-started.achievements_explained.choice_skip",
+              "goto": "skip_ending"
+            }
+          ]
+        },
+        "content_composition_intro": {
+          "id": "content_composition_intro",
+          "kind": "choice",
+          "textKey": "getting-started.content_composition_intro.text",
+          "choices": [
+            {
+              "id": "shrug",
+              "labelKey": "getting-started.content_composition_intro.choice_shrug",
+              "goto": "campaign_shapes"
+            },
+            {
+              "id": "skip",
+              "labelKey": "getting-started.content_composition_intro.choice_skip",
+              "goto": "skip_ending"
+            }
+          ]
+        },
+        "campaign_shapes": {
+          "id": "campaign_shapes",
+          "kind": "choice",
+          "textKey": "getting-started.campaign_shapes.text",
+          "choices": [
+            {
+              "id": "example",
+              "labelKey": "getting-started.campaign_shapes.choice_example",
+              "goto": "tv_support_2"
+            },
+            {
+              "id": "skip",
+              "labelKey": "getting-started.campaign_shapes.choice_skip",
+              "goto": "skip_ending"
+            }
+          ]
+        },
+        "tv_support_2": {
+          "id": "tv_support_2",
+          "kind": "choice",
+          "textKey": "getting-started.tv_support_2.text",
+          "choices": [
+            {
+              "id": "yes",
+              "labelKey": "getting-started.tv_support_2.choice_yes",
+              "goto": "tv_support_3"
+            },
+            {
+              "id": "no",
+              "labelKey": "getting-started.tv_support_2.choice_no",
+              "goto": "tv_support_4"
+            }
+          ]
+        },
+        "tv_support_3": {
+          "id": "tv_support_3",
+          "kind": "choice",
+          "textKey": "getting-started.tv_support_3.text",
+          "choices": [
+            {
+              "id": "yes",
+              "labelKey": "getting-started.tv_support_3.choice_yes",
+              "goto": "tv_support_5"
+            },
+            {
+              "id": "no",
+              "labelKey": "getting-started.tv_support_3.choice_no",
+              "goto": "tv_support_6"
+            }
+          ]
+        },
+        "tv_support_4": {
+          "id": "tv_support_4",
+          "kind": "choice",
+          "textKey": "getting-started.tv_support_4.text",
+          "choices": [
+            {
+              "id": "continue",
+              "labelKey": "getting-started.tv_support_4.choice_continue",
+              "goto": "tv_support_end_ok"
+            }
+          ]
+        },
+        "tv_support_5": {
+          "id": "tv_support_5",
+          "kind": "choice",
+          "textKey": "getting-started.tv_support_5.text",
+          "choices": [
+            {
+              "id": "continue",
+              "labelKey": "getting-started.tv_support_5.choice_continue",
+              "goto": "tv_support_end_ok"
+            }
+          ]
+        },
+        "tv_support_6": {
+          "id": "tv_support_6",
+          "kind": "choice",
+          "textKey": "getting-started.tv_support_6.text",
+          "choices": [
+            {
+              "id": "continue",
+              "labelKey": "getting-started.tv_support_6.choice_continue",
+              "goto": "tv_support_end_maybe"
+            }
+          ]
+        },
+        "tv_support_end_ok": {
+          "id": "tv_support_end_ok",
+          "kind": "choice",
+          "textKey": "getting-started.tv_support_end_ok.text",
+          "choices": [
+            {
+              "id": "continue",
+              "labelKey": "getting-started.tv_support_end_ok.choice_continue",
+              "goto": "self_hosting_intro"
+            },
+            {
+              "id": "skip",
+              "labelKey": "getting-started.tv_support_end_ok.choice_skip",
+              "goto": "skip_ending"
+            }
+          ]
+        },
+        "tv_support_end_maybe": {
+          "id": "tv_support_end_maybe",
+          "kind": "choice",
+          "textKey": "getting-started.tv_support_end_maybe.text",
+          "choices": [
+            {
+              "id": "call_ben",
+              "labelKey": "getting-started.tv_support_end_maybe.choice_call",
+              "goto": "escalation_ending"
+            },
+            {
+              "id": "continue",
+              "labelKey": "getting-started.tv_support_end_maybe.choice_continue",
+              "goto": "self_hosting_intro"
+            }
+          ]
+        },
+        "escalation_ending": {
+          "id": "escalation_ending",
+          "kind": "ending",
+          "textKey": "getting-started.escalation_ending.text",
+          "endingId": "escalation",
+          "outcome": "neutral"
+        },
+        "self_hosting_intro": {
+          "id": "self_hosting_intro",
+          "kind": "choice",
+          "textKey": "getting-started.self_hosting_intro.text",
+          "choices": [
+            {
+              "id": "continue",
+              "labelKey": "getting-started.self_hosting_intro.choice_continue",
+              "goto": "closing"
+            },
+            {
+              "id": "skip",
+              "labelKey": "getting-started.self_hosting_intro.choice_skip",
+              "goto": "skip_ending"
+            }
+          ]
+        },
+        "closing": {
+          "id": "closing",
+          "kind": "choice",
+          "textKey": "getting-started.closing.text",
+          "choices": [
+            {
+              "id": "finish",
+              "labelKey": "getting-started.closing.choice_finish",
+              "goto": "complete_ending"
+            }
+          ]
+        },
+        "complete_ending": {
+          "id": "complete_ending",
+          "kind": "ending",
+          "textKey": "getting-started.complete_ending.text",
+          "endingId": "complete",
+          "outcome": "win"
+        },
+        "skip_ending": {
+          "id": "skip_ending",
+          "kind": "ending",
+          "textKey": "getting-started.skip_ending.text",
+          "endingId": "skip",
+          "outcome": "neutral"
+        }
+      }
+    }
+  },
+  "strings": {
+    "getting-started.campaign.title": "Getting Started",
+    "getting-started.campaign.description": "An interactive orientation. It explains Adventures by making you use Adventures. Skipping is a valid choice. So is not skipping.",
+    "getting-started.var_first_take.label": "First take",
+    "getting-started.start.text": "Welcome to SubZeroDev.Adventures.\n\nThis probably requires an explanation.",
+    "getting-started.start.choice_explain": "What the fuck is this?",
+    "getting-started.start.choice_skip": "Skip Intro...",
+    "getting-started.explain_engine.text": "Adventures is a small platform for playing — and building — interactive stories called campaigns.\n\nA campaign is a graph: nodes with text, choices that branch, state that persists across choices, and achievements that fire when you do something notable. No account required to read it.\n\nThis conversation? Also a campaign. We are using the platform to explain the platform.",
+    "getting-started.explain_engine.choice_continue": "Keep going.",
+    "getting-started.explain_engine.choice_skip": "Skip Intro...",
+    "getting-started.branching_demo.text": "The engine lets a story branch based on what you pick. Here's a branch. It doesn't matter which way you go.",
+    "getting-started.branching_demo.choice_powerful": "This sounds incredibly powerful.",
+    "getting-started.branching_demo.choice_complicated": "This sounds unnecessarily complicated.",
+    "getting-started.branching_demo.choice_skip": "Skip Intro...",
+    "getting-started.branch_converge.text": "Both lead here.\n\nSee? Choices.\n\n(You said this sounds {first_take}. We'll remember that — state persists across the whole run, not just the one choice you made it in.)",
+    "getting-started.branch_converge.choice_continue": "Continue.",
+    "getting-started.branch_converge.choice_skip": "Skip Intro...",
+    "getting-started.node_kinds.text": "(unshown — a bare `auto` pass-through node; see achievements_intro's opening line)",
+    "getting-started.achievements_intro.text": "Getting to this line took one extra step you didn't click anything for — a node with no choices, that just forwards you to the next one. If you didn't notice, that's correct. That's what those are for.\n\nSpeaking of things that happen without a form to fill out: the engine also tracks achievements — unlocked mid-story, the moment some condition becomes true, whether or not anyone announces it.\n\nFor example. You're satisfying one right now.",
+    "getting-started.achievements_intro.choice_what": "Wait, what did I just unlock?",
+    "getting-started.achievements_intro.choice_skip": "Skip Intro...",
+    "getting-started.achievements_explained.text": "Achievement Unlocked: Achievement Unlocked.\n\nYou learned that achievements exist by receiving an achievement for learning that achievements exist.",
+    "getting-started.achievements_explained.choice_continue": "Neat.",
+    "getting-started.achievements_explained.choice_skip": "Skip Intro...",
+    "getting-started.content_composition_intro.text": "Not every campaign is a sealed island, either. Content can be composed — extra nodes and choices, injected onto an existing graph from a separate file, without anyone touching the original.\n\nCampaigns aren't necessarily isolated. Other content can—",
+    "getting-started.content_composition_intro.choice_shrug": "—sure. Moving on.",
+    "getting-started.content_composition_intro.choice_skip": "Skip Intro...",
+    "getting-started.campaign_shapes.text": "Here's the part people miss: a campaign isn't just \"choose your own adventure.\" It's a decision graph with content, state, branching, persistence, and achievements. That shape can hold a comedy. It can also hold a game, a how-to guide, a troubleshooting flow, an internal runbook, onboarding for literally anything, or family tech support.",
+    "getting-started.campaign_shapes.choice_example": "Show me the family tech support one.",
+    "getting-started.campaign_shapes.choice_skip": "Skip Intro...",
+    "getting-started.tv_support_2.text": "Case file: \"My television doesn't work.\"\n\nIs it turned on?",
+    "getting-started.tv_support_2.choice_yes": "Yes.",
+    "getting-started.tv_support_2.choice_no": "No.",
+    "getting-started.tv_support_3.text": "Does it say NO SIGNAL?",
+    "getting-started.tv_support_3.choice_yes": "Yes.",
+    "getting-started.tv_support_3.choice_no": "No.",
+    "getting-started.tv_support_4.text": "Turn it on.",
+    "getting-started.tv_support_4.choice_continue": "...Oh.",
+    "getting-started.tv_support_5.text": "Check the input source. It's HDMI 2. It's always HDMI 2.",
+    "getting-started.tv_support_5.choice_continue": "Continue.",
+    "getting-started.tv_support_6.text": "Unplug it, count to ten, plug it back in. This resolves sixty percent of problems, one hundred percent of the time.",
+    "getting-started.tv_support_6.choice_continue": "Continue.",
+    "getting-started.tv_support_end_ok.text": "That's the whole runbook. It's not funnier than your actual runbooks. That's kind of the point.",
+    "getting-started.tv_support_end_ok.choice_continue": "Good. Continue.",
+    "getting-started.tv_support_end_ok.choice_skip": "Skip Intro...",
+    "getting-started.tv_support_end_maybe.text": "Nothing worked.",
+    "getting-started.tv_support_end_maybe.choice_call": "Call Ben.",
+    "getting-started.tv_support_end_maybe.choice_continue": "Give up gracefully and continue.",
+    "getting-started.escalation_ending.text": "Ben does not pick up.\n\nThe graph has exhausted its usefulness. So has Ben.",
+    "getting-started.self_hosting_intro.text": "Longer term, campaigns won't only be ours. The plan is for you to author your own graphs and decide how they're exposed — public, private, shared by a link, or fully self-hosted. Some of that exists today. Some of it doesn't yet. We're telling you which is which instead of pretending otherwise.",
+    "getting-started.self_hosting_intro.choice_continue": "Noted.",
+    "getting-started.self_hosting_intro.choice_skip": "Skip Intro...",
+    "getting-started.closing.text": "That's Adventures: a graph engine wearing a trenchcoat.\n\nIn the last few minutes you've used branching, persistent state, an achievement, a node kind nobody named out loud, and — if you went looking — a small unauthorized side quest. There's nothing left to explain. Only things left to play.",
+    "getting-started.closing.choice_finish": "See the shelf.",
+    "getting-started.complete_ending.text": "Tutorial complete.\n\nAchievement unlocked: Actually Reads the Manual. We genuinely did not expect anyone to get this far.\n\nGo pick a real one.",
+    "getting-started.skip_ending.text": "Skipped.\n\nNo judgment. Well — a little.",
+    "getting-started.achievement_never.name": "Never Reads the Manual",
+    "getting-started.achievement_never.description": "Skipped the tutorial. You'll figure it out. Probably.",
+    "getting-started.achievement_tried.name": "Tried Reading the Manual",
+    "getting-started.achievement_tried.description": "You made an effort. That's more concerning, actually.",
+    "getting-started.achievement_actually.name": "Actually Reads the Manual",
+    "getting-started.achievement_actually.description": "We genuinely did not expect anyone to get this far.",
+    "getting-started.achievement_meta.name": "Achievement Unlocked: Achievement Unlocked",
+    "getting-started.achievement_meta.description": "You learned that achievements exist by receiving an achievement for learning that achievements exist.",
+    "getting-started.achievement_escalation.name": "The Escalation Path",
+    "getting-started.achievement_escalation.description": "The graph has exhausted its usefulness. So has Ben."
+  }
+}

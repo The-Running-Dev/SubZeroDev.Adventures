@@ -54,7 +54,16 @@
       "id": "saki-quest-for-redemption",
       "version": "1.0.0",
       "digest": "sha-256:9b8e4b0cd93e421fd995232e52f36a408725e4a4194d6bc1a18f33b38eac46a3"
+    },
+    {
+      "file": "getting-started.json",
+      "id": "getting-started",
+      "version": "1.0.0",
+      "digest": "sha-256:90177e815849ddc424632331dfe7a9def0885c646d99b9239648e992584eda7c"
     }
   ],
-  "resolution": "sha-256:9b487629351b980c8499ae8b53c1048fbb59639ef72ebc32578635df2b27333d"
+  "extensions": [
+    "getting-started-extension.json"
+  ],
+  "resolution": "sha-256:2b4d5855ca55631dd0f190c17c4ea402a86b64f00907ebd6abc2c0f3a34f17f5"
 }

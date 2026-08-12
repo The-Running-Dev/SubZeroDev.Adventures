@@ -22,15 +22,10 @@ import type { PublicProfileTotal } from "./platform-baselines.js";
 const databaseUrl = process.env.DATABASE_URL;
 const describeIfDb = databaseUrl ? describe : describe.skip;
 
-// `computeLeaderboard`/`currentLeaderPlayerId` now scope their cross-player session read to
-// a caller-supplied core campaign id list (platform-baselines.ts's `publicProfileTotals`) --
-// this suite has no real `ServerDemo`, so it stands in with every campaign id any fixture
-// below actually seeds a session against.
-const CORE_CAMPAIGN_IDS = [
-  "a",
-  "what-would-lucifer-do",
-  "what-would-lucifer-do-engineers-cut",
-];
+// `computeLeaderboard`/`currentLeaderPlayerId` now exclude submission-tier campaigns from
+// their cross-player session read (platform-baselines.ts's `publicProfileTotals`) -- an
+// empty list, since none of this file's campaign ids are ever real submissions.
+const NO_SUBMISSIONS: readonly string[] = [];
 
 function total(
   overrides: Partial<PublicProfileTotal> = {},
@@ -287,7 +282,7 @@ describeIfDb("ranking against a live database", () => {
     await seedSession(high, { stepCount: 1, attemptCounter: 51 }); // 50 rejected -> 250
     await seedBadge(high, "first-steps");
 
-    const { entries } = await computeLeaderboard(pool, CORE_CAMPAIGN_IDS);
+    const { entries } = await computeLeaderboard(pool, NO_SUBMISSIONS);
     expect(entries.map((e) => e.profileSlug)).toEqual(["high", "mid", "low"]);
     expect(entries[0]!.position).toBe(1);
     expect(entries[0]!.absurdityIndex).toBe(100 + 250);
@@ -298,13 +293,13 @@ describeIfDb("ranking against a live database", () => {
     await seedSession(secret, { stepCount: 1, attemptCounter: 999 });
     await createPlayer({ public: true, slug: "visible" });
 
-    const { entries } = await computeLeaderboard(pool, CORE_CAMPAIGN_IDS);
+    const { entries } = await computeLeaderboard(pool, NO_SUBMISSIONS);
     expect(entries.map((e) => e.profileSlug)).toEqual(["visible"]);
   });
 
   it("includes a public player with zero sessions, all zeros, a valid position", async () => {
     await createPlayer({ public: true, slug: "untouched" });
-    const { entries } = await computeLeaderboard(pool, CORE_CAMPAIGN_IDS);
+    const { entries } = await computeLeaderboard(pool, NO_SUBMISSIONS);
     expect(entries).toEqual([
       expect.objectContaining({
         profileSlug: "untouched",
@@ -321,14 +316,14 @@ describeIfDb("ranking against a live database", () => {
   it("a session with a null profile_id contributes to nobody's totals", async () => {
     await createPlayer({ public: true, slug: "player" });
     await seedSession(null, { stepCount: 500, attemptCounter: 500 });
-    const { entries } = await computeLeaderboard(pool, CORE_CAMPAIGN_IDS);
+    const { entries } = await computeLeaderboard(pool, NO_SUBMISSIONS);
     expect(entries[0]!.moves).toBe(0);
   });
 
   it("clamps rejected moves at zero when attempt_counter is under step_count", async () => {
     const player = await createPlayer({ public: true, slug: "player" });
     await seedSession(player, { stepCount: 10, attemptCounter: 5 });
-    const { entries } = await computeLeaderboard(pool, CORE_CAMPAIGN_IDS);
+    const { entries } = await computeLeaderboard(pool, NO_SUBMISSIONS);
     expect(entries[0]!.rejected).toBe(0);
   });
 
@@ -344,18 +339,18 @@ describeIfDb("ranking against a live database", () => {
       status: "ended",
       endingId: "shared-ending",
     });
-    const { entries } = await computeLeaderboard(pool, CORE_CAMPAIGN_IDS);
+    const { entries } = await computeLeaderboard(pool, NO_SUBMISSIONS);
     expect(entries[0]!.endings).toBe(2);
   });
 
   it("excludes the crown badge from a player's own badgeCount and index", async () => {
     const player = await createPlayer({ public: true, slug: "player" });
     await seedBadge(player, "first-steps");
-    const before = await computeLeaderboard(pool, CORE_CAMPAIGN_IDS);
+    const before = await computeLeaderboard(pool, NO_SUBMISSIONS);
     expect(before.entries[0]!.badgeCount).toBe(1);
 
     await seedBadge(player, CROWN_BADGE_ID);
-    const after = await computeLeaderboard(pool, CORE_CAMPAIGN_IDS);
+    const after = await computeLeaderboard(pool, NO_SUBMISSIONS);
     expect(after.entries[0]!.badgeCount).toBe(1);
     expect(after.entries[0]!.absurdityIndex).toBe(
       before.entries[0]!.absurdityIndex,
@@ -365,11 +360,11 @@ describeIfDb("ranking against a live database", () => {
   it("currentLeaderPlayerId agrees with the crowned entry, and is null below the floor", async () => {
     const a = await createPlayer({ public: true, slug: "a" });
     await createPlayer({ public: true, slug: "b" });
-    expect(await currentLeaderPlayerId(pool, CORE_CAMPAIGN_IDS)).toBeNull();
+    expect(await currentLeaderPlayerId(pool, NO_SUBMISSIONS)).toBeNull();
 
     await createPlayer({ public: true, slug: "c" });
     await seedBadge(a, "first-steps");
-    expect(await currentLeaderPlayerId(pool, CORE_CAMPAIGN_IDS)).toBe(a);
+    expect(await currentLeaderPlayerId(pool, NO_SUBMISSIONS)).toBe(a);
   });
 
   it("/api/ranking and /api/profile/:slug agree on endingsFound and moves", async () => {

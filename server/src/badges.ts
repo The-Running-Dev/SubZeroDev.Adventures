@@ -642,7 +642,7 @@ export async function evaluateBadges(
   demo: ServerDemo,
   playerId: string,
 ): Promise<BadgeRow[]> {
-  const coreCampaignIds = demo.core.map((campaign) => campaign.campaignId);
+  const excludedCampaignIds = Array.from(demo.provenance.keys());
   const [
     sessionsResult,
     achievementsResult,
@@ -666,10 +666,10 @@ export async function evaluateBadges(
       `select merge_count from players where player_id = $1`,
       [playerId],
     ),
-    endingMedianSteps(pool, coreCampaignIds),
-    rejectedPercentileFor(pool, playerId, coreCampaignIds),
+    endingMedianSteps(pool, excludedCampaignIds),
+    rejectedPercentileFor(pool, playerId, excludedCampaignIds),
     totalPlayerCount(pool),
-    currentLeaderPlayerId(pool, coreCampaignIds),
+    currentLeaderPlayerId(pool, excludedCampaignIds),
   ]);
 
   const data: BadgeData = {

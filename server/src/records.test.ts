@@ -9,11 +9,10 @@ import { Pool } from "pg";
 import { computeRecords } from "./records.js";
 import { longestConsecutiveRun } from "./badges.js";
 
-// `computeRecords` now scopes its cross-player `discovererCounts` read to a caller-supplied
-// core campaign id list (platform-baselines.ts) -- this suite has no real `ServerDemo`, so
-// it stands in with every campaign id any fixture below actually seeds a session against,
-// which is every campaign id in this file "counting as core" for these tests' purposes.
-const CORE_CAMPAIGN_IDS = ["a", "b", "c", "popular", "rare"];
+// `computeRecords` now excludes submission-tier campaigns from its cross-player
+// `discovererCounts` read (platform-baselines.ts) -- an empty list, since none of this
+// file's synthetic campaign ids are ever real submissions.
+const NO_SUBMISSIONS: readonly string[] = [];
 
 const databaseUrl = process.env.DATABASE_URL;
 const describeIfDb = databaseUrl ? describe : describe.skip;
@@ -77,7 +76,7 @@ describeIfDb("computeRecords", () => {
 
   it("returns all zeros/nulls for a player with no sessions", async () => {
     const player = await createPlayer();
-    const records = await computeRecords(pool, player, CORE_CAMPAIGN_IDS);
+    const records = await computeRecords(pool, player, NO_SUBMISSIONS);
     expect(records).toEqual({
       longestRun: 0,
       longestStreak: 0,
@@ -95,7 +94,7 @@ describeIfDb("computeRecords", () => {
     const player = await createPlayer();
     await seedSession(player, { createdAt: new Date(), stepCount: 50 });
     await seedSession(player, { createdAt: new Date(), stepCount: 120 });
-    const records = await computeRecords(pool, player, CORE_CAMPAIGN_IDS);
+    const records = await computeRecords(pool, player, NO_SUBMISSIONS);
     expect(records.longestRun).toBe(120);
   });
 
@@ -107,7 +106,7 @@ describeIfDb("computeRecords", () => {
       dates.add(createdAt.toISOString().slice(0, 10));
       await seedSession(player, { createdAt });
     }
-    const records = await computeRecords(pool, player, CORE_CAMPAIGN_IDS);
+    const records = await computeRecords(pool, player, NO_SUBMISSIONS);
     expect(records.longestStreak).toBe(longestConsecutiveRun(dates));
     expect(records.longestStreak).toBe(5);
   });
@@ -117,7 +116,7 @@ describeIfDb("computeRecords", () => {
     const day = new Date(Date.UTC(2026, 0, 1, 12));
     await seedSession(player, { createdAt: day, stepCount: 100 });
     await seedSession(player, { createdAt: day, stepCount: 50 });
-    const records = await computeRecords(pool, player, CORE_CAMPAIGN_IDS);
+    const records = await computeRecords(pool, player, NO_SUBMISSIONS);
     expect(records.mostMovesInADay).toBe(150);
   });
 
@@ -130,7 +129,7 @@ describeIfDb("computeRecords", () => {
       });
     }
     await seedSession(player, { createdAt: new Date(), campaignId: "rare" });
-    const records = await computeRecords(pool, player, CORE_CAMPAIGN_IDS);
+    const records = await computeRecords(pool, player, NO_SUBMISSIONS);
     expect(records.favoriteDisk).toEqual({
       campaignId: "popular",
       sessions: 3,
@@ -144,7 +143,7 @@ describeIfDb("computeRecords", () => {
       stepCount: 10,
       attemptCounter: 5,
     });
-    const records = await computeRecords(pool, player, CORE_CAMPAIGN_IDS);
+    const records = await computeRecords(pool, player, NO_SUBMISSIONS);
     expect(records.mostRejectedMoves).toBe(0);
   });
 
@@ -164,7 +163,7 @@ describeIfDb("computeRecords", () => {
     });
     // Not counted: no ending reached.
     await seedSession(player, { createdAt: new Date(), stepCount: 1 });
-    const records = await computeRecords(pool, player, CORE_CAMPAIGN_IDS);
+    const records = await computeRecords(pool, player, NO_SUBMISSIONS);
     expect(records.fastestEnding).toBe(12);
   });
 
@@ -189,7 +188,7 @@ describeIfDb("computeRecords", () => {
       endingId: "rare-ending",
     });
 
-    const records = await computeRecords(pool, subject, CORE_CAMPAIGN_IDS);
+    const records = await computeRecords(pool, subject, NO_SUBMISSIONS);
     expect(records.rarestEnding).toEqual({
       campaignId: "c",
       endingId: "rare-ending",
@@ -211,7 +210,7 @@ describeIfDb("computeRecords", () => {
       stepCount: 10,
       attemptCounter: 20,
     });
-    const records = await computeRecords(pool, player, CORE_CAMPAIGN_IDS);
+    const records = await computeRecords(pool, player, NO_SUBMISSIONS);
     expect(records.completionRate).toBe(0.5);
     // 20 total steps / 30 total attempts.
     expect(records.attemptEfficiency).toBeCloseTo(20 / 30);

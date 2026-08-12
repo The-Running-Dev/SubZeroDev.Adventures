@@ -172,7 +172,7 @@ export interface PublicLeaderboardEntry {
  *  own "too few public records" note read the true count. */
 export async function computeLeaderboard(
   pool: Pool,
-  coreCampaignIds: readonly string[],
+  excludedCampaignIds: readonly string[],
 ): Promise<{
   readonly entries: readonly PublicLeaderboardEntry[];
   readonly totalRanked: number;
@@ -180,7 +180,7 @@ export async function computeLeaderboard(
   const totals = await publicProfileTotals(
     pool,
     CROWN_BADGE_ID,
-    coreCampaignIds,
+    excludedCampaignIds,
   );
   const ranked = rankProfiles(totals);
   const entries = ranked
@@ -205,12 +205,12 @@ export async function computeLeaderboard(
  *  calls this; the public route only ever sees `computeLeaderboard`'s slug-keyed shape. */
 export async function currentLeaderPlayerId(
   pool: Pool,
-  coreCampaignIds: readonly string[],
+  excludedCampaignIds: readonly string[],
 ): Promise<string | null> {
   const totals = await publicProfileTotals(
     pool,
     CROWN_BADGE_ID,
-    coreCampaignIds,
+    excludedCampaignIds,
   );
   const ranked = rankProfiles(totals);
   return ranked.find((r) => r.crowned)?.playerId ?? null;

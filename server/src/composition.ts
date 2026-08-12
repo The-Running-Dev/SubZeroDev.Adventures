@@ -40,16 +40,30 @@ export interface ServerDemo {
    *  registered but not access-checked is not the same as visible to a given request. */
   readonly all: readonly CatalogEntry[];
   /** Core content only -- the builtin source plus whatever an admin has added, none of it
-   *  player-submitted. The platform-wide denominator every aggregate that must not move when
-   *  a player publishes something reads instead of `all`: badges' `catalogKindIds`/
-   *  `catalogSize`, `routes/profile.ts`'s public stats, `routes/stats.ts`, `routes/ranking.ts`,
-   *  and `platform-baselines.ts`'s rarity/median queries. */
+   *  player-submitted. Used for `catalogSize`-style denominators (badges' `catalogSize`,
+   *  `routes/profile.ts`'s public "campaigns played" stat) and the listing surface
+   *  (`catalog`, below). Cross-player *fairness* queries (badges' cross-player baselines,
+   *  the leaderboard, rarity records) read `provenance`'s keys instead, as a deny-list, not
+   *  this as an allow-list -- see `provenance`'s own doc comment for why the two aren't
+   *  interchangeable. */
   readonly core: readonly CatalogEntry[];
   /** `core`, hidden campaigns filtered out -- the listing surface, matching
    *  `BrowserDemo.catalog`'s convention (src/play/composition.ts). */
   readonly catalog: readonly CatalogEntry[];
-  /** Every submission-tier campaign's ownership and visibility, keyed by campaign id. A
-   *  campaign with no entry here is core. */
+  /**
+   * Every submission-tier campaign's ownership and visibility, keyed by campaign id. A
+   * campaign with no entry here is core.
+   *
+   * `platform-baselines.ts`'s cross-player queries (badges' rarity/percentile baselines,
+   * the leaderboard, the Rarest Ending record) take this map's *keys* as an exclusion list,
+   * not `core` as an inclusion list -- a real session's `campaign_id` is always either core
+   * or a submission, so the two would agree for real gameplay, but excluding only known
+   * submissions is what stays correct for a `sessions` row whose `campaign_id` isn't
+   * currently registered at all (a revoked submission, or a synthetic id a test seeds
+   * directly without going through the registry) -- an allow-list would wrongly treat that
+   * row as if it belonged to a submission and drop it from the comparison; a deny-list
+   * leaves it counted, which is what "not a known submission" actually means.
+   */
   readonly provenance: ReadonlyMap<string, CampaignProvenance>;
   /** Every campaign id a given viewer may currently reach: all of `core`, plus their own
    *  submissions regardless of visibility, plus every other player's `public` ones.

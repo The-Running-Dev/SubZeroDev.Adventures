@@ -12,6 +12,19 @@
  * unauthenticated request: it feeds `ranking.ts`'s public leaderboard, has no storage or
  * staleness question like `discovererCounts`, and is recomputed per request.
  *
+ * Every one of these takes `excludedCampaignIds` -- every submission-tier campaign id
+ * (`ServerDemo.provenance`'s keys), *not* an allow-list of core campaign ids. A player
+ * could otherwise shift their own badge eligibility, win "rarest ending" by construction
+ * (a private campaign's ending always has exactly one discoverer), or farm the leaderboard
+ * by publishing their own content -- excluding submissions closes that. An allow-list of
+ * core ids would also close it, but wrongly excludes every `sessions` row whose
+ * `campaign_id` isn't a *registered* campaign at all -- which real gameplay never produces
+ * (every session is created against something in the registry), but this suite's own unit
+ * tests deliberately do, seeding synthetic ids like `"test-campaign"` to exercise badge
+ * logic without needing real content. A deny-list treats an unrecognized id as core by
+ * default (correct for real gameplay, and incidental for a synthetic test id), rather than
+ * as excluded (wrong for both).
+ *
  * None of these are cached or materialized. Full scans/aggregations across every
  * player's `sessions` rows are a different cost profile than the rest of this
  * codebase's per-player queries -- acceptable at this deployment's current scale (the
@@ -25,13 +38,12 @@ function medianKey(campaignId: string, endingId: string): string {
   return `${campaignId}:${endingId}`;
 }
 
-/** Median `step_count` among every player's `ended` sessions, per (campaign, ending). Scoped
- *  to core campaigns only (`coreCampaignIds` -- `ServerDemo.core`), so a player cannot shift
- *  their own `scenic-route`/`sequence-breaker` baseline by publishing content nobody else
- *  plays. Keyed `"<campaignId>:<endingId>"`. */
+/** Median `step_count` among every player's `ended` sessions, per (campaign, ending),
+ *  excluding submission-tier campaigns -- see this file's header. Keyed
+ *  `"<campaignId>:<endingId>"`. */
 export async function endingMedianSteps(
   pool: Pool,
-  coreCampaignIds: readonly string[],
+  excludedCampaignIds: readonly string[],
 ): Promise<ReadonlyMap<string, number>> {
   const { rows } = await pool.query<{
     campaign_id: string;
@@ -42,9 +54,9 @@ export async function endingMedianSteps(
             percentile_cont(0.5) within group (order by step_count) as median_steps
        from sessions
       where status = 'ended' and ending_id is not null
-        and campaign_id = any($1)
+        and not (campaign_id = any($1))
       group by campaign_id, ending_id`,
-    [coreCampaignIds],
+    [excludedCampaignIds],
   );
   return new Map(
     rows.map((row) => [
@@ -66,14 +78,14 @@ export async function endingMedianSteps(
 export async function rejectedPercentileFor(
   pool: Pool,
   playerId: string,
-  coreCampaignIds: readonly string[],
+  excludedCampaignIds: readonly string[],
 ): Promise<number> {
   const { rows } = await pool.query<{ pct: string }>(
     `with per_player as (
        select profile_id, sum(greatest(attempt_counter - step_count, 0)) as rejected
          from sessions
         where profile_id is not null
-          and campaign_id = any($2)
+          and not (campaign_id = any($2))
         group by profile_id
      ),
      ranked as (
@@ -81,20 +93,17 @@ export async function rejectedPercentileFor(
          from per_player
      )
      select pct from ranked where profile_id = $1`,
-    [playerId, coreCampaignIds],
+    [playerId, excludedCampaignIds],
   );
   return rows[0] ? Number(rows[0].pct) : 0;
 }
 
-/** Global discoverer count per (campaign, ending), scoped to core campaigns only -- how many
- *  distinct players have ever reached each ending. Keyed `"<campaignId>:<endingId>"`. Feeds
- *  the Rarest Ending record only; not a badge input. Scoping this to core is what keeps a
- *  private submission's ending from trivially "winning" rarest ending for its own author --
- *  it would otherwise always have exactly one discoverer, by construction, with nobody else
- *  able to reach it at all. */
+/** Global discoverer count per (campaign, ending), excluding submission-tier campaigns --
+ *  how many distinct players have ever reached each ending. Keyed
+ *  `"<campaignId>:<endingId>"`. Feeds the Rarest Ending record only; not a badge input. */
 export async function discovererCounts(
   pool: Pool,
-  coreCampaignIds: readonly string[],
+  excludedCampaignIds: readonly string[],
 ): Promise<ReadonlyMap<string, number>> {
   const { rows } = await pool.query<{
     campaign_id: string;
@@ -104,9 +113,9 @@ export async function discovererCounts(
     `select campaign_id, ending_id, count(distinct profile_id)::int as discoverers
        from sessions
       where ending_id is not null
-        and campaign_id = any($1)
+        and not (campaign_id = any($1))
       group by campaign_id, ending_id`,
-    [coreCampaignIds],
+    [excludedCampaignIds],
   );
   return new Map(
     rows.map((row) => [
@@ -162,22 +171,23 @@ interface PublicProfileTotalRow {
  * importing `CROWN_BADGE_ID` here, so this module's only edge to `ranking.ts` stays the
  * existing one, not a new one back.
  *
+ * `session_totals`'s `sessions s` excludes submission-tier campaigns (`excludedCampaignIds`
+ * -- this file's header) -- otherwise a player could author their own campaign with
+ * hundreds of endings and grind it for absurdity-index score (`ranking.ts`'s
+ * `moves`/`rejected`/`endings` inputs) with no connection to official content.
+ * `badge_totals` needs no equivalent filter: every badge a player can actually unlock is
+ * defined over core content already (`badges.ts`'s `catalogKindIds`), so there is no
+ * submission-tier badge to farm in the first place.
+ *
  * Reads no `sessions` timestamp: `created_at`/`updated_at` there are TEXT (migration
  * 002), and this query's ordering inputs -- `players.created_at`, `badges.unlocked_at`
  * -- are both real `timestamptz` already, so there's nothing to cast or move into JS the
  * way `evaluateBadges` has to for its own date handling.
  */
-/** `session_totals`'s `sessions s` is scoped to `coreCampaignIds` (`ServerDemo.core`) --
- *  otherwise a player could author their own campaign with hundreds of endings and grind it
- *  for absurdity-index score (`ranking.ts`'s `moves`/`rejected`/`endings` inputs) with no
- *  connection to official content. `badge_totals` needs no equivalent filter: every badge a
- *  player can actually unlock is defined over core content already (`badges.ts`'s
- *  `catalogKindIds` fix, above), so there is no submission-tier badge to farm in the first
- *  place. */
 export async function publicProfileTotals(
   pool: Pool,
   excludedBadgeId: string,
-  coreCampaignIds: readonly string[],
+  excludedCampaignIds: readonly string[],
 ): Promise<readonly PublicProfileTotal[]> {
   const { rows } = await pool.query<PublicProfileTotalRow>(
     `with ranked_players as (
@@ -204,7 +214,7 @@ export async function publicProfileTotals(
                 filter (where s.ending_id is not null)::int as endings
          from sessions s
          join ranked_players p on p.player_id = s.profile_id
-        where s.campaign_id = any($2)
+        where not (s.campaign_id = any($2))
         group by s.profile_id
      )
      select p.player_id,
@@ -219,7 +229,7 @@ export async function publicProfileTotals(
        from ranked_players p
        left join badge_totals   b on b.player_id = p.player_id
        left join session_totals t on t.player_id = p.player_id`,
-    [excludedBadgeId, coreCampaignIds],
+    [excludedBadgeId, excludedCampaignIds],
   );
   return rows.map((row) => ({
     playerId: row.player_id,

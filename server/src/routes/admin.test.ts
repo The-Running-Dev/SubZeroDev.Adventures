@@ -723,10 +723,13 @@ describeIfDb("a stored source that cannot be merged", () => {
       "truncate content_sources, badges, achievements, identities, auth_sessions, saves, sessions, players restart identity cascade",
     );
     // `end` is already a node on every `minimalPortableCampaign`, so applying this throws
-    // inside `buildValidatedContentRegistry` rather than failing any source's load.
+    // inside `buildValidatedContentRegistry` rather than failing any source's load. An
+    // admin-added row, same as `addPastedSource` (content-sources.ts) actually inserts --
+    // `status`/`visibility` set explicitly since an owner-less row must be `approved`/
+    // `public` (migration 013's `content_sources_owner_shape` constraint).
     await pool.query(
-      `insert into content_sources (source_id, kind, label, payload)
-       values ('00000000-0000-4000-8000-00000000c011', 'pasted', 'colliding-ext', $1)`,
+      `insert into content_sources (source_id, kind, label, payload, status, visibility)
+       values ('00000000-0000-4000-8000-00000000c011', 'pasted', 'colliding-ext', $1, 'approved', 'public')`,
       [
         JSON.stringify({
           formatVersion: 1,

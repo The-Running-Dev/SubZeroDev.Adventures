@@ -16,12 +16,10 @@ export function registerRankingRoutes(
   cell: ContentCell,
 ): void {
   app.get("/api/ranking", async () => {
-    const coreCampaignIds = cell
-      .current()
-      .core.map((campaign) => campaign.campaignId);
+    const excludedCampaignIds = Array.from(cell.current().provenance.keys());
     const { entries, totalRanked } = await computeLeaderboard(
       pool,
-      coreCampaignIds,
+      excludedCampaignIds,
     );
     return { entries, totalRanked };
   });

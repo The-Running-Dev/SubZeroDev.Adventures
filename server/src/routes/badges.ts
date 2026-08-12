@@ -30,10 +30,10 @@ export function registerBadgeRoutes(
     const principal = request.principalOrNull;
     if (!principal) return { badges: [], records: null };
     const demo = cell.current();
-    const coreCampaignIds = demo.core.map((campaign) => campaign.campaignId);
+    const excludedCampaignIds = Array.from(demo.provenance.keys());
     const [badges, records] = await Promise.all([
       evaluateBadges(pool, demo, principal.playerId),
-      computeRecords(pool, principal.playerId, coreCampaignIds),
+      computeRecords(pool, principal.playerId, excludedCampaignIds),
     ]);
     return { badges, records };
   });

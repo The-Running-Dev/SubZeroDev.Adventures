@@ -55,6 +55,12 @@ x-adventures-api-common: &adventures-api-common
     PORT: "8787"
     SITE_URL: "${SITE_URL:-https://adventures.subzerodev.com}"
     API_URL: "${API_URL:-https://adventures-api.subzerodev.com}"
+    # Comma-separated extra browser origins allowed through CORS and the write-origin
+    # check (server/src/app.ts). Unset -- the default -- is exactly the pre-existing
+    # posture: SITE_URL alone. Set it to a preview host (docs/preview.md) to let a
+    # tunnelled dev build talk to this API. Every origin listed can act as the player, so
+    # it belongs to hosts you control, not to anything you merely want to allow to read.
+    PREVIEW_ORIGINS: "${PREVIEW_ORIGINS:-}"
     # Optional, unlike DB_PASSWORD above: server/src/identity/registry.ts treats an unset
     # credential pair as "this provider isn't configured" (503 oauth_not_configured on its
     # routes), not a startup precondition, so deployment must not be blocked on the

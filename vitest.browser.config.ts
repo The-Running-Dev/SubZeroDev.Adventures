@@ -33,6 +33,18 @@ export default defineConfig({
   },
   test: {
     include: ["src/**/*.browser.test.{ts,tsx}"],
+    // The same pin, for the same reason, as vite.config.ts's jsdom project (issue #18) --
+    // and it was missing here, which made this suite unrunnable on any machine that has a
+    // `.env.local`. Vite loads that file regardless of mode, so a local `VITE_API_URL`
+    // reaches `import.meta.env` and silently switches `createBrowserDemo()`
+    // (src/play/composition.ts) into remote mode: every spec then sits on `play-loading`
+    // waiting for a deployed API that CORS will not let it call anyway, and 25 of 38 fail
+    // for a reason that has nothing to do with the code under test.
+    //
+    // Load-bearing beyond the failure itself: `npm run baselines:update` bind-mounts the
+    // whole checkout, `.env.local` included, so without this pin a regenerated baseline
+    // would be a screenshot of the loading state.
+    env: { VITE_API_URL: "" },
     exclude:
       platform() === "win32"
         ? [...configDefaults.exclude, visualBaselineSpec]

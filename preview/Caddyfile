@@ -1,0 +1,33 @@
+# Plain HTTP on 8080. TLS and the public hostname belong to whatever reverse proxy already
+# owns proxy-net, exactly as for the deployment stack -- this file must never grow an
+# `https://` site block or Caddy would try to provision its own certificate.
+:8080 {
+	root * /srv/current
+
+	# The app has no router: main.tsx dispatches on `location.pathname` for /ranking,
+	# /profile, /content, /oauth/consent and /u/<slug>. On GitHub Pages those survive a
+	# direct navigation only via the public/404.html redirect dance that index.html then
+	# reverses; here the file server can just answer with index.html directly, which is
+	# the same thing minus the detour (index.html's `spa_redirect` handler is a no-op
+	# without the query parameter, so the identical bundle works under both).
+	try_files {path} /index.html
+
+	# Written fresh by every deploy and polled every 3s by the injected reload script
+	# (vite.config.ts). A cached copy would mean the tab never learns a new build exists,
+	# which is the entire feature.
+	@build-id path /__build-id
+	header @build-id Cache-Control "no-store"
+
+	# Vite emits content-hashed asset filenames, so those are safe to cache hard, but
+	# index.html must not be -- a reloading tab has to actually fetch the new one.
+	@html path *.html /
+	header @html Cache-Control "no-store"
+
+	file_server
+	encode gzip
+
+	log {
+		output stdout
+		format console
+	}
+}

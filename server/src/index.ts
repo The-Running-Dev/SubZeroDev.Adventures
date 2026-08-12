@@ -5,6 +5,15 @@ import { createMultiSourceCampaignSource } from "./campaigns/multi-source.js";
 const port = Number(process.env.PORT ?? 8787);
 const siteUrl = process.env.SITE_URL ?? "http://localhost:5173";
 const apiUrl = process.env.API_URL ?? "http://localhost:8787";
+// Comma-separated extra browser origins allowed to call this API (`app.ts`'s
+// `AppConfig.previewOrigins`) -- the tunnelled preview host in docs/preview.md is why this
+// exists. Unset means "SITE_URL and nothing else", which is the posture every deployment
+// had before it. Parsed here rather than in `app.ts` because `index.ts` is the one place
+// this server reads `process.env` (issue #12).
+const previewOrigins = (process.env.PREVIEW_ORIGINS ?? "")
+  .split(",")
+  .map((entry) => entry.trim())
+  .filter((entry) => entry !== "");
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error("DATABASE_URL is required");
 
@@ -33,6 +42,7 @@ const campaignSource = createMultiSourceCampaignSource(pool, {
 const app = await buildApp(pool, {
   siteUrl,
   apiUrl,
+  previewOrigins,
   campaignSource,
 });
 

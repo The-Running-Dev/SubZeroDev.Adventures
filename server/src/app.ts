@@ -28,6 +28,15 @@ import { loadIdentityProviders } from "./identity/registry.js";
 export interface AppConfig {
   readonly siteUrl: string;
   readonly apiUrl: string;
+  /** Extra browser origins allowed alongside `siteUrl` -- a tunnelled preview host or a
+   *  local `vite dev` (docs/preview.md), fed from `PREVIEW_ORIGINS` by `index.ts`.
+   *
+   *  Deliberately a second field rather than making `siteUrl` a list: `siteUrl` is also
+   *  the post-OAuth redirect target (`routes/identity.ts`) and the thing `deploy.yml`
+   *  builds the site against, and both of those have to keep resolving to exactly one
+   *  answer. Widening the CORS allowlist is the only thing a preview origin is entitled
+   *  to; it does not become a site this server will redirect a browser to. */
+  readonly previewOrigins?: readonly string[];
   /** Undefined means `createDiskCampaignSource()` -- the only configuration every test and
    *  every non-deployed run needs, and it never touches the network or the
    *  `content_sources` table. `index.ts` is the only caller that passes something else: a
@@ -51,6 +60,7 @@ export async function buildApp(
   {
     siteUrl,
     apiUrl,
+    previewOrigins = [],
     campaignSource = createDiskCampaignSource(),
     bootstrapSource,
   }: AppConfig,
@@ -77,13 +87,20 @@ export async function buildApp(
   );
 
   await app.register(cookie);
+  // The canonical site plus any opt-in preview origins (see `AppConfig.previewOrigins`).
+  // Normalized through `URL` so a configured value carrying a trailing slash or a path
+  // still compares equal to the bare `Origin` header a browser actually sends -- the raw
+  // string this used to pass would have silently failed to match one.
+  const allowedOrigins = [siteUrl, ...previewOrigins].map(
+    (url) => new URL(url).origin,
+  );
   // `@fastify/cors`'s own default `methods` is `GET,HEAD,POST` -- unlike the vanilla `cors`
   // package it's modeled on, it does not include DELETE. Left implicit, that silently blocks
   // the preflight for `DELETE /api/admin/content/sources/:id` (admin.ts) with no error this
   // server ever sees -- the browser refuses to send the real request at all. Listed
   // explicitly here so it tracks the methods this API actually exposes, not the plugin's.
   await app.register(cors, {
-    origin: siteUrl,
+    origin: allowedOrigins,
     credentials: true,
     methods: ["GET", "HEAD", "POST", "DELETE"],
   });
@@ -94,11 +111,17 @@ export async function buildApp(
   // write, so this closes the gap CORS leaves open. GET is exempt: it's how the OAuth
   // callback itself arrives, redirected here by the identity provider, which has no
   // Origin header reason to match this site.
-  const siteOrigin = new URL(siteUrl).origin;
+  //
+  // A preview origin is trusted for writes too, not just for reads: it is a build of this
+  // same site, and a preview that could read state but not save a game would be testing
+  // something other than what ships. That is the whole cost of `PREVIEW_ORIGINS` -- every
+  // origin listed there can act as the player, so it is an operator-set variable and never
+  // anything a request can influence.
+  const writeableOrigins = new Set(allowedOrigins);
   app.addHook("onRequest", async (request, reply) => {
     if (request.method === "GET" || request.method === "HEAD") return;
     const origin = request.headers.origin;
-    if (origin !== undefined && origin !== siteOrigin) {
+    if (origin !== undefined && !writeableOrigins.has(origin)) {
       reply.code(403).send({
         error: { operation: "origin_check", code: "forbidden_origin" },
       });

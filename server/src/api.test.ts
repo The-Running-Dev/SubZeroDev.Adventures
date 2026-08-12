@@ -706,4 +706,49 @@ describeIfDb("server API", () => {
       entries.find((e) => e.displayName === "Anonymous Operator"),
     ).toBeTruthy();
   });
+
+  // The preview loop in docs/preview.md rests entirely on these two: a listed origin has
+  // to be able to *write*, or a preview build can't save a game, and an unlisted one has
+  // to stay rejected, or `PREVIEW_ORIGINS` would be a way to turn the check off.
+  it("accepts a write from a configured preview origin and still refuses an unlisted one", async () => {
+    const preview = await buildApp(pool, {
+      siteUrl: "http://localhost:5173",
+      apiUrl: "http://localhost:8787",
+      // Trailing slash on purpose: `app.ts` normalizes through `URL` precisely so a value
+      // written this way still matches the bare `Origin` header a browser sends.
+      previewOrigins: ["https://dev.adventures.subzerodev.com/"],
+    });
+    try {
+      const allowed = await preview.inject({
+        method: "POST",
+        url: "/api/sessions",
+        headers: { origin: "https://dev.adventures.subzerodev.com" },
+        payload: { campaignId: "what-would-lucifer-do" },
+      });
+      expect(allowed.statusCode).toBe(200);
+
+      const refused = await preview.inject({
+        method: "POST",
+        url: "/api/sessions",
+        headers: { origin: "https://not-a-preview.example.com" },
+        payload: { campaignId: "what-would-lucifer-do" },
+      });
+      expect(refused.statusCode).toBe(403);
+      expect((refused.json() as { error: { code: string } }).error.code).toBe(
+        "forbidden_origin",
+      );
+    } finally {
+      await preview.close();
+    }
+  });
+
+  it("keeps SITE_URL as the only allowed origin when no preview origin is configured", async () => {
+    const refused = await app.inject({
+      method: "POST",
+      url: "/api/sessions",
+      headers: { origin: "https://dev.adventures.subzerodev.com" },
+      payload: { campaignId: "what-would-lucifer-do" },
+    });
+    expect(refused.statusCode).toBe(403);
+  });
 });

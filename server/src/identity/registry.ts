@@ -20,6 +20,7 @@
  * it does so only in this comment, not in code.
  */
 import { createOidcProvider } from "./oidc.js";
+import { createDevIdentityProvider } from "./dev.js";
 import { clientSecretBasicRaw } from "./vendor-quirks.js";
 import type { IdentityProvider } from "./provider.js";
 
@@ -27,6 +28,21 @@ export async function loadIdentityProviders(): Promise<
   ReadonlyMap<string, IdentityProvider>
 > {
   const providers = new Map<string, IdentityProvider>();
+
+  // `dev.ts`'s fake provider -- localhost sign-in with no issuer to configure (docs/
+  // preview.md). Refused outright in production regardless of `DEV_IDENTITY`, so this can
+  // never reach the deployed API by nothing more than a stray environment variable: the
+  // deployed docker-compose.yml would have to both set `NODE_ENV=production` (it already
+  // does) *and* stop setting it, which is not something one variable slipping in can do.
+  if (process.env.DEV_IDENTITY === "1") {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error(
+        "DEV_IDENTITY=1 is refused when NODE_ENV=production -- this provider is a fake sign-in and must never run on the deployed API.",
+      );
+    }
+    providers.set("dev", createDevIdentityProvider());
+    return providers;
+  }
 
   const oidcIssuer = process.env.OIDC_ISSUER_URL;
   const oidcClientId = process.env.OIDC_CLIENT_ID;

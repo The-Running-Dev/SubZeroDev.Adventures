@@ -170,11 +170,18 @@ export interface PublicLeaderboardEntry {
  *  existing rule, reused rather than re-derived here). `totalRanked` is the full public
  *  population, independent of `RANKING_LIMIT`'s slice, so the crown gate and the page's
  *  own "too few public records" note read the true count. */
-export async function computeLeaderboard(pool: Pool): Promise<{
+export async function computeLeaderboard(
+  pool: Pool,
+  coreCampaignIds: readonly string[],
+): Promise<{
   readonly entries: readonly PublicLeaderboardEntry[];
   readonly totalRanked: number;
 }> {
-  const totals = await publicProfileTotals(pool, CROWN_BADGE_ID);
+  const totals = await publicProfileTotals(
+    pool,
+    CROWN_BADGE_ID,
+    coreCampaignIds,
+  );
   const ranked = rankProfiles(totals);
   const entries = ranked
     .slice(0, RANKING_LIMIT)
@@ -198,8 +205,13 @@ export async function computeLeaderboard(pool: Pool): Promise<{
  *  calls this; the public route only ever sees `computeLeaderboard`'s slug-keyed shape. */
 export async function currentLeaderPlayerId(
   pool: Pool,
+  coreCampaignIds: readonly string[],
 ): Promise<string | null> {
-  const totals = await publicProfileTotals(pool, CROWN_BADGE_ID);
+  const totals = await publicProfileTotals(
+    pool,
+    CROWN_BADGE_ID,
+    coreCampaignIds,
+  );
   const ranked = rankProfiles(totals);
   return ranked.find((r) => r.crowned)?.playerId ?? null;
 }

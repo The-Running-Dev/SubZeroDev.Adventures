@@ -44,10 +44,12 @@ function statusFor(code: string): number {
  */
 function attachStore(pool: Pool, cell: ContentCell) {
   return async (request: FastifyRequest): Promise<void> => {
+    const demo = cell.current();
     request.store = ownedStore(
-      cell.current().store,
+      demo.store,
       pool,
       request.principal.playerId,
+      demo,
     );
   };
 }
@@ -91,15 +93,40 @@ export function registerSessionRoutes(
     });
   });
 
-  // Unfiltered -- a hidden campaign is reachable via a direct `?campaign=` link
-  // (composition.ts), and `BrowserDemo.findCampaign` is synchronous, so the full catalog
-  // including hidden entries has to be prefetched here rather than resolved per lookup.
-  // `summaries` backs `SessionStore.listCampaigns()`, which the contract requires to be
-  // synchronous too (04-core.md) -- the browser's `RemoteSessionStore` cannot fetch it
-  // lazily, so it rides along in the same response `createRemoteDemo` already awaits.
-  app.get("/api/campaigns", async () => {
+  // Hidden-unfiltered within what a viewer may access -- a hidden campaign is reachable via
+  // a direct `?campaign=` link (composition.ts), and `BrowserDemo.findCampaign` is
+  // synchronous, so the full accessible catalog including hidden entries has to be
+  // prefetched here rather than resolved per lookup. `summaries` backs
+  // `SessionStore.listCampaigns()`, which the contract requires to be synchronous too
+  // (04-core.md) -- the browser's `RemoteSessionStore` cannot fetch it lazily, so it rides
+  // along in the same response `createRemoteDemo` already awaits.
+  //
+  // Access-filtered per viewer since a submission tier exists: `resolve` never mints (a bare
+  // GET stays anonymous rather than growing the `players` table), and the response now
+  // varies by who's asking, so `Vary: Cookie` -- this was a plain public, cacheable GET
+  // before and any intermediary caching it needs to know that changed.
+  app.get("/api/campaigns", { preHandler: resolve }, async (request, reply) => {
     const demo = cell.current();
-    return { campaigns: demo.all, summaries: demo.store.listCampaigns() };
+    const playerId = request.principalOrNull?.playerId ?? null;
+    const accessible = demo.accessibleCampaignIds(playerId);
+    reply.header("Vary", "Cookie");
+    reply.header("Cache-Control", "private, no-cache");
+    return {
+      campaigns: demo.all
+        .filter((campaign) => accessible.has(campaign.campaignId))
+        .map((campaign) => {
+          const entry = demo.provenance.get(campaign.campaignId);
+          if (!entry) return campaign;
+          return {
+            ...campaign,
+            mine: entry.ownerPlayerId === playerId,
+            visibility: entry.visibility,
+          };
+        }),
+      summaries: demo.store
+        .listCampaigns()
+        .filter((summary) => accessible.has(summary.campaignId)),
+    };
   });
 
   // `signInProvider` is the name `/api/auth/:provider/start` is actually registered under
@@ -137,9 +164,13 @@ export function registerSessionRoutes(
       : [],
   }));
 
-  app.post("/api/sessions", { preHandler: auth }, async (request) => {
+  // `[auth, owned]`, not just `auth` -- `owned` is what attaches a store decorated for the
+  // access check `ownedStore.createSession` now does (store/ownedStore.ts), so this creates
+  // through `request.store` rather than reaching past the decorator to `cell.current().store`
+  // directly, which would make that check dead code no request path ever reached.
+  app.post("/api/sessions", { preHandler: [auth, owned] }, async (request) => {
     const body = request.body as { campaignId: string; seed?: string };
-    return cell.current().store.createSession({
+    return request.store.createSession({
       campaignId: body.campaignId,
       ...(body.seed !== undefined ? { seed: body.seed } : {}),
       audience: "player",

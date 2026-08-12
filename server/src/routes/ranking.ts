@@ -8,10 +8,21 @@
 import type { FastifyInstance } from "fastify";
 import type { Pool } from "pg";
 import { computeLeaderboard } from "../ranking.js";
+import type { ContentCell } from "../content-cell.js";
 
-export function registerRankingRoutes(app: FastifyInstance, pool: Pool): void {
+export function registerRankingRoutes(
+  app: FastifyInstance,
+  pool: Pool,
+  cell: ContentCell,
+): void {
   app.get("/api/ranking", async () => {
-    const { entries, totalRanked } = await computeLeaderboard(pool);
+    const coreCampaignIds = cell
+      .current()
+      .core.map((campaign) => campaign.campaignId);
+    const { entries, totalRanked } = await computeLeaderboard(
+      pool,
+      coreCampaignIds,
+    );
     return { entries, totalRanked };
   });
 }

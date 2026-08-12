@@ -8,6 +8,7 @@
     "start": "tsx src/index.ts",
     "build": "tsc -p tsconfig.build.json",
     "migrate": "node-pg-migrate",
+    "grant-role": "tsx src/grant-role-cli.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "verify:contract": "node scripts/verify-contract-artifact.mjs"

@@ -1,8 +1,8 @@
 /**
  * `/api/admin/content/*` (issue #27): the swap cell's HTTP surface. Same `buildApp` +
- * `app.inject` style as `api.test.ts`, plus a direct `identities` insert to make a guest
- * "admin" -- the allowlist checks `(provider, subject)` rows, never a stored role, so that
- * is the only way to become one.
+ * `app.inject` style as `api.test.ts`, plus a direct `players.role` update to make a guest
+ * an "admin" (`roles.ts`, migration 012) -- the guard checks that column, never a session
+ * claim, so that is the only way to become one.
  */
 import { createServer, type Server } from "node:http";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -18,14 +18,18 @@ import { createMultiSourceCampaignSource } from "../campaigns/multi-source.js";
 const databaseUrl = process.env.DATABASE_URL;
 const describeIfDb = databaseUrl ? describe : describe.skip;
 
-const ADMIN_SUBJECT = "test-provider:test-subject";
-
 function cookieFrom(response: { headers: Record<string, unknown> }): string {
   const raw = response.headers["set-cookie"];
   const value = Array.isArray(raw) ? raw[0] : raw;
   if (typeof value !== "string")
     throw new Error("no Set-Cookie header in response");
   return value.split(";")[0]!;
+}
+
+async function makeAdmin(pool: Pool, playerId: string): Promise<void> {
+  await pool.query(`update players set role = 'admin' where player_id = $1`, [
+    playerId,
+  ]);
 }
 
 /** A minimal but fully valid story-graph `PortableCampaign` -- same shape proven against
@@ -121,7 +125,6 @@ describeIfDb("/api/admin/content", () => {
     app = await buildApp(pool, {
       siteUrl: "http://localhost:5173",
       apiUrl: "http://localhost:8787",
-      adminSubjects: [ADMIN_SUBJECT],
     });
   });
 
@@ -153,15 +156,11 @@ describeIfDb("/api/admin/content", () => {
       headers: { cookie },
     });
     const { playerId } = me.json() as { playerId: string };
-    const [provider, subject] = ADMIN_SUBJECT.split(":");
-    await pool.query(
-      `insert into identities (provider, subject, player_id) values ($1, $2, $3)`,
-      [provider, subject, playerId],
-    );
+    await makeAdmin(pool, playerId);
     return cookie;
   }
 
-  it("refuses a refresh from a guest who isn't on the allowlist", async () => {
+  it("refuses a refresh from a guest who isn't an admin", async () => {
     const cookie = await guestCookie();
     const response = await app.inject({
       method: "POST",
@@ -179,7 +178,7 @@ describeIfDb("/api/admin/content", () => {
     expect(response.statusCode).toBe(403);
   });
 
-  it("lets an allowlisted admin refresh content", async () => {
+  it("lets an admin refresh content", async () => {
     const cookie = await adminCookie();
     const response = await app.inject({
       method: "POST",
@@ -190,7 +189,7 @@ describeIfDb("/api/admin/content", () => {
     expect(response.json()).toEqual({ ok: true });
   });
 
-  it("shows status and the catalog only to an allowlisted signed-in player", async () => {
+  it("shows status and the catalog only to an admin signed-in player", async () => {
     const guest = await guestCookie();
     const guestStatus = await app.inject({
       method: "GET",
@@ -222,6 +221,89 @@ describeIfDb("/api/admin/content", () => {
     expect(adminBody.campaigns.length).toBeGreaterThan(0);
     expect(adminBody.status.campaignCount).toBe(adminBody.campaigns.length);
   });
+
+  it("grants and revokes the admin role by identity, and a revoked admin loses access", async () => {
+    const admin = await adminCookie();
+    const target = await guestCookie();
+    const targetMe = await app.inject({
+      method: "GET",
+      url: "/api/me",
+      headers: { cookie: target },
+    });
+    const { playerId: targetId } = targetMe.json() as { playerId: string };
+    await pool.query(
+      `insert into identities (provider, subject, player_id) values ('test-provider', 'target-subject', $1)`,
+      [targetId],
+    );
+
+    const grant = await app.inject({
+      method: "POST",
+      url: "/api/admin/players/role",
+      headers: { cookie: admin },
+      payload: {
+        provider: "test-provider",
+        subject: "target-subject",
+        role: "admin",
+      },
+    });
+    expect(grant.statusCode).toBe(200);
+
+    const promotedStatus = await app.inject({
+      method: "GET",
+      url: "/api/admin/content/status",
+      headers: { cookie: target },
+    });
+    expect(promotedStatus.statusCode).toBe(200);
+
+    const revoke = await app.inject({
+      method: "POST",
+      url: "/api/admin/players/role",
+      headers: { cookie: admin },
+      payload: {
+        provider: "test-provider",
+        subject: "target-subject",
+        role: "player",
+      },
+    });
+    expect(revoke.statusCode).toBe(200);
+
+    const demotedStatus = await app.inject({
+      method: "GET",
+      url: "/api/admin/content/status",
+      headers: { cookie: target },
+    });
+    expect(demotedStatus.statusCode).toBe(403);
+  });
+
+  it("refuses a role grant from a non-admin", async () => {
+    const guest = await guestCookie();
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/admin/players/role",
+      headers: { cookie: guest },
+      payload: {
+        provider: "test-provider",
+        subject: "whoever",
+        role: "admin",
+      },
+    });
+    expect(response.statusCode).toBe(403);
+  });
+
+  it("404s a role grant for an identity nobody has linked", async () => {
+    const admin = await adminCookie();
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/admin/players/role",
+      headers: { cookie: admin },
+      payload: {
+        provider: "test-provider",
+        subject: "nobody-linked-this",
+        role: "admin",
+      },
+    });
+    expect(response.statusCode).toBe(404);
+  });
 });
 
 describeIfDb("/api/admin/content/sources", () => {
@@ -236,7 +318,6 @@ describeIfDb("/api/admin/content/sources", () => {
     app = await buildApp(pool, {
       siteUrl: "http://localhost:5173",
       apiUrl: "http://localhost:8787",
-      adminSubjects: [ADMIN_SUBJECT],
       campaignSource: createMultiSourceCampaignSource(pool, {
         id: "builtin-test",
         label: "builtin test source",
@@ -261,7 +342,7 @@ describeIfDb("/api/admin/content/sources", () => {
   // No campaign this app's builtin source serves is a valid `POST /api/sessions`
   // `campaignId` for every test below, so a cookie is minted the same way `requireAdmin`
   // itself does it for an anonymous caller: `requirePrincipal` mints and sets the cookie
-  // before the allowlist check ever runs, so the 403 body doesn't matter here.
+  // before the admin check ever runs, so the 403 body doesn't matter here.
   async function cookie(): Promise<string> {
     const response = await app.inject({
       method: "POST",
@@ -278,11 +359,7 @@ describeIfDb("/api/admin/content/sources", () => {
       headers: { cookie: c },
     });
     const { playerId } = me.json() as { playerId: string };
-    const [provider, subject] = ADMIN_SUBJECT.split(":");
-    await pool.query(
-      `insert into identities (provider, subject, player_id) values ($1, $2, $3)`,
-      [provider, subject, playerId],
-    );
+    await makeAdmin(pool, playerId);
     return c;
   }
 
@@ -548,7 +625,6 @@ describeIfDb("/api/admin/content/sources with an unreachable builtin", () => {
     app = await buildApp(pool, {
       siteUrl: "http://localhost:5173",
       apiUrl: "http://localhost:8787",
-      adminSubjects: [ADMIN_SUBJECT],
       campaignSource: createMultiSourceCampaignSource(pool, {
         id: "builtin-default",
         label: "unreachable builtin",
@@ -589,11 +665,7 @@ describeIfDb("/api/admin/content/sources with an unreachable builtin", () => {
       headers: { cookie: c },
     });
     const { playerId } = me.json() as { playerId: string };
-    const [provider, subject] = ADMIN_SUBJECT.split(":");
-    await pool.query(
-      `insert into identities (provider, subject, player_id) values ($1, $2, $3)`,
-      [provider, subject, playerId],
-    );
+    await makeAdmin(pool, playerId);
     return c;
   }
 
@@ -676,7 +748,6 @@ describeIfDb("a stored source that cannot be merged", () => {
     app = await buildApp(pool, {
       siteUrl: "http://localhost:5173",
       apiUrl: "http://localhost:8787",
-      adminSubjects: [ADMIN_SUBJECT],
       campaignSource: createMultiSourceCampaignSource(pool, {
         id: "builtin-default",
         label: "builtin",
@@ -721,11 +792,7 @@ describeIfDb("a stored source that cannot be merged", () => {
       url: "/api/me",
       headers: { cookie },
     });
-    const [provider, subject] = ADMIN_SUBJECT.split(":");
-    await pool.query(
-      `insert into identities (provider, subject, player_id) values ($1, $2, $3)`,
-      [provider, subject, (me.json() as { playerId: string }).playerId],
-    );
+    await makeAdmin(pool, (me.json() as { playerId: string }).playerId);
 
     const beforeFix = await app.inject({
       method: "GET",

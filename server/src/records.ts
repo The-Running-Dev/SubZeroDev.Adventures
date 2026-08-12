@@ -45,6 +45,7 @@ function dayUtc(iso: string): string {
 export async function computeRecords(
   pool: Pool,
   playerId: string,
+  coreCampaignIds: readonly string[],
 ): Promise<PersonnelRecords> {
   const [sessionsResult, discoverers] = await Promise.all([
     pool.query<RecordSessionRow>(
@@ -53,7 +54,11 @@ export async function computeRecords(
          from sessions where profile_id = $1`,
       [playerId],
     ),
-    discovererCounts(pool),
+    // Scoped to core campaigns -- see this function's own `discoverers.get(key) ===
+    // undefined` check below, which is what keeps a private submission's ending from
+    // trivially winning `rarestEnding` (it would otherwise always have exactly one
+    // discoverer: its own author).
+    discovererCounts(pool, coreCampaignIds),
   ]);
   const sessions = sessionsResult.rows;
 

@@ -29,9 +29,11 @@ export function registerBadgeRoutes(
   app.get("/api/badges", { preHandler: resolve }, async (request) => {
     const principal = request.principalOrNull;
     if (!principal) return { badges: [], records: null };
+    const demo = cell.current();
+    const coreCampaignIds = demo.core.map((campaign) => campaign.campaignId);
     const [badges, records] = await Promise.all([
-      evaluateBadges(pool, cell.current(), principal.playerId),
-      computeRecords(pool, principal.playerId),
+      evaluateBadges(pool, demo, principal.playerId),
+      computeRecords(pool, principal.playerId, coreCampaignIds),
     ]);
     return { badges, records };
   });

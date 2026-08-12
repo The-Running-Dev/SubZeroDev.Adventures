@@ -258,6 +258,20 @@ export async function sessionOwner(
   return rows[0] ? (rows[0].profile_id ?? null) : undefined;
 }
 
+/** A session's campaign id, or `undefined` if the session doesn't exist -- `store/ownedStore.ts`'s
+ *  `getStrings` override reads this to know which campaign's strings a session may see,
+ *  since the engine's own `getStrings` has no per-campaign partition to narrow by. */
+export async function sessionCampaignId(
+  pool: Pool,
+  sessionId: string,
+): Promise<string | undefined> {
+  const { rows } = await pool.query(
+    `select campaign_id from sessions where session_id = $1`,
+    [sessionId],
+  );
+  return rows[0]?.campaign_id as string | undefined;
+}
+
 export async function saveOwner(
   pool: Pool,
   saveId: string,

@@ -88,11 +88,20 @@ interface EntryLoad {
   readonly degradedError?: string;
 }
 
-async function loadPrimary(entry: SourceEntry): Promise<LoadedContent> {
+/** Exported for `campaigns/submissions.ts`, which loads a player-submitted row the same way a
+ *  trusted one loads -- the difference between the two tiers is what happens *around* a load
+ *  (fail-open vs. fail-closed) and, for a `url` row, what actually does the fetching:
+ *  `httpOptions` is how `submissions.ts` swaps in `safe-fetch.ts`'s SSRF-guarded fetch and a
+ *  shorter timeout/retry budget for a player-submitted URL, since a player is not the trusted
+ *  operator every other caller of this function is. */
+export async function loadPrimary(
+  entry: SourceEntry,
+  httpOptions?: Parameters<typeof createHttpCampaignSource>[1],
+): Promise<LoadedContent> {
   if (entry.kind === "url") {
     if (!entry.url)
       throw new Error(`source "${entry.label}": a url source has no url`);
-    return createHttpCampaignSource(entry.url).load();
+    return createHttpCampaignSource(entry.url, httpOptions).load();
   }
   const kind = classifyPastedPayload(entry.payload);
   if (kind === "campaign")
@@ -197,7 +206,9 @@ export async function loadAllSources(
   return { campaigns, extensions, outcomes, ok };
 }
 
-function rowToEntry(row: ContentSourceRow): SourceEntry {
+/** Exported for `campaigns/submissions.ts`, which builds a `SourceEntry` from a
+ *  player-submitted row the same way. */
+export function rowToEntry(row: ContentSourceRow): SourceEntry {
   return {
     id: row.id,
     label: row.label,
@@ -253,7 +264,13 @@ export function createMultiSourceCampaignSource(
 
   return {
     async load() {
-      const dbRows = await listContentSources(pool);
+      // Admin-curated rows only (migration 013's `owner_player_id is null`) -- a
+      // player-submitted row goes through `campaigns/submissions.ts`'s fail-open tier
+      // instead, from `composition.ts`. This fan-out stays exactly as fail-closed as it
+      // always was, now correctly scoped to the rows that posture was designed for.
+      const dbRows = (await listContentSources(pool)).filter(
+        (row) => row.ownerPlayerId === undefined,
+      );
       const entries: readonly SourceEntry[] = [
         builtin,
         ...dbRows.map(rowToEntry),

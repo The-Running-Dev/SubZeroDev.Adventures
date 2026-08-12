@@ -25,10 +25,13 @@ function medianKey(campaignId: string, endingId: string): string {
   return `${campaignId}:${endingId}`;
 }
 
-/** Median `step_count` among every player's `ended` sessions, per (campaign, ending).
- *  Keyed `"<campaignId>:<endingId>"`. Feeds `scenic-route`/`sequence-breaker`. */
+/** Median `step_count` among every player's `ended` sessions, per (campaign, ending). Scoped
+ *  to core campaigns only (`coreCampaignIds` -- `ServerDemo.core`), so a player cannot shift
+ *  their own `scenic-route`/`sequence-breaker` baseline by publishing content nobody else
+ *  plays. Keyed `"<campaignId>:<endingId>"`. */
 export async function endingMedianSteps(
   pool: Pool,
+  coreCampaignIds: readonly string[],
 ): Promise<ReadonlyMap<string, number>> {
   const { rows } = await pool.query<{
     campaign_id: string;
@@ -39,7 +42,9 @@ export async function endingMedianSteps(
             percentile_cont(0.5) within group (order by step_count) as median_steps
        from sessions
       where status = 'ended' and ending_id is not null
+        and campaign_id = any($1)
       group by campaign_id, ending_id`,
+    [coreCampaignIds],
   );
   return new Map(
     rows.map((row) => [
@@ -61,12 +66,14 @@ export async function endingMedianSteps(
 export async function rejectedPercentileFor(
   pool: Pool,
   playerId: string,
+  coreCampaignIds: readonly string[],
 ): Promise<number> {
   const { rows } = await pool.query<{ pct: string }>(
     `with per_player as (
        select profile_id, sum(greatest(attempt_counter - step_count, 0)) as rejected
          from sessions
         where profile_id is not null
+          and campaign_id = any($2)
         group by profile_id
      ),
      ranked as (
@@ -74,16 +81,20 @@ export async function rejectedPercentileFor(
          from per_player
      )
      select pct from ranked where profile_id = $1`,
-    [playerId],
+    [playerId, coreCampaignIds],
   );
   return rows[0] ? Number(rows[0].pct) : 0;
 }
 
-/** Global discoverer count per (campaign, ending) -- how many distinct players have
- *  ever reached each ending. Keyed `"<campaignId>:<endingId>"`. Feeds the Rarest Ending
- *  record only; not a badge input. */
+/** Global discoverer count per (campaign, ending), scoped to core campaigns only -- how many
+ *  distinct players have ever reached each ending. Keyed `"<campaignId>:<endingId>"`. Feeds
+ *  the Rarest Ending record only; not a badge input. Scoping this to core is what keeps a
+ *  private submission's ending from trivially "winning" rarest ending for its own author --
+ *  it would otherwise always have exactly one discoverer, by construction, with nobody else
+ *  able to reach it at all. */
 export async function discovererCounts(
   pool: Pool,
+  coreCampaignIds: readonly string[],
 ): Promise<ReadonlyMap<string, number>> {
   const { rows } = await pool.query<{
     campaign_id: string;
@@ -93,7 +104,9 @@ export async function discovererCounts(
     `select campaign_id, ending_id, count(distinct profile_id)::int as discoverers
        from sessions
       where ending_id is not null
+        and campaign_id = any($1)
       group by campaign_id, ending_id`,
+    [coreCampaignIds],
   );
   return new Map(
     rows.map((row) => [
@@ -154,9 +167,17 @@ interface PublicProfileTotalRow {
  * -- are both real `timestamptz` already, so there's nothing to cast or move into JS the
  * way `evaluateBadges` has to for its own date handling.
  */
+/** `session_totals`'s `sessions s` is scoped to `coreCampaignIds` (`ServerDemo.core`) --
+ *  otherwise a player could author their own campaign with hundreds of endings and grind it
+ *  for absurdity-index score (`ranking.ts`'s `moves`/`rejected`/`endings` inputs) with no
+ *  connection to official content. `badge_totals` needs no equivalent filter: every badge a
+ *  player can actually unlock is defined over core content already (`badges.ts`'s
+ *  `catalogKindIds` fix, above), so there is no submission-tier badge to farm in the first
+ *  place. */
 export async function publicProfileTotals(
   pool: Pool,
   excludedBadgeId: string,
+  coreCampaignIds: readonly string[],
 ): Promise<readonly PublicProfileTotal[]> {
   const { rows } = await pool.query<PublicProfileTotalRow>(
     `with ranked_players as (
@@ -183,6 +204,7 @@ export async function publicProfileTotals(
                 filter (where s.ending_id is not null)::int as endings
          from sessions s
          join ranked_players p on p.player_id = s.profile_id
+        where s.campaign_id = any($2)
         group by s.profile_id
      )
      select p.player_id,
@@ -197,7 +219,7 @@ export async function publicProfileTotals(
        from ranked_players p
        left join badge_totals   b on b.player_id = p.player_id
        left join session_totals t on t.player_id = p.player_id`,
-    [excludedBadgeId],
+    [excludedBadgeId, coreCampaignIds],
   );
   return rows.map((row) => ({
     playerId: row.player_id,

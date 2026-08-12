@@ -42,7 +42,7 @@ describeIfDb("server API", () => {
 
   beforeEach(async () => {
     await pool.query(
-      "truncate badges, achievements, auth_sessions, saves, sessions, players restart identity cascade",
+      "truncate content_sources, badges, achievements, auth_sessions, saves, sessions, players restart identity cascade",
     );
   });
 

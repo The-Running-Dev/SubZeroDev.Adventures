@@ -102,9 +102,17 @@ export function registerProfileRoutes(
       return { error: { operation: "profile", code: "not_found" } };
     }
     const playerId = player.player_id;
+    const coreCampaignIds = cell
+      .current()
+      .core.map((campaign) => campaign.campaignId);
 
     const [statsResult, achievementsResult, badgesResult, records] =
       await Promise.all([
+        // `campaigns`/`endings` scoped to core, matching `campaignsTotal` below
+        // (`cell.current().catalog.length`, already core-only) -- otherwise a player with
+        // private submissions could publicly show something like "12 of 9 stories
+        // finished", counting campaigns the denominator was never counting in the first
+        // place.
         pool.query<{
           total: number;
           finished: number;
@@ -115,11 +123,13 @@ export function registerProfileRoutes(
           `select count(*)::int as total,
                   count(*) filter (where status = 'ended')::int as finished,
                   coalesce(sum(step_count), 0)::int as steps,
-                  count(distinct campaign_id)::int as campaigns,
+                  count(distinct campaign_id)
+                    filter (where campaign_id = any($2))::int as campaigns,
                   count(distinct (campaign_id, ending_id))
-                    filter (where ending_id is not null)::int as endings
+                    filter (where ending_id is not null and campaign_id = any($2))::int
+                    as endings
              from sessions where profile_id = $1`,
-          [playerId],
+          [playerId, coreCampaignIds],
         ),
         pool.query<{ n: number }>(
           `select count(*)::int as n from achievements where player_id = $1`,
@@ -129,7 +139,7 @@ export function registerProfileRoutes(
           `select badge_id, unlocked_at from badges where player_id = $1 order by unlocked_at`,
           [playerId],
         ),
-        computeRecords(pool, playerId),
+        computeRecords(pool, playerId, coreCampaignIds),
       ]);
     const stats = statsResult.rows[0]!;
 

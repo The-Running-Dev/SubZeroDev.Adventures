@@ -64,11 +64,6 @@ x-adventures-api-common: &adventures-api-common
     OIDC_CLIENT_SECRET: "${OIDC_CLIENT_SECRET:-}"
     OIDC_PROVIDER_NAME: "${OIDC_PROVIDER_NAME:-}"
     OIDC_SPEC_COMPLIANT_BASIC_AUTH: "${OIDC_SPEC_COMPLIANT_BASIC_AUTH:-}"
-    # Comma-separated provider:subject pairs gating /api/admin/* (server/src/index.ts,
-    # issue #27). Empty means nobody passes the guard, not that the guard is skipped --
-    # same "optional, unset is a valid state" posture as the OIDC vars above, not a
-    # startup precondition like DB_PASSWORD.
-    ADMIN_SUBJECTS: "${ADMIN_SUBJECTS:-}"
 
 services:
   db:

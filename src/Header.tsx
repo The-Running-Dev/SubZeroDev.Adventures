@@ -6,9 +6,10 @@ interface HeaderProps {
   /**
    * Which top-level nav item the current page is: the disk shelf at `"/"`
    * (`"shelf"`), a story actually loaded and in progress there (`"playing"`), or one
-   * of the standalone pages reached by a real navigation (`"standings"`, `"profile"`).
+   * of the standalone pages reached by a real navigation (`"standings"`, `"profile"`,
+   * `"content"`).
    */
-  current: "shelf" | "playing" | "standings" | "profile";
+  current: "shelf" | "playing" | "standings" | "profile" | "content";
   /** The loaded story's title -- required, and only ever shown, while `current` is
    *  `"playing"`. A third nav item next to "Standings", marking that specific story
    *  current instead of "Disk library" while it's the thing actually on screen. */
@@ -63,6 +64,13 @@ export function Header({
           aria-current={current === "standings" ? "page" : undefined}
         >
           Standings
+        </a>
+        <a
+          className="system-bar-link"
+          href="/content"
+          aria-current={current === "content" ? "page" : undefined}
+        >
+          My content
         </a>
         {current === "playing" && playingTitle && (
           <span

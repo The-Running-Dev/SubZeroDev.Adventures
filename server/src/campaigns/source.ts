@@ -111,14 +111,25 @@ function sleep(ms: number): Promise<void> {
  */
 export function createHttpCampaignSource(
   baseUrl: string,
-  options: { readonly timeoutMs?: number; readonly retries?: number } = {},
+  options: {
+    readonly timeoutMs?: number;
+    readonly retries?: number;
+    /** Defaults to the global `fetch` -- `campaigns/submissions.ts` passes
+     *  `safe-fetch.ts`'s `safeFetch` here instead for a player-submitted URL, which is not
+     *  a trusted operator's input the way every other caller of this function is. */
+    readonly fetchImpl?: (
+      url: string | URL,
+      init: { readonly signal: AbortSignal },
+    ) => Promise<Response>;
+  } = {},
 ): CampaignSource {
   const base = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
   const timeoutMs = options.timeoutMs ?? 10_000;
   const retries = options.retries ?? 2;
+  const doFetch = options.fetchImpl ?? fetch;
 
   async function fetchOnce(path: string): Promise<Response> {
-    const response = await fetch(new URL(path, base), {
+    const response = await doFetch(new URL(path, base), {
       signal: AbortSignal.timeout(timeoutMs),
     });
     if (!response.ok)

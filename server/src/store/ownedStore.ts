@@ -15,7 +15,8 @@
  */
 import type { Pool } from "pg";
 import type { SessionStore } from "@the-running-dev/game-engine";
-import { saveOwner, sessionOwner } from "../persistence.js";
+import { saveOwner, sessionCampaignId, sessionOwner } from "../persistence.js";
+import type { ServerDemo } from "../composition.js";
 
 export class OwnershipError extends Error {
   readonly operation: string;
@@ -62,17 +63,39 @@ export async function assertSaveOwned(
 
 /**
  * Every id-keyed `SessionStore` operation checked against `playerId` before it reaches
- * the underlying store. `listCampaigns` and `createSession` pass straight through -- there
- * is no existing id to own yet.
+ * the underlying store. `listCampaigns` passes straight through -- there is no existing id
+ * to own yet. `createSession` and `getStrings` are the two operations this decorator does
+ * more than check ownership for:
+ *
+ * - `createSession` checks `demo.accessibleCampaignIds(playerId)` before minting a session on
+ *   a campaign this player cannot reach -- someone else's private or pending submission,
+ *   specifically. A `campaignId` this player *can* reach, or one that isn't registered at all,
+ *   passes straight through to the underlying store's own `unknown_campaign` -- same
+ *   "don't preempt a real 404 with a 403" posture as `assertSessionOwned` below.
+ * - `getStrings` narrows the engine's own whole-registry answer
+ *   (`SessionStore.getStrings` has no per-campaign partition — see `composition.ts`'s
+ *   `stringsFor`) to the one campaign this session is actually playing, via `sessionCampaignId`
+ *   -- otherwise a session in a core campaign would read every private submission's narrative
+ *   text off the same shared registry.
  */
 export function ownedStore(
   store: SessionStore,
   pool: Pool,
   playerId: string,
+  demo: ServerDemo,
 ): SessionStore {
   return {
     listCampaigns: () => store.listCampaigns(),
-    createSession: (config) => store.createSession(config),
+    async createSession(config) {
+      const accessible = demo.accessibleCampaignIds(playerId);
+      const registered = demo.all.some(
+        (campaign) => campaign.campaignId === config.campaignId,
+      );
+      if (registered && !accessible.has(config.campaignId)) {
+        throw new OwnershipError("createSession");
+      }
+      return store.createSession(config);
+    },
 
     async getScene(sessionId) {
       await assertSessionOwned(pool, sessionId, playerId, "getScene");
@@ -84,7 +107,11 @@ export function ownedStore(
     },
     async getStrings(sessionId) {
       await assertSessionOwned(pool, sessionId, playerId, "getStrings");
-      return store.getStrings(sessionId);
+      const campaignId = await sessionCampaignId(pool, sessionId);
+      // No row -- `assertSessionOwned` above already let this through as "no such session",
+      // so the underlying call is what actually produces the `unknown_session` error.
+      if (campaignId === undefined) return store.getStrings(sessionId);
+      return demo.stringsFor([campaignId]);
     },
     async previewAction(sessionId, actionId, params) {
       await assertSessionOwned(pool, sessionId, playerId, "previewAction");

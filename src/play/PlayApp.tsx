@@ -910,7 +910,13 @@ function PlayAppReady({
                     >
                       <span className="dossier-number">
                         DISK {String(index + 1).padStart(2, "0")} //{" "}
-                        {campaign.featured ? "FEATURED" : "READY"}
+                        {campaign.mine
+                          ? campaign.visibility === "public"
+                            ? "PUBLISHED BY YOU"
+                            : "PRIVATE"
+                          : campaign.featured
+                            ? "FEATURED"
+                            : "READY"}
                       </span>
                       <strong>{campaign.title}</strong>
                       <span>{campaign.duration}</span>

@@ -181,6 +181,58 @@ before assuming server-side identity/session work is done:
   per-route — this was the one property that didn't hold as of issue #6; keep it that way
   rather than letting a new guarded route reach back for a per-route preHandler instead.
 
+## User-Submitted Content
+
+A signed-in player can submit their own campaign or extension (`/content`,
+`server/src/routes/content.ts`) — playable by them immediately, privately; an admin's approval
+(`routes/admin.ts`'s queue) is what makes it public. `content_sources` (migration 011) holds
+both admin-curated rows (`owner_player_id null`, always `approved`/`public` — migration 013's
+`content_sources_owner_shape` constraint enforces this in the schema) and player submissions.
+
+- **Two tiers, two failure postures.** The trusted tier (builtin + admin rows,
+  `campaigns/multi-source.ts`) stays exactly as fail-closed as before this feature existed: one
+  bad admin source still aborts the whole refresh. The submission tier
+  (`campaigns/submissions.ts`) is fail-open per row — `shared/campaign-registry.ts`'s
+  `buildTieredCatalog` quarantines a colliding or broken submission and still publishes
+  everything else, using a greedy incremental build (not two independent probes) so a
+  collision _between_ two submissions — an unnamespaced string key each defines differently,
+  say — is still attributed to a specific row.
+- **A submitted extension may only extend a campaign its own author also submitted** — enforced
+  in `campaigns/submissions.ts` — because `mergeExtensions` mutates its base campaign in place
+  before validation, so there is no way to filter one per-viewer after the fact. Extending core
+  content stays admin-only.
+- **The engine's own `getStrings` has no per-campaign partition** — it returns the whole merged
+  registry string table for any session. `ServerDemo.stringsFor` (`composition.ts`) and
+  `ownedStore.getStrings` narrow that to the session's own campaign before it reaches a player,
+  closing what would otherwise be every private submission's narrative text leaking to anyone
+  with an active session.
+- **Platform-wide aggregates read `ServerDemo.core`, never `.all`.** Badges, public profile
+  stats, the leaderboard, and rarity/median baselines
+  (`badges.ts`/`routes/profile.ts`/`ranking.ts`/`platform-baselines.ts`) are all scoped to core
+  content — otherwise a player could shift their own badge eligibility, win "rarest ending" by
+  construction, or farm the leaderboard by publishing their own campaign. `routes/stats.ts`'s
+  `campaignsPlayed` is the one deliberate exception: a plain growing count, not a denominator or
+  a score.
+- **Player-submitted `url` sources go through `campaigns/safe-fetch.ts`**, not the plain global
+  `fetch` an admin's URL source uses — https-only, refuses a resolved private/loopback/link-local
+  address, no redirects, a capped response body. A DNS answer that changes between that check
+  and the actual connect (rebinding) is a known, accepted gap — see the file's own header.
+
+### Admin bootstrap
+
+Admin access is `players.role = 'admin'` (migration 012), not an env var. The first admin (any
+deployment) is granted once, out of band:
+
+```bash
+npm run grant-role --prefix server -- <provider> <subject> admin
+```
+
+or, against the deployed image directly: `docker compose run --rm api node
+dist/server/src/grant-role-cli.js <provider> <subject>`. The target player must already exist
+(have signed in at least once, so an `identities` row links them) — this does not mint one.
+Every admin after the first is granted from the admin page itself
+(`POST /api/admin/players/role`).
+
 ## House Conventions
 
 - Metric units and Celsius throughout, including in comments, docs, and test fixtures.

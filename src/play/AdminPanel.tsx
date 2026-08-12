@@ -106,6 +106,69 @@ function useAdminContentStatus(
   return { status, error, refetch: () => setManualToken((t) => t + 1) };
 }
 
+interface PendingSubmission {
+  readonly id: string;
+  readonly label: string;
+  readonly kind: "url" | "pasted";
+  readonly ownerPlayerId?: string;
+  readonly lastError?: string;
+  readonly quarantineReason?: string;
+  readonly campaignCount?: number;
+  readonly extensionCount?: number;
+}
+
+/** The moderation queue -- every player submission awaiting a decision
+ * (`GET /api/admin/content/submissions`). Independent of `useAdminContentStatus`'s catalog
+ * status, same "refetchKey is opaque, the caller folds sync/approve/reject together"
+ * pattern. */
+function useSubmissionQueue(
+  apiUrl: string | undefined,
+  refetchKey: string,
+): {
+  submissions: readonly PendingSubmission[];
+  error: string | undefined;
+  refetch: () => void;
+} {
+  const [submissions, setSubmissions] = useState<readonly PendingSubmission[]>(
+    [],
+  );
+  const [error, setError] = useState<string>();
+  const [manualToken, setManualToken] = useState(0);
+
+  useEffect(() => {
+    if (!apiUrl) return;
+    let cancelled = false;
+    fetch(`${apiUrl}/api/admin/content/submissions`, {
+      credentials: "include",
+    })
+      .then((response) => {
+        if (!response.ok)
+          throw new Error(`submissions request failed: ${response.status}`);
+        return response.json() as Promise<{
+          submissions: PendingSubmission[];
+        }>;
+      })
+      .then((data) => {
+        if (cancelled) return;
+        // Defensive against an unexpected body shape (a malformed response, or -- in
+        // tests -- a single canned mock reused across every fetch this panel makes)
+        // rather than crashing the render on `.map`.
+        setSubmissions(Array.isArray(data.submissions) ? data.submissions : []);
+        setError(undefined);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : String(err));
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apiUrl, refetchKey, manualToken]);
+
+  return { submissions, error, refetch: () => setManualToken((t) => t + 1) };
+}
+
 function shortPreview(text: string, max = 60): string {
   return text.length <= max ? text : `${text.slice(0, max - 1)}…`;
 }
@@ -197,6 +260,50 @@ export function AdminPanel({
   const [selectedFile, setSelectedFile] = useState<File>();
   const [addingFile, setAddingFile] = useState(false);
   const [fileOutcome, setFileOutcome] = useState<AddOutcome>();
+
+  const {
+    submissions: pendingSubmissions,
+    error: queueError,
+    refetch: refetchQueue,
+  } = useSubmissionQueue(demo.apiUrl, sourcesToken.toString());
+  const [reviewBusyId, setReviewBusyId] = useState<string>();
+  const [reviewError, setReviewError] = useState<{
+    id: string;
+    text: string;
+  }>();
+
+  async function review(
+    id: string,
+    decision: "approve" | "reject",
+  ): Promise<void> {
+    setReviewBusyId(id);
+    setReviewError(undefined);
+    try {
+      const response = await fetch(
+        `${demo.apiUrl}/api/admin/content/submissions/${id}/${decision}`,
+        { method: "POST", credentials: "include" },
+      );
+      if (!response.ok) {
+        const json = (await response.json().catch(() => undefined)) as
+          { error?: { code?: string } } | undefined;
+        throw new Error(
+          json?.error?.code
+            ? `${response.status} (${json.error.code})`
+            : `request failed: ${response.status}`,
+        );
+      }
+      refetchQueue();
+      setSourcesToken((t) => t + 1);
+      onSync();
+    } catch (error) {
+      setReviewError({
+        id,
+        text: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setReviewBusyId(undefined);
+    }
+  }
 
   const [removingId, setRemovingId] = useState<string>();
   const [removeError, setRemoveError] = useState<{
@@ -659,6 +766,107 @@ export function AdminPanel({
               </p>
             )}
             {fileOutcome && <AddOutcomeNote outcome={fileOutcome} />}
+          </div>
+        </section>
+      )}
+
+      {demo.apiUrl && (
+        <section className="admin-block">
+          <h2 className="admin-heading">Review queue</h2>
+          <p className="admin-note">
+            Player-submitted content awaiting a decision. Approving makes it
+            public in the catalog above on the next sync; rejecting keeps it
+            private to its author. Either one re-syncs automatically.
+          </p>
+          {queueError !== undefined && (
+            <p className="admin-error" role="alert">
+              Could not read the queue: {queueError}
+            </p>
+          )}
+          <div className="admin-table-scroll">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th scope="col">Label</th>
+                  <th scope="col">Kind</th>
+                  <th scope="col">Author</th>
+                  <th scope="col">Campaigns</th>
+                  <th scope="col">Issue</th>
+                  <th scope="col" />
+                </tr>
+              </thead>
+              <tbody>
+                {pendingSubmissions.map((submission) => (
+                  <tr key={submission.id}>
+                    <td>{submission.label}</td>
+                    <td>{submission.kind}</td>
+                    <td>
+                      <code>
+                        {submission.ownerPlayerId
+                          ? shortPreview(submission.ownerPlayerId, 12)
+                          : "—"}
+                      </code>
+                    </td>
+                    <td>{submission.campaignCount ?? "—"}</td>
+                    <td>
+                      {submission.lastError ? (
+                        <span
+                          className="admin-cell-error-icon"
+                          title={submission.lastError}
+                          role="img"
+                          aria-label={`Error: ${submission.lastError}`}
+                        >
+                          ⚠
+                        </span>
+                      ) : submission.quarantineReason ? (
+                        <span
+                          className="admin-cell-error-icon"
+                          title={submission.quarantineReason}
+                          role="img"
+                          aria-label={`Not published: ${submission.quarantineReason}`}
+                        >
+                          ⚠
+                        </span>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        className="admin-sync admin-row-action"
+                        onClick={() => void review(submission.id, "approve")}
+                        disabled={
+                          reviewBusyId === submission.id || !canManageSources
+                        }
+                      >
+                        Approve
+                      </button>
+                      <button
+                        type="button"
+                        className="admin-remove admin-row-action"
+                        onClick={() => void review(submission.id, "reject")}
+                        disabled={
+                          reviewBusyId === submission.id || !canManageSources
+                        }
+                      >
+                        Reject
+                      </button>
+                      {reviewError?.id === submission.id && (
+                        <p className="admin-cell-error-note" role="alert">
+                          {reviewError.text}
+                        </p>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+                {pendingSubmissions.length === 0 && (
+                  <tr>
+                    <td colSpan={6}>Nothing awaiting review.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </section>
       )}

@@ -3,11 +3,10 @@
  * demand, and see what the server is currently serving -- backing `AdminPanel.tsx`'s
  * sources table, Sync buttons, and paste-JSON block.
  *
- * Guarded by a signed-in principal whose linked `(provider, subject)` (the `identities`
- * table, migration 007) appears in the `ADMIN_SUBJECTS` allowlist (`AppConfig`). Nothing
- * durable is stored -- no role column, no migration -- and no provider name is typed into
- * this file: the allowlist is opaque configuration, checked against rows this file reads
- * generically. Keeps the identity seam CLAUDE.md documents intact.
+ * Guarded by `players.role = 'admin'` (`roles.ts`, migration 012) -- queryable, assignable
+ * data rather than the `ADMIN_SUBJECTS` env allowlist this used to check. The first grant
+ * comes from `grant-role-cli.ts`, run once per deployment; every admin after that is granted
+ * from this page (see the role routes below).
  */
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { Pool } from "pg";
@@ -20,31 +19,20 @@ import {
 import {
   addPastedSource,
   addUrlSource,
+  approveSubmission,
   getContentSource,
   listContentSources,
+  listPendingSubmissions,
+  rejectSubmission,
   removeContentSource,
   type ContentSourceRow,
 } from "../content-sources.js";
 import { requirePrincipal, resolvePrincipal } from "../principal.js";
-
-async function isAdmin(
-  pool: Pool,
-  playerId: string,
-  adminSubjects: ReadonlySet<string>,
-): Promise<boolean> {
-  if (adminSubjects.size === 0) return false;
-  const { rows } = await pool.query<{ provider: string; subject: string }>(
-    `select provider, subject from identities where player_id = $1`,
-    [playerId],
-  );
-  return rows.some((row) =>
-    adminSubjects.has(`${row.provider}:${row.subject}`),
-  );
-}
+import { findPlayerByIdentity, isAdmin, setRole } from "../roles.js";
 
 /** A write -- refreshing content is a real action, so this mints a guest the same as any
- *  other authenticated write route would (session.ts's `auth`), then checks the allowlist. */
-function requireAdmin(pool: Pool, adminSubjects: ReadonlySet<string>) {
+ *  other authenticated write route would (session.ts's `auth`), then checks the role. */
+function requireAdmin(pool: Pool) {
   const auth = requirePrincipal(pool);
   return async (
     request: FastifyRequest,
@@ -52,7 +40,7 @@ function requireAdmin(pool: Pool, adminSubjects: ReadonlySet<string>) {
   ): Promise<void> => {
     await auth(request, reply);
     if (reply.sent) return;
-    if (!(await isAdmin(pool, request.principal.playerId, adminSubjects))) {
+    if (!(await isAdmin(pool, request.principal.playerId))) {
       reply.code(403);
       await reply.send({ error: { operation: "admin", code: "forbidden" } });
     }
@@ -61,7 +49,7 @@ function requireAdmin(pool: Pool, adminSubjects: ReadonlySet<string>) {
 
 /** Read-only admin guard: unlike `requireAdmin`, this never mints a guest account merely
  *  because somebody guessed an admin URL. */
-function resolveAdmin(pool: Pool, adminSubjects: ReadonlySet<string>) {
+function resolveAdmin(pool: Pool) {
   const resolve = resolvePrincipal(pool);
   return async (
     request: FastifyRequest,
@@ -69,10 +57,7 @@ function resolveAdmin(pool: Pool, adminSubjects: ReadonlySet<string>) {
   ): Promise<void> => {
     await resolve(request);
     const principal = request.principalOrNull;
-    if (
-      !principal ||
-      !(await isAdmin(pool, principal.playerId, adminSubjects))
-    ) {
+    if (!principal || !(await isAdmin(pool, principal.playerId))) {
       reply.code(403);
       await reply.send({ error: { operation: "admin", code: "forbidden" } });
     }
@@ -155,11 +140,9 @@ export function registerAdminRoutes(
   pool: Pool,
   cell: ContentCell,
   campaignSource: CampaignSource,
-  adminSubjects: readonly string[],
 ): void {
-  const allowlist = new Set(adminSubjects);
-  const admin = requireAdmin(pool, allowlist);
-  const readAdmin = resolveAdmin(pool, allowlist);
+  const admin = requireAdmin(pool);
+  const readAdmin = resolveAdmin(pool);
 
   // This response contains source URLs and refresh errors as well as the catalog, so the
   // read itself is guarded rather than relying on the browser to hide the page.
@@ -277,6 +260,98 @@ export function registerAdminRoutes(
         return { error: { operation: "admin", code: "not_found" } };
       }
       return { ok: true };
+    },
+  );
+
+  // The moderation queue -- every player-submitted row awaiting a decision. Approving or
+  // rejecting refreshes afterward for the same reason adding a source does (this file's
+  // header on `POST /api/admin/content/sources`): the row's `status`/`visibility` change is
+  // only what `composition.ts` reads into `ServerDemo.provenance` on the *next* build, so a
+  // decision has no visible effect until one runs.
+  app.get(
+    "/api/admin/content/submissions",
+    { preHandler: readAdmin },
+    async () => ({ submissions: await listPendingSubmissions(pool) }),
+  );
+
+  app.post(
+    "/api/admin/content/submissions/:id/approve",
+    { preHandler: admin },
+    async (request, reply) => {
+      const { id } = request.params as { id: string };
+      const body = request.body as { note?: string } | undefined;
+      const ok = await approveSubmission(
+        pool,
+        id,
+        request.principal.playerId,
+        body?.note,
+      );
+      if (!ok) {
+        reply.code(404);
+        return { error: { operation: "admin", code: "not_found" } };
+      }
+      const refresh = await cell.refresh();
+      return { source: await getContentSource(pool, id), refresh };
+    },
+  );
+
+  // Also how an admin revokes a previously-approved row -- `rejectSubmission` sets both
+  // `status` and `visibility` regardless of which state the row was already in.
+  app.post(
+    "/api/admin/content/submissions/:id/reject",
+    { preHandler: admin },
+    async (request, reply) => {
+      const { id } = request.params as { id: string };
+      const body = request.body as { note?: string } | undefined;
+      const ok = await rejectSubmission(
+        pool,
+        id,
+        request.principal.playerId,
+        body?.note,
+      );
+      if (!ok) {
+        reply.code(404);
+        return { error: { operation: "admin", code: "not_found" } };
+      }
+      const refresh = await cell.refresh();
+      return { source: await getContentSource(pool, id), refresh };
+    },
+  );
+
+  // Grants or revokes the admin role by `(provider, subject)` -- the same identity shape
+  // `ADMIN_SUBJECTS` used to be configured with, now a runtime action instead of a redeploy.
+  // Resolving through `identities` (rather than taking a raw `playerId`) means an operator
+  // never has to go find one -- they already know the identity they want to promote.
+  app.post(
+    "/api/admin/players/role",
+    { preHandler: admin },
+    async (request, reply) => {
+      const body = request.body as {
+        provider?: string;
+        subject?: string;
+        role?: string;
+      };
+      if (!body.provider || !body.subject || !body.role) {
+        reply.code(400);
+        return {
+          error: { operation: "admin", code: "missing_provider_subject_role" },
+        };
+      }
+      if (body.role !== "player" && body.role !== "admin") {
+        reply.code(400);
+        return { error: { operation: "admin", code: "invalid_role" } };
+      }
+      const target = await findPlayerByIdentity(
+        pool,
+        body.provider,
+        body.subject,
+      );
+      if (!target) {
+        reply.code(404);
+        return { error: { operation: "admin", code: "identity_not_found" } };
+      }
+      await setRole(pool, target, body.role);
+      return { ok: true, playerId: target, role: body.role };
     },
   );
 }

@@ -11,6 +11,12 @@ import type { ServerDemo } from "./composition.js";
 export interface ContentStatus {
   readonly campaignCount: number;
   readonly contentDigest: string | undefined;
+  /** Core content only (`ServerDemo.core`/`coreContentDigest`) -- what `health.ts` reports on
+   *  its unauthenticated route, so a change to a private submission is not a publicly
+   *  observable signal. `campaignCount`/`contentDigest` above stay whole-catalog for the
+   *  admin-gated status page, which is meant to show everything currently serving. */
+  readonly coreCampaignCount: number;
+  readonly coreContentDigest: string | undefined;
   readonly lastSuccessAt: string | undefined;
   readonly lastFailureAt: string | undefined;
   readonly lastError: string | undefined;
@@ -101,6 +107,8 @@ export function createContentCell(build: () => Promise<ServerDemo>): {
       return {
         campaignCount: demo?.all.length ?? 0,
         contentDigest: demo?.contentDigest,
+        coreCampaignCount: demo?.core.length ?? 0,
+        coreContentDigest: demo?.coreContentDigest,
         lastSuccessAt,
         lastFailureAt,
         lastError,

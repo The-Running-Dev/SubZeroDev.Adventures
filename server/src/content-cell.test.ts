@@ -8,11 +8,13 @@ import { describe, expect, it, vi } from "vitest";
 import { createContentCell } from "./content-cell.js";
 import type { ServerDemo } from "./composition.js";
 
-// The cell only ever reads `.all.length` off a `ServerDemo` (status()) -- everything else
-// is opaque to it, so a minimal stand-in is enough.
+// The cell only ever reads `.all.length`/`.core.length` off a `ServerDemo` (status()) --
+// everything else is opaque to it, so a minimal stand-in is enough. `core` mirrors `all`
+// here since nothing in this suite distinguishes the two tiers.
 function fakeDemo(campaignCount: number): ServerDemo {
   return {
     all: Array.from({ length: campaignCount }),
+    core: Array.from({ length: campaignCount }),
   } as unknown as ServerDemo;
 }
 

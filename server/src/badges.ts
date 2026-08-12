@@ -642,6 +642,7 @@ export async function evaluateBadges(
   demo: ServerDemo,
   playerId: string,
 ): Promise<BadgeRow[]> {
+  const coreCampaignIds = demo.core.map((campaign) => campaign.campaignId);
   const [
     sessionsResult,
     achievementsResult,
@@ -665,10 +666,10 @@ export async function evaluateBadges(
       `select merge_count from players where player_id = $1`,
       [playerId],
     ),
-    endingMedianSteps(pool),
-    rejectedPercentileFor(pool, playerId),
+    endingMedianSteps(pool, coreCampaignIds),
+    rejectedPercentileFor(pool, playerId, coreCampaignIds),
     totalPlayerCount(pool),
-    currentLeaderPlayerId(pool),
+    currentLeaderPlayerId(pool, coreCampaignIds),
   ]);
 
   const data: BadgeData = {
@@ -691,7 +692,12 @@ export async function evaluateBadges(
       achievementId: row.achievement_id,
     })),
     mergeCount: playerResult.rows[0]?.merge_count ?? 0,
-    catalogKindIds: new Set(demo.all.map((c) => c.kindId)),
+    // Core content only -- a player-submitted `simulation`/`world-graph` campaign must not
+    // make `multiclass` (which requires having played every kind in this set) permanently
+    // unachievable for everyone, and `catalogSize`-driven badges must not move just because
+    // someone published a submission. `demo.catalog` (below) is already core-only --
+    // `composition.ts` derives it from `demo.core`, not `demo.all`.
+    catalogKindIds: new Set(demo.core.map((c) => c.kindId)),
     catalogSize: demo.catalog.length,
     endingTotalOf: (campaignId) =>
       demo.findCampaign(campaignId)?.endingCount ?? 0,

@@ -13,15 +13,28 @@ export function registerHealthRoute(
       .then(() => true)
       .catch(() => false);
 
-    const content = cell.status();
+    const status = cell.status();
     // A refresh that has never succeeded is a startup-ordering impossibility --
     // `createContentCell`'s `ready()` is awaited before any route registers -- so a failure
     // here only ever means the *most recent* refresh failed and the previous catalog is
     // still what's serving. Degraded, not unhealthy: players are unaffected.
     const contentOk =
-      content.lastFailureAt === undefined ||
-      (content.lastSuccessAt !== undefined &&
-        content.lastSuccessAt > content.lastFailureAt);
+      status.lastFailureAt === undefined ||
+      (status.lastSuccessAt !== undefined &&
+        status.lastSuccessAt > status.lastFailureAt);
+
+    // Core fields only -- this route is unauthenticated. `campaignCount`/`contentDigest`
+    // move on any private submission's change, which would make them a public "did a
+    // private submission just appear/change" side channel; `coreCampaignCount`/
+    // `coreContentDigest` (content-cell.ts) never do.
+    const content = {
+      campaignCount: status.coreCampaignCount,
+      contentDigest: status.coreContentDigest,
+      lastSuccessAt: status.lastSuccessAt,
+      lastFailureAt: status.lastFailureAt,
+      lastError: status.lastError,
+      bootstrapFallback: status.bootstrapFallback,
+    };
 
     if (!dbOk) {
       reply.code(503);

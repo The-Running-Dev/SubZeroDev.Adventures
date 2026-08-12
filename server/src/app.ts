@@ -19,6 +19,7 @@ import { registerStatsRoutes } from "./routes/stats.js";
 import { registerProfileRoutes } from "./routes/profile.js";
 import { registerRankingRoutes } from "./routes/ranking.js";
 import { registerAdminRoutes } from "./routes/admin.js";
+import { registerContentRoutes } from "./routes/content.js";
 import { loadIdentityProviders } from "./identity/registry.js";
 
 /** The one place this server reads deployment configuration from -- `index.ts` is the only
@@ -41,12 +42,6 @@ export interface AppConfig {
    *  there, a build that fails is the thing under test, not an operator locked out of
    *  their own server. */
   readonly bootstrapSource?: CampaignSource;
-  /** `provider:subject` pairs, matched against a signed-in principal's linked identities
-   *  (`identities` table) to gate `/api/admin/*`. No provider name is ever typed into this
-   *  file or `routes/admin.ts` -- these are opaque strings from configuration, the same
-   *  posture `identity/registry.ts` already takes (CLAUDE.md, "The Identity Seam"). Absent
-   *  or empty means nobody can pass the guard, not that the guard is skipped. */
-  readonly adminSubjects?: readonly string[];
 }
 
 /** Builds the wired Fastify instance without binding a port -- shared by `index.ts`
@@ -58,7 +53,6 @@ export async function buildApp(
     apiUrl,
     campaignSource = createDiskCampaignSource(),
     bootstrapSource,
-    adminSubjects = [],
   }: AppConfig,
 ): Promise<FastifyInstance> {
   const app = Fastify({ logger: process.env.NODE_ENV !== "test" });
@@ -133,8 +127,9 @@ export async function buildApp(
   registerBadgeRoutes(app, pool, cell);
   registerStatsRoutes(app, pool);
   registerProfileRoutes(app, pool, cell);
-  registerRankingRoutes(app, pool);
-  registerAdminRoutes(app, pool, cell, campaignSource, adminSubjects);
+  registerRankingRoutes(app, pool, cell);
+  registerAdminRoutes(app, pool, cell, campaignSource);
+  registerContentRoutes(app, pool, cell);
 
   return app;
 }

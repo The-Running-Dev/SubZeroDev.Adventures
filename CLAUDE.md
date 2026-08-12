@@ -179,6 +179,11 @@ before assuming server-side identity/session work is done:
 - Adding a sign-in provider is a new file implementing `IdentityProvider`
   (`server/src/identity/provider.ts`), not a new design. `server/src/identity/oidc.ts` is
   the one provider today, fully generic — no vendor named in its code.
+  `server/src/identity/dev.ts` is a second, deliberately fake one — a no-issuer localhost
+  sign-in for `docs/preview.md`, opted into with `DEV_IDENTITY=1` and refused outright when
+  `NODE_ENV=production`. It goes through the exact same `registry.ts` → `routes/identity.ts`
+  → `upgradeViaIdentity` path a real provider does; nothing downstream of `IdentityProvider`
+  can tell the two apart, which is the property worth protecting here.
 - There is exactly one place a request becomes a player: `requirePrincipal`/
   `resolvePrincipal` in `server/src/principal.ts`. Nothing else mints or resolves one.
 - No provider name (`github`, `supabase`, …) appears outside `server/src/identity/` or

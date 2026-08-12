@@ -23,6 +23,11 @@ Use the tunnel while you are actively editing. Use the preview host when you wan
 that stays up after you close the laptop — showing someone, testing on a phone you don't
 want to keep tethered, or leaving something running overnight.
 
+Both loops point at the **deployed** API, not a local one — that is what makes them a
+preview of the real thing rather than a third environment. If you instead want the entire
+stack local (own database, own content), see "Local dev sign-in" below, which is a
+different setup with a different answer to sign-in.
+
 ## Both loops need this first: `PREVIEW_ORIGINS`
 
 The API allows exactly one browser origin through CORS, and refuses any write from an
@@ -138,6 +143,37 @@ To roll back, re-point the symlink by hand:
 ```bash
 ssh vps 'ln -sfn releases/<id> /srv/adventures-preview/current.tmp && mv -Tf /srv/adventures-preview/current.tmp /srv/adventures-preview/current'
 ```
+
+## Local dev sign-in
+
+`npm run dev` plus `server/docker-compose.yml` already works end to end with no setup —
+sessions, saves, badges, the leaderboard, `SITE_URL`/`API_URL` both pinned to `localhost` in
+that compose file. The one thing that doesn't work there is signing in: OIDC credentials
+default to unset, and even configured, a real provider's callback URL has to be registered
+with that provider — not something worth doing for local iteration.
+
+`DEV_IDENTITY=1` replaces that with a fake `IdentityProvider`
+(`server/src/identity/dev.ts`) that needs no issuer at all. Set it before bringing the dev
+stack up:
+
+```bash
+DEV_IDENTITY=1 docker compose -f server/docker-compose.yml up -d --build
+```
+
+Then use the site's own "Sign in" button — it goes through the real flow (state cookie,
+callback, `upgradeViaIdentity`, session rotation), just against a provider that always
+resolves to the same fixed local player rather than asking anyone to authenticate. Your
+existing guest progress carries over, because it's the same `upgradeViaIdentity` call a real
+sign-in makes.
+
+Refused outright if `NODE_ENV=production` (`identity/registry.ts`), so this can't end up
+live on the deployed API by an environment variable slipping in — the deployment stack's
+`docker-compose.yml` doesn't set `DEV_IDENTITY` and never should.
+
+This is orthogonal to `PREVIEW_ORIGINS` above: that widens which _origins_ the deployed API
+trusts, this fakes the _identity provider_ on a local one. The tunnel and preview-host loops
+still get sign-in for free by reusing your real, already-authenticated session against the
+deployed API — no reason to want a fake identity there too.
 
 ## Baselines — the other half of the wait
 

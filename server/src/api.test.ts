@@ -23,6 +23,22 @@ function cookieFrom(response: { headers: Record<string, unknown> }): string {
   return value.split(";")[0]!;
 }
 
+/** Like `cookieFrom`, but for a response that may carry more than one `Set-Cookie` --
+ *  the OAuth callback clears `sza_oauth_state` *and* sets `sza_session`, in that order, so
+ *  grabbing index 0 there silently returns the wrong one. */
+function sessionCookieFrom(response: {
+  headers: Record<string, unknown>;
+}): string {
+  const raw = response.headers["set-cookie"];
+  const values = Array.isArray(raw) ? raw : raw ? [raw] : [];
+  const sessionSet = values.find(
+    (v): v is string => typeof v === "string" && v.startsWith("sza_session="),
+  );
+  if (!sessionSet)
+    throw new Error("no sza_session Set-Cookie header in response");
+  return sessionSet.split(";")[0]!;
+}
+
 describeIfDb("server API", () => {
   let pool: Pool;
   let app: FastifyInstance;
@@ -750,5 +766,65 @@ describeIfDb("server API", () => {
       payload: { campaignId: "what-would-lucifer-do" },
     });
     expect(refused.statusCode).toBe(403);
+  });
+
+  // The docs/preview.md localhost-sign-in loop rests on this: DEV_IDENTITY has to drive
+  // the exact same start -> state cookie -> callback -> upgradeViaIdentity path a real
+  // provider's callback does, all the way through to a member cookie -- not a shortcut
+  // that merely looks like sign-in from the frontend's side.
+  it("upgrades a guest to a member through the dev identity provider's real start/callback flow", async () => {
+    const originalDevIdentity = process.env.DEV_IDENTITY;
+    const originalNodeEnv = process.env.NODE_ENV;
+    process.env.DEV_IDENTITY = "1";
+    process.env.NODE_ENV = "development";
+    let devApp: FastifyInstance | undefined;
+    try {
+      devApp = await buildApp(pool, {
+        siteUrl: "http://localhost:5173",
+        apiUrl: "http://localhost:8787",
+      });
+
+      const cookie = await (async () => {
+        const response = await devApp!.inject({
+          method: "POST",
+          url: "/api/sessions",
+          payload: { campaignId: "what-would-lucifer-do" },
+        });
+        return cookieFrom(response);
+      })();
+
+      const start = await devApp.inject({
+        method: "GET",
+        url: "/api/auth/dev/start",
+        headers: { cookie },
+      });
+      expect(start.statusCode).toBe(302);
+      const stateCookie = cookieFrom(start);
+      const callbackUrl = start.headers.location as string;
+      expect(callbackUrl).toContain("/api/auth/dev/callback");
+
+      const callback = await devApp.inject({
+        method: "GET",
+        url: callbackUrl,
+        headers: { cookie: `${cookie}; ${stateCookie}` },
+      });
+      expect(callback.statusCode).toBe(302);
+      expect(callback.headers.location).toBe("http://localhost:5173");
+
+      const memberCookie = sessionCookieFrom(callback);
+      const me = await devApp
+        .inject({
+          method: "GET",
+          url: "/api/me",
+          headers: { cookie: memberCookie },
+        })
+        .then((r) => r.json() as { kind: string; displayName: string | null });
+      expect(me.kind).toBe("member");
+      expect(me.displayName).toBe("Local Dev");
+    } finally {
+      if (devApp) await devApp.close();
+      process.env.DEV_IDENTITY = originalDevIdentity;
+      process.env.NODE_ENV = originalNodeEnv;
+    }
   });
 });

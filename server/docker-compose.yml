@@ -33,6 +33,11 @@ x-adventures-api-dev: &adventures-api-dev
     PORT: "8787"
     SITE_URL: http://localhost:5173
     API_URL: http://localhost:8787
+    # Unset by default -- the pre-existing posture, no sign-in without real OIDC creds in
+    # .env. Set `DEV_IDENTITY=1` in the shell before `up` for a fake localhost sign-in
+    # instead (identity/dev.ts, docs/preview.md) -- refused by identity/registry.ts if
+    # NODE_ENV were ever production, which this target never is.
+    DEV_IDENTITY: "${DEV_IDENTITY:-}"
   # The repo-root .env, shared with the deployment file's own `env_file` -- one .env
   # location, one .env.example describing it. Optional here (unlike the deployment file,
   # where it is required) so a fresh clone can bring the stack up with no setup; only the

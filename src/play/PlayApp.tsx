@@ -64,15 +64,11 @@ const cabinetThemes: Readonly<
   "bulgaria-driving": { accent: "yellow", eyebrow: "ROAD SAFETY OFFICE" },
   "bulgaria-inheritance": { accent: "green", eyebrow: "ESTATE RECORDS" },
   "bulgaria-enterprise": { accent: "violet", eyebrow: "ENTERPRISE DESK" },
-  "getting-started": { accent: "green", eyebrow: "SYSTEM FILE" },
   "saki-quest-for-redemption": {
     accent: "violet",
     eyebrow: "REDEMPTION FILE",
   },
-  [GETTING_STARTED_CAMPAIGN_ID]: {
-    accent: "default",
-    eyebrow: "ORIENTATION PROGRAM",
-  },
+  [GETTING_STARTED_CAMPAIGN_ID]: { accent: "green", eyebrow: "SYSTEM FILE" },
 };
 
 interface Stat {

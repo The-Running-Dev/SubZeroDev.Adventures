@@ -106,6 +106,37 @@ export function findLocalSave(campaignId: string): string | undefined {
   }
 }
 
+/**
+ * A hidden campaign (`catalog.hidden`, `shared/campaign-registry.ts`) that doubles as the
+ * landing experience: `PlayApp.tsx` auto-starts it in place of the disk shelf on a visitor's
+ * first-ever load, the same way a `?campaign=` link auto-starts any other hidden campaign.
+ * Its own "Skip" control (and simply playing it through) both mark it seen.
+ */
+export const GETTING_STARTED_CAMPAIGN_ID = "getting-started";
+
+const ONBOARDING_SEEN_KEY = "subzerodev.play.onboarding-seen.v1";
+
+/** Whether the landing wizard has already run (or been skipped) in this browser. Storage
+ *  being unavailable is treated as "seen" -- there is nowhere to remember "skipped" in that
+ *  environment, and re-showing it on every load would be worse than never showing it. */
+export function hasSeenOnboarding(): boolean {
+  if (!browserStorageAvailable()) return true;
+  try {
+    return localStorage.getItem(ONBOARDING_SEEN_KEY) === "1";
+  } catch {
+    return true;
+  }
+}
+
+export function markOnboardingSeen(): void {
+  if (!browserStorageAvailable()) return;
+  try {
+    localStorage.setItem(ONBOARDING_SEEN_KEY, "1");
+  } catch {
+    // Nothing to fall back to -- the wizard may simply run again next load.
+  }
+}
+
 // SPIKE: campaigns are runtime-loaded JSON under /campaigns/, not compiled into the
 // engine package. See plans/spike-notes.md. `base` matches Vite's `BASE_URL` so this
 // resolves under a subpath deploy (`/play/`) the same way the rest of the site does.

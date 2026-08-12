@@ -898,6 +898,38 @@
 }
 
 /*
+ * The landing wizard (PlayApp.tsx's `isOnboarding`) is full-screen rather than a framed
+ * cabinet on the shelf page: no site header, no side status console, edge-to-edge. Still
+ * built from the same cabinet/accent vocabulary as every other story, so it reads as this
+ * site rather than a bolted-on splash screen -- it just fills the whole viewport doing it.
+ */
+.play-main.onboarding-active {
+  max-width: none;
+  padding: 0;
+}
+
+.cabinet.onboarding {
+  border-width: 0;
+  box-shadow: none;
+}
+
+.cabinet.onboarding .cabinet-layout {
+  align-items: center;
+  grid-template-columns: 1fr;
+  min-height: 100dvh;
+}
+
+.cabinet.onboarding .status-console {
+  display: none;
+}
+
+.cabinet.onboarding .scene-viewport {
+  margin: 0 auto;
+  max-width: 46rem;
+  width: 100%;
+}
+
+/*
  * Scene length varies enormously between turns -- a long opening followed by
  * "Not quite." and one Continue made the whole cabinet visibly shrink under the
  * reader between turns. A floor keeps the frame still and lets the text print

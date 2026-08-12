@@ -21,6 +21,9 @@ import { BbsPrompt } from "./BbsPrompt";
 import { BrowserClient, type PlayState } from "./browser-client";
 import {
   createBrowserDemo,
+  GETTING_STARTED_CAMPAIGN_ID,
+  hasSeenOnboarding,
+  markOnboardingSeen,
   type BrowserCampaign,
   type BrowserDemo,
   type StatBounds,
@@ -65,6 +68,10 @@ const cabinetThemes: Readonly<
   "saki-quest-for-redemption": {
     accent: "violet",
     eyebrow: "REDEMPTION FILE",
+  },
+  [GETTING_STARTED_CAMPAIGN_ID]: {
+    accent: "default",
+    eyebrow: "ORIENTATION PROGRAM",
   },
 };
 
@@ -531,6 +538,8 @@ function PlayAppReady({
 
   const selected = demo.findCampaign((state ? campaignId : selectedId) ?? "");
   const cabinetTheme = cabinetThemes[selected?.campaignId ?? ""];
+  /** The landing wizard, full-screen and chromeless, rather than an ordinary story run. */
+  const isOnboarding = campaignId === GETTING_STARTED_CAMPAIGN_ID;
   const ended = state?.scene.status === "ended";
   const sceneText = state?.scene.body.text;
 
@@ -598,6 +607,25 @@ function PlayAppReady({
     // on mount (guarded by `autoStarted`), and both functions are redefined every render,
     // so including them would either force this disable anyway or reintroduce the
     // repeated-start bug the ref exists to prevent.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [demo]);
+
+  /**
+   * A first-ever visit lands on the "getting started" wizard instead of the disk shelf --
+   * the landing page. It shares `autoStarted` with the `?campaign=` effect above (which runs
+   * first and sets it when a direct link wins), so a real link is never pre-empted by this.
+   * Marked seen the moment it starts, not on skip/finish: "first visit only" means once,
+   * however that visit ends.
+   */
+  useEffect(() => {
+    if (autoStarted.current) return;
+    if (new URLSearchParams(window.location.search).has("admin")) return;
+    if (hasSeenOnboarding()) return;
+    if (!demo.findCampaign(GETTING_STARTED_CAMPAIGN_ID)) return;
+    autoStarted.current = true;
+    markOnboardingSeen();
+    setSelectedId(GETTING_STARTED_CAMPAIGN_ID);
+    void start(GETTING_STARTED_CAMPAIGN_ID);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [demo]);
 
@@ -805,27 +833,31 @@ function PlayAppReady({
   return (
     <>
       {displayTheme === "matrix" && <MatrixRain />}
-      <main className="play-main">
+      <main
+        className={isOnboarding ? "play-main onboarding-active" : "play-main"}
+      >
         <div className="boot-flash" key={displayTheme} aria-hidden="true" />
-        <Header
-          current={isAdminPage ? "shelf" : state ? "playing" : "shelf"}
-          playingTitle={isAdminPage ? undefined : selected?.title}
-          onSelectShelf={isAdminPage ? undefined : returnToShelf}
-          theme={displayTheme}
-          onThemeChange={changeTheme}
-        >
-          {demo.apiUrl && (
-            <AccountPanel
-              apiUrl={demo.apiUrl}
-              identity={identity}
-              loading={identityLoading}
-              authError={authError}
-              onChanged={() => setIdentityRefreshToken((token) => token + 1)}
-              isAdmin={isAdmin}
-              profileAvailable={profileAvailable}
-            />
-          )}
-        </Header>
+        {!isOnboarding && (
+          <Header
+            current={isAdminPage ? "shelf" : state ? "playing" : "shelf"}
+            playingTitle={isAdminPage ? undefined : selected?.title}
+            onSelectShelf={isAdminPage ? undefined : returnToShelf}
+            theme={displayTheme}
+            onThemeChange={changeTheme}
+          >
+            {demo.apiUrl && (
+              <AccountPanel
+                apiUrl={demo.apiUrl}
+                identity={identity}
+                loading={identityLoading}
+                authError={authError}
+                onChanged={() => setIdentityRefreshToken((token) => token + 1)}
+                isAdmin={isAdmin}
+                profileAvailable={profileAvailable}
+              />
+            )}
+          </Header>
+        )}
         {isAdminPage ? (
           adminAccessLoading ? (
             <div className="play-loading" role="status">
@@ -971,7 +1003,7 @@ function PlayAppReady({
           </section>
         ) : (
           <section
-            className={`cabinet accent-${cabinetTheme?.accent ?? "default"}`}
+            className={`cabinet accent-${cabinetTheme?.accent ?? "default"}${isOnboarding ? " onboarding" : ""}`}
             aria-label={`${selected?.title ?? "Story"} adventure terminal`}
           >
             <header className="cabinet-marquee">
@@ -982,17 +1014,19 @@ function PlayAppReady({
                 <h1>{selected?.title}</h1>
               </div>
               <div className="marquee-controls">
-                <span
-                  className={saveFailed ? "save-lamp warning" : "save-lamp"}
-                >
-                  <span aria-hidden="true" />{" "}
-                  {saveFailed ? "DISK WRITE ERROR" : "GAME SAVED"}
-                </span>
+                {!isOnboarding && (
+                  <span
+                    className={saveFailed ? "save-lamp warning" : "save-lamp"}
+                  >
+                    <span aria-hidden="true" />{" "}
+                    {saveFailed ? "DISK WRITE ERROR" : "GAME SAVED"}
+                  </span>
+                )}
                 <button
                   className="cabinet-button quiet"
                   onClick={returnToShelf}
                 >
-                  Quit to library
+                  {isOnboarding ? "Skip" : "Quit to library"}
                 </button>
               </div>
             </header>

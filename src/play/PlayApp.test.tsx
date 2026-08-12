@@ -10,6 +10,10 @@ import {
   it,
   vi,
 } from "vitest";
+import {
+  digestPortableCampaign,
+  type PortableCampaign,
+} from "@the-running-dev/game-engine";
 import PlayApp from "./PlayApp";
 import manifestJson from "../../public/campaigns/manifest.json";
 import whatWouldLuciferDoJson from "../../public/campaigns/what-would-lucifer-do.json";
@@ -77,6 +81,7 @@ async function findSceneBody(pattern: RegExp): Promise<HTMLElement> {
 }
 
 const THEME_STORAGE_KEY = "subzerodev.play.theme.v1";
+const ONBOARDING_STORAGE_KEY = "subzerodev.play.onboarding-seen.v1";
 
 describe("PlayApp cabinet presentation", () => {
   /**
@@ -586,6 +591,141 @@ describe("PlayApp BBS Terminal prompt", () => {
     await findSceneBody(/handwritten/i);
 
     await user.type(input, "QUIT{enter}");
+    expect(
+      await screen.findByRole("heading", { name: "Adventure disk library" }),
+    ).toBeVisible();
+  });
+});
+
+describe("PlayApp landing wizard", () => {
+  /**
+   * A synthetic hidden campaign layered on top of the shared fixture set (rather than
+   * replacing it), so a test can both watch the wizard auto-start *and* confirm the
+   * ordinary shelf underneath still works once it's left. Its digest is computed, not
+   * hardcoded, so this fixture can't drift out of sync with the manifest entry pointing
+   * at it the way a copy-pasted hash could.
+   */
+  const gettingStartedCampaign: PortableCampaign = {
+    formatVersion: 2,
+    catalog: {
+      title: "Getting Started",
+      description: "A short orientation.",
+      duration: "1 min",
+      contentNotice: "none",
+      featured: false,
+      hidden: true,
+    },
+    campaign: {
+      id: "getting-started",
+      kindId: "story-graph",
+      version: "1.0.0",
+      titleKey: "gs.title",
+      content: {
+        descriptionKey: "gs.description",
+        variables: {},
+        nodes: {
+          start: {
+            id: "start",
+            kind: "choice",
+            textKey: "gs.start.text",
+            choices: [
+              { id: "continue", labelKey: "gs.start.continue", goto: "end" },
+            ],
+          },
+          end: {
+            id: "end",
+            kind: "ending",
+            textKey: "gs.end.text",
+            endingId: "end",
+          },
+        },
+        startNodeId: "start",
+        achievements: [],
+      },
+    },
+    strings: {
+      "gs.title": "Getting Started",
+      "gs.description": "A short orientation.",
+      "gs.start.text": "Welcome. This is the wizard.",
+      "gs.start.continue": "Continue",
+      "gs.end.text": "You made it.",
+    },
+  };
+
+  const onboardingManifest = {
+    ...manifestJson,
+    campaigns: [
+      {
+        file: "getting-started.json",
+        id: "getting-started",
+        version: "1.0.0",
+        digest: digestPortableCampaign(gettingStartedCampaign),
+      },
+      ...manifestJson.campaigns,
+    ],
+  };
+  const onboardingExports: Readonly<Record<string, unknown>> = {
+    ...exportedCampaigns,
+    "manifest.json": onboardingManifest,
+    "getting-started.json": gettingStartedCampaign,
+  };
+
+  const outerFetch = globalThis.fetch;
+
+  beforeEach(() => {
+    localStorage.setItem(THEME_STORAGE_KEY, "dos");
+    localStorage.removeItem(ONBOARDING_STORAGE_KEY);
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      const fileName = url.split("/campaigns/")[1];
+      const body = fileName ? onboardingExports[fileName] : undefined;
+      if (body === undefined) throw new Error(`Unstubbed fetch: ${url}`);
+      return new Response(JSON.stringify(body), { status: 200 });
+    }) as typeof fetch;
+  });
+
+  afterEach(() => {
+    globalThis.fetch = outerFetch;
+    localStorage.removeItem(THEME_STORAGE_KEY);
+    localStorage.removeItem(ONBOARDING_STORAGE_KEY);
+  });
+
+  it("auto-starts the wizard full-screen on a first visit, ahead of the disk shelf", async () => {
+    render(<PlayApp />);
+
+    await findSceneBody(/Welcome\. This is the wizard\./);
+    expect(
+      screen.queryByRole("heading", { name: "Adventure disk library" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("navigation", { name: "Primary" }),
+    ).not.toBeInTheDocument();
+    expect(document.querySelector(".cabinet.onboarding")).toBeInTheDocument();
+    expect(
+      document.querySelector(".play-main.onboarding-active"),
+    ).toBeInTheDocument();
+    expect(localStorage.getItem(ONBOARDING_STORAGE_KEY)).toBe("1");
+  });
+
+  it("never lists the wizard as a disk, and Skip returns to a normal shelf", async () => {
+    const user = userEvent.setup();
+    render(<PlayApp />);
+
+    await findSceneBody(/Welcome\. This is the wizard\./);
+    await user.click(screen.getByRole("button", { name: "Skip" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "Adventure disk library" }),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole("button", { name: /Getting Started/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("does not re-run the wizard once it has already been seen", async () => {
+    localStorage.setItem(ONBOARDING_STORAGE_KEY, "1");
+    render(<PlayApp />);
+
     expect(
       await screen.findByRole("heading", { name: "Adventure disk library" }),
     ).toBeVisible();

@@ -61,6 +61,87 @@ describe("Wizard — stored draft", () => {
   });
 });
 
+describe("Wizard — start from a sample", () => {
+  it("loads the sample and opens on the playtest step, where it runs once named", async () => {
+    const user = userEvent.setup();
+    render(<Wizard onExit={() => {}} />);
+    await user.click(
+      screen.getByRole("button", { name: /START FROM A SAMPLE/ }),
+    );
+
+    expect(
+      screen.getByText(/CAMPAIGN AUTHORING — PLAYTEST/),
+    ).toBeInTheDocument();
+
+    // Unnamed, so the existing gate holds: the sample adds no gate of its own, and clears
+    // this one the moment the author supplies a title.
+    expect(screen.getByRole("button", { name: "RUN ▸" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: /^1\) Identity$/ }));
+    await user.type(screen.getByLabelText("Title"), "The Last Tram");
+    await user.click(screen.getByRole("button", { name: /^5\) Playtest$/ }));
+    await user.click(screen.getByRole("button", { name: "RUN ▸" }));
+
+    // The sample's own opening scene, back out of the real engine via `BrowserClient` --
+    // the same path a hand-authored draft takes.
+    expect(
+      await screen.findByText(/The last tram left nine minutes ago/),
+    ).toBeInTheDocument();
+    await user.click(
+      await screen.findByRole("button", { name: /Start walking\./ }),
+    );
+    expect(
+      await screen.findByText(/The river is black under the bridge/),
+    ).toBeInTheDocument();
+  });
+
+  it("loads without confirming when there is nothing to lose", async () => {
+    const user = userEvent.setup();
+    render(<Wizard onExit={() => {}} />);
+    await user.click(
+      screen.getByRole("button", { name: /START FROM A SAMPLE/ }),
+    );
+    expect(
+      screen.queryByText(/This replaces the draft you already have/),
+    ).not.toBeInTheDocument();
+  });
+
+  it("confirms before replacing a draft the author has already worked on", async () => {
+    const user = await mountWithCompleteDraft();
+    await user.click(
+      screen.getByRole("button", { name: /START FROM A SAMPLE/ }),
+    );
+
+    // Still on identity, still the author's own draft, and nothing written to storage yet.
+    expect(screen.getByDisplayValue("Test Campaign")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /Keep what I have/ }));
+    expect(screen.getByDisplayValue("Test Campaign")).toBeInTheDocument();
+    expect(
+      (
+        JSON.parse(localStorage.getItem("subzerodev.play.draft.v1")!) as {
+          id: string;
+        }
+      ).id,
+    ).toBe("test-campaign");
+
+    await user.click(
+      screen.getByRole("button", { name: /START FROM A SAMPLE/ }),
+    );
+    await user.click(screen.getByRole("button", { name: /REPLACE MY DRAFT/ }));
+    expect(
+      screen.getByText(/CAMPAIGN AUTHORING — PLAYTEST/),
+    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        (
+          JSON.parse(localStorage.getItem("subzerodev.play.draft.v1")!) as {
+            startNodeId: string;
+          }
+        ).startNodeId,
+      ).toBe("platform"),
+    );
+  });
+});
+
 describe("Wizard — validation console", () => {
   it("reports a fresh draft's findings without blocking navigation", async () => {
     const user = userEvent.setup();

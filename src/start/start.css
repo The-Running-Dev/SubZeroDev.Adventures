@@ -134,6 +134,10 @@
   gap: 1rem;
   padding: 0.7rem 0.85rem;
   text-align: left;
+  /* A menu row is a button or, for a path that navigates away, a link. The two have to be
+     indistinguishable here: the row's own chrome is the affordance, and one underlined row
+     among four would read as a different kind of thing. */
+  text-decoration: none;
   width: 100%;
 }
 

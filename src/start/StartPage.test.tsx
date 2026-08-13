@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { StartPage } from "./StartPage";
-import { PATHS } from "./content";
+import { GUIDED_INTRO_HREF, PATHS } from "./content";
 
 describe("StartPage", () => {
   it("opens on the fork, listing every path", async () => {
@@ -12,9 +12,22 @@ describe("StartPage", () => {
     ).toBeInTheDocument();
     for (const path of PATHS) {
       expect(
-        screen.getByRole("button", { name: new RegExp(path.title, "i") }),
+        screen.getByRole(path.href ? "link" : "button", {
+          name: new RegExp(path.title, "i"),
+        }),
       ).toBeInTheDocument();
     }
+  });
+
+  it("offers the guided intro as a permanent ?campaign= link into the real player", () => {
+    render(<StartPage />);
+    // `getting-started` is hidden, so it is not on the shelf and cannot be reached by
+    // browsing -- `?campaign=` is its only door (src/play/composition.ts). A real anchor,
+    // not a button that navigates, so it can be opened in a new tab or copied.
+    expect(
+      screen.getByRole("link", { name: /Play the guided intro/i }),
+    ).toHaveAttribute("href", GUIDED_INTRO_HREF);
+    expect(GUIDED_INTRO_HREF).toContain("?campaign=getting-started");
   });
 
   it("walks a chosen path and reports real step progress", async () => {

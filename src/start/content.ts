@@ -30,6 +30,9 @@ export interface StartPath {
   readonly time: string;
   /** A path with no walk is a door: picking it leaves the page's own branch machine. */
   readonly walk: readonly WalkScreen[];
+  /** Set on a path that leaves the site's own page entirely -- rendered as a link rather
+   *  than a menu button, since it navigates rather than advancing the branch machine. */
+  readonly href?: string;
 }
 
 const done = (label: string): Check => ({ state: "done", label });
@@ -44,6 +47,18 @@ export const CHECK_MARK: Readonly<Record<CheckState, string>> = {
 
 /** The id of the path that opens the authoring wizard instead of walking a branch. */
 export const AUTHOR_PATH_ID = "author";
+
+/**
+ * The guided intro's permanent link.
+ *
+ * `getting-started` is a hidden campaign (`src/play/composition.ts`), and `?campaign=<id>` is
+ * a hidden campaign's only door in -- `PlayApp` auto-starts whatever that parameter names,
+ * listed or not. So this needs no catalog entry, no change to the deployed content source,
+ * and no unhiding: the campaign stays off the shelf and this link opens it anyway. Verified
+ * present in the deployed source's manifest (`SubZeroDev.Adventures.Content`), not only in
+ * this repository's `public/campaigns/` fixtures.
+ */
+export const GUIDED_INTRO_HREF = "/?campaign=getting-started";
 
 export const PATHS: readonly StartPath[] = [
   {
@@ -84,6 +99,15 @@ export const PATHS: readonly StartPath[] = [
   },
   {
     key: "B",
+    id: "intro",
+    title: "Play the guided intro",
+    meta: "opens in the real player, not a demo of one",
+    time: "~4 min",
+    walk: [],
+    href: GUIDED_INTRO_HREF,
+  },
+  {
+    key: "C",
     id: AUTHOR_PATH_ID,
     title: "Write a campaign",
     meta: "assembles and playtests here in the browser",
@@ -91,7 +115,7 @@ export const PATHS: readonly StartPath[] = [
     walk: [],
   },
   {
-    key: "C",
+    key: "D",
     id: "embed",
     title: "Embed the engine in your own app",
     meta: "node 20+",
@@ -127,7 +151,7 @@ export const PATHS: readonly StartPath[] = [
     ],
   },
   {
-    key: "D",
+    key: "E",
     id: "host",
     title: "Host your own instance",
     meta: "docker · postgres 15+",

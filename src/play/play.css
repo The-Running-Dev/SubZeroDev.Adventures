@@ -493,10 +493,15 @@
   top: 1.65rem;
 }
 
+/* `--on-cyan-hover`, not `--on-cyan-hover-text` -- the latter is near-white in DOS/Matrix/
+   Amber (`--on-cyan-strong`'s sibling token, meant for a large glowing headline) and fails
+   4.5:1 against `--cyan-hover` in every theme but BBS (2.86-3.86:1). Masked here on this
+   container itself only because `.dossier strong`/`.dossier-number` below set their own
+   colour, but a future child that doesn't would inherit unreadable near-white-on-teal text. */
 .dossier:hover,
 .dossier.is-selected {
   background: var(--cyan-hover);
-  color: var(--on-cyan-hover-text);
+  color: var(--on-cyan-hover);
 }
 
 .dossier:focus-visible {
@@ -540,9 +545,14 @@
   text-transform: uppercase;
 }
 
+/* `--on-cyan-hover`, not `--on-cyan-strong`: the latter is white or near-white in DOS
+   (#ffffff), Matrix (#eaffea) and Amber (#fff3e0), and against `--cyan-hover` that measures
+   3.33-4.05:1 -- the featured/selected story card's own title, in white-on-teal, was the
+   concrete "white text in blue buttons" report this fixes. `--on-cyan-hover` is the same
+   pairing `.dossier-number` right above already uses on hover. */
 .dossier:hover strong,
 .dossier.is-selected strong {
-  color: var(--on-cyan-strong);
+  color: var(--on-cyan-hover);
 }
 
 /*

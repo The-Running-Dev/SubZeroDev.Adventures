@@ -22,6 +22,7 @@ public/campaigns/       test-fixture campaign JSON, committed — see "Campaign 
 src/
   main.tsx, index.css, site.css, shared.tsx    app shell
   play/                  the game itself: PlayApp.tsx, composition.ts, browser-client.ts, play.css
+  start/                 `/start`: the getting-started page and the campaign-authoring wizard
   test/                  jsdom + real-browser test setup and shared assertion helpers
 shared/                 code both compositions import — environment-neutral, no DOM, no Node
 server/                 the hosted Node API: its own npm project, its own Dockerfile
@@ -127,21 +128,28 @@ point at.
 
 ## Visual Baselines — The One Real Gotcha
 
-`src/play/browser/__screenshots__/visual-baseline.browser.test.tsx/` holds 16 PNGs, one per
-snapshot, all suffixed `chromium-linux`. **CI runs on `ubuntu-latest` with Playwright's
-managed Chromium** and that `-linux` set is the only baseline the repo maintains — no
-`chromium-win32` set is committed. `vitest.browser.config.ts` excludes
-`visual-baseline.browser.test.tsx` from the run when `os.platform() === "win32"` (checked at
+`src/play/browser/__screenshots__/visual-baseline.browser.test.tsx/` holds 24 PNGs, one per
+snapshot, all suffixed `chromium-linux`. Four states of `/play/` and two of `/start`
+(`src/start/`, whose fixtures live alongside `PlayApp`'s in `src/play/browser/fixtures.tsx`
+rather than in a spec of their own — the screenshot directory is derived from the spec file's
+name, and a second one would have to be registered in the config exclusion below _and_ twice
+in the workflow further down), at four widths each. **CI runs on `ubuntu-latest` with
+Playwright's managed Chromium** and that `-linux` set is the only baseline the repo maintains
+— no `chromium-win32` or `chromium-darwin` set is committed. `vitest.browser.config.ts`
+excludes `visual-baseline.browser.test.tsx` from the run on **any non-Linux host** (checked at
 config load, in Node — the spec file itself also runs inside the real browser tab it tests
 in, where there is no equivalent platform check), so running `npm run test:browser` natively
-on Windows silently skips these specs instead of failing on baselines that don't exist for
-that platform. That means a Windows contributor gets no local visual-regression signal before
-pushing — the tradeoff for not having to keep two baseline sets in sync — so treat CI as the
-first real check for a visual change made on Windows.
+on Windows or macOS silently skips these specs instead of failing on baselines that don't
+exist for that platform. Vitest suffixes a reference by _host_ platform and writes a fresh one
+when none is found, so without that exclusion a non-Linux run both fails every visual spec and
+leaves a full second baseline set in the working tree. That means a Windows or macOS
+contributor gets no local visual-regression signal before pushing — the tradeoff for not
+having to keep several baseline sets in sync — so treat CI as the first real check for a
+visual change made off Linux.
 
 If a UI change legitimately changes rendered output, regenerate the `chromium-linux` set from
-Windows (there is no other set to regenerate) by running it inside a Linux container so the
-pixels actually match what CI will compare against:
+Windows or macOS (there is no other set to regenerate) by running it inside a Linux container
+so the pixels actually match what CI will compare against:
 
 ```bash
 npm run baselines:update
@@ -392,6 +400,67 @@ Reversibility: cheap | expensive
   local reason is a rule nobody can evaluate.
 
 ### Why it is installed this way
+
+#### 2026-08-13 — `/start` and the authoring wizard validate through `hydrateCatalog`
+
+Context: the wizard has to tell an author whether their draft is a legal campaign, on every
+edit. The obvious-looking entry points are not validators: `fromPortable` states in its own
+header that it validates nothing, and `digestPortableCampaign` is a sha-256 over canonical
+JSON, so it answers "did this change?" and never "is this correct?". The real validator is
+`buildValidatedContentRegistry`, and the only non-throwing wrapper around it was
+`hydrateCatalog`, private to `shared/campaign-registry.ts`.
+
+Chosen: export `hydrateCatalog` and route the wizard through it, carrying the engine's own
+`ValidationError[]`/`ValidationWarning[]` on the result instead of only the flattened string
+existing callers read. That makes the wizard fail on exactly what `/api/content` will fail on,
+since `buildTieredCatalog` reaches the same function. `digestPortableCampaign` is still used,
+for what it is actually for: deciding when the playtest runtime is stale and when a validation
+result is still current.
+
+Rejected: a wizard-local validator (a second opinion about what a campaign is, guaranteed to
+drift from the server's — and the exact thing routing through the engine avoids); gating each
+step on validity (a story graph is invalid for most of its authoring life, and classifying
+which errors are "expected at this step" rebuilds that second validator by the back door — so
+validation runs continuously and only playtest and submit are gated on it).
+
+Reversibility: cheap for the export; expensive to unpick if a second validator is ever written
+against it, which is the outcome this exists to prevent.
+
+#### 2026-08-13 — The wizard's draft is browser-local, and submits down the existing route
+
+Context: an author needs their work to survive a reload, and a finished campaign needs to
+reach the review queue.
+
+Chosen: `localStorage` under `subzerodev.play.draft.v1`, read as lazy initial state (not in a
+mount effect — see `Wizard.tsx`'s note on the clobber that cost an author their draft), and
+submitted as a `{kind: "pasted"}` `POST /api/content` — the same request `MyContent.tsx`'s
+paste form already sends. No new server route, so an authored campaign inherits the submission
+tier's fail-open quarantine and the admin review queue exactly as a pasted one does.
+
+Rejected: server-side draft persistence (`content_sources` holds submissions, not works in
+progress; adding a second thing it holds is a schema decision this feature does not need to
+make, and it would put unreviewed half-campaigns in the same table as reviewed ones); an
+authoring-specific API route (a second door into the same queue, with its own trust posture to
+keep in sync).
+
+Reversibility: cheap.
+
+#### 2026-08-13 — One mocked direction, rendered through the theme system; authoring unlocked
+
+Context: the design bundle offered five getting-started directions, each drawn in one fixed
+palette, and locked its "write a campaign" door behind "finish a run first".
+
+Chosen: build direction 2b's chrome (setup dialog, numbered menu, block bar, F-key legend) and
+colour it entirely from `themes.css` variables, so the page renders in all four display modes
+like every other page. Leave the authoring door open.
+
+Rejected: shipping all five directions (they differ only in landing chrome — the walkthrough
+body is shared markup — so four of them are a palette-and-framing choice, not a feature);
+pinning the page to the mocked DOS Blue (it would be the only page on the site that ignores
+the display mode); keeping the door locked (the mockup wrote that before the wizard existed,
+and honouring it means inventing cross-session progress tracking purely to gate against).
+
+Reversibility: cheap.
 
 #### 2026-08-13 — Kit installed without `design/`, `AGENTS.md` merged into `CLAUDE.md`
 

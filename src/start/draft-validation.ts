@@ -88,7 +88,15 @@ export function describeFinding(
     case "invalid_identifier":
       return `Campaign id must be lower-case words joined by hyphens${where}.`;
     case "invalid_loc_key":
-      return `Malformed text key${where}.`;
+      // Every key the wizard emits is `<campaign id>.<segments>` (`keyFor`, draft.ts), so a
+      // key whose first segment is empty has exactly one cause: the campaign has no id yet.
+      // Reporting that as a malformed text key sends an author looking for a key they never
+      // wrote and cannot find -- the id field is nowhere near the words "text key". This is
+      // the second of the two findings an unnamed draft always produces, alongside
+      // `invalid_identifier`, and naming the campaign clears both.
+      return finding.path?.startsWith(".")
+        ? `Name the campaign — until it has an id, the text keys it defines have nothing to prefix them${where}.`
+        : `Malformed text key${where}.`;
     case "missing_string_key":
       return `Some text is still blank${where}.`;
     case "dangling_reference":

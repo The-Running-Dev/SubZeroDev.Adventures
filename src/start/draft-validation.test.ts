@@ -229,6 +229,44 @@ describe("describeFinding", () => {
     ).toBe("A choice leads to a scene that does not exist (nowhere).");
   });
 
+  it("blames the missing campaign id, not the text key, when the key has no prefix", () => {
+    // Regression: this rendered as "Malformed text key (.campaign.title)", which is what an
+    // author with a complete but unnamed draft was told to go and fix. There is no malformed
+    // key to find -- `keyFor` prefixes every key with the campaign id, so an empty first
+    // segment means only that the id is still blank.
+    expect(
+      describeFinding({
+        code: "invalid_loc_key",
+        messageKey: "core.reason.invalid_loc_key",
+        path: ".campaign.title",
+      }),
+    ).toBe(
+      "Name the campaign — until it has an id, the text keys it defines have nothing to prefix them (.campaign.title).",
+    );
+  });
+
+  it("still calls a genuinely malformed key malformed", () => {
+    expect(
+      describeFinding({
+        code: "invalid_loc_key",
+        messageKey: "core.reason.invalid_loc_key",
+        path: "my-campaign.node_start..text",
+      }),
+    ).toBe("Malformed text key (my-campaign.node_start..text).");
+  });
+
+  it("renders both of an unnamed draft's findings as things the author can act on", () => {
+    // End to end through the engine rather than against hand-written findings: a complete
+    // campaign with no name produces exactly these two, and neither may send the author
+    // hunting for a defect that is not there.
+    const unnamed = validateDraft({ ...completeDraft(), id: "", title: "" });
+    const sentences = unnamed.errors.map(describeFinding).sort();
+    expect(sentences).toEqual([
+      "Campaign id must be lower-case words joined by hyphens.",
+      "Name the campaign — until it has an id, the text keys it defines have nothing to prefix them (.campaign.title).",
+    ]);
+  });
+
   it("falls back to the raw code rather than pretending to recognise it", () => {
     expect(
       describeFinding({

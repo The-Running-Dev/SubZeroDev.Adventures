@@ -86,8 +86,13 @@
   color: var(--cyan);
 }
 
+/* `--muted`, not `--text-dim`: `--text-dim` collapses to the same value as `--text-faint`
+   under BBS Terminal (`themes.css`), which drops it to a 2.82:1 contrast against this file's
+   flat backgrounds -- unreadable, not just secondary. `--muted` is what `play.css`'s own
+   admin forms use for exactly this "real content, de-emphasised" tier, and it clears 4.5:1
+   in all four themes. */
 .gs-dim {
-  color: var(--text-dim);
+  color: var(--muted);
 }
 
 .gs-note {
@@ -153,7 +158,7 @@
 }
 
 .gs-menu-time {
-  color: var(--text-dim);
+  color: var(--muted);
   flex: none;
   font-size: 0.8125rem;
   text-align: right;
@@ -226,8 +231,11 @@
   color: var(--text-body);
 }
 
+/* `--muted`, not `--text-faint`: `--text-faint` fails 4.5:1 against every one of this file's
+   backgrounds in all four themes (as low as 2.82:1 in BBS, never above 4.26:1 even in the
+   best case) -- it was never actually readable body text anywhere, "locked" or not. */
 .gs-check-locked {
-  color: var(--text-faint);
+  color: var(--muted);
 }
 
 /* ----------------------------------------------------------------- legend */
@@ -288,9 +296,12 @@
   color: var(--ink);
 }
 
+/* Opacity, not a swap to `--text-faint` (which fails 4.5:1 everywhere -- see `.gs-check-locked`
+   above): the same "dim the real colours" approach `play.css`'s `.admin-sync:disabled` already
+   uses, so a disabled control still reads instead of vanishing into the background. */
 .gs-btn:disabled {
-  color: var(--text-faint);
   cursor: default;
+  opacity: 0.55;
 }
 
 .gs-btn:focus-visible {
@@ -304,16 +315,22 @@
   color: var(--on-cyan);
 }
 
+/* `--on-cyan-hover`, not `--on-cyan-hover-text`: the latter is `play.css`'s large-headline
+   pairing (`.dossier:hover`'s own big title text) and fails 4.5:1 against `--cyan-hover` in
+   every theme (2.86-3.86:1) -- fine for a big word, not for an 0.8rem button label. This is
+   the pairing `.admin-sync:hover` already uses for the same button-text case. */
 .gs-btn-primary:hover:not(:disabled) {
   background: var(--cyan-hover);
   border-color: var(--cyan-hover);
-  color: var(--on-cyan-hover-text);
+  color: var(--on-cyan-hover);
 }
 
+/* Opacity, matching `.gs-btn:disabled` above -- `--text-faint` never clears 4.5:1 anywhere. */
 .gs-btn-primary:disabled {
   background: none;
   border-color: var(--rule-soft);
-  color: var(--text-faint);
+  color: var(--text-body);
+  opacity: 0.55;
 }
 
 /* ----------------------------------------------------------------- wizard */
@@ -352,7 +369,7 @@
 }
 
 .gs-field-label {
-  color: var(--text-dim);
+  color: var(--muted);
   font-size: 0.75rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -440,7 +457,7 @@
 }
 
 .gs-json summary {
-  color: var(--text-dim);
+  color: var(--muted);
   cursor: pointer;
   font-size: 0.8125rem;
 }

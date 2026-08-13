@@ -11,6 +11,13 @@ const projectRoot = fileURLToPath(new URL(".", import.meta.url));
 // that is the only set it ever compares against. Excluded here, at config load (which always
 // runs in Node), rather than inside the spec itself: the spec file is also loaded into the
 // real browser tab it tests in, where a Node platform check has no equivalent.
+//
+// The condition is "not linux", not "is win32". Vitest suffixes a baseline with the *host*
+// platform, so on macOS every one of these specs looks for a `-chromium-darwin` file that has
+// never existed, fails, and -- worse -- writes the whole set into `__screenshots__/` as new
+// references on its way out, one careless `git add` away from being committed as a second
+// baseline set nothing compares against. Windows was simply the only non-linux host anyone
+// had run this on.
 const visualBaselineSpec = "src/play/browser/visual-baseline.browser.test.tsx";
 
 // Real-browser counterpart to vite.config.ts's jsdom project (ported from the engine
@@ -46,9 +53,9 @@ export default defineConfig({
     // would be a screenshot of the loading state.
     env: { VITE_API_URL: "" },
     exclude:
-      platform() === "win32"
-        ? [...configDefaults.exclude, visualBaselineSpec]
-        : configDefaults.exclude,
+      platform() === "linux"
+        ? configDefaults.exclude
+        : [...configDefaults.exclude, visualBaselineSpec],
     setupFiles: ["./src/test/browser-setup.ts"],
     // The unavailable-choice fixture (fixtures.tsx) retries a real, randomly-forking route
     // up to 60 times in the worst case.

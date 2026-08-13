@@ -2,9 +2,11 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { page } from "vitest/browser";
 import { clearEmulatedMedia, emulateMedia } from "../../test/browser/cdp";
 import {
+  reachAuthoringWizard,
   reachEnded,
   reachPersistenceWarning,
   reachPlaying,
+  reachStartLanding,
   reachUnavailableChoice,
 } from "./fixtures";
 
@@ -130,6 +132,28 @@ describe("visual baseline (W65.5)", () => {
       await expect
         .element(page.elementLocator(container))
         .toMatchScreenshot(`unavailable-choice-${width}`, SCREENSHOT_OPTIONS);
+    });
+
+    // `/start` and the wizard (`src/start/`). Captured in this spec rather than a new one --
+    // see `fixtures.tsx`'s note on the three places a second screenshot directory would have
+    // to be registered. Neither state has anything non-deterministic in it, so neither needs
+    // `hideNonDeterministicContent`.
+    it(`start-landing at ${width}px`, async () => {
+      await page.viewport(width, 900);
+      const { container } = reachStartLanding();
+      resetScroll();
+      await expect
+        .element(page.elementLocator(container))
+        .toMatchScreenshot(`start-landing-${width}`, SCREENSHOT_OPTIONS);
+    });
+
+    it(`authoring-wizard at ${width}px`, async () => {
+      await page.viewport(width, 900);
+      const { container } = await reachAuthoringWizard();
+      resetScroll();
+      await expect
+        .element(page.elementLocator(container))
+        .toMatchScreenshot(`authoring-wizard-${width}`, SCREENSHOT_OPTIONS);
     });
   }
 });

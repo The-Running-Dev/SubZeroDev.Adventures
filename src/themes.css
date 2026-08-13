@@ -44,9 +44,14 @@
 
   /* Accent inversions (text/marks sitting on a --cyan or --amber fill) */
   --on-cyan: #001c2d;
+  /* Decorative only -- the Matrix theme's char-reveal flash (`play.css`) is the sole
+     remaining consumer of `--on-cyan-strong`/`--on-cyan-hover-text`. Every static-text use of
+     either was a contrast bug (near-white on `--cyan-hover`, 2.86-3.86:1) and has moved to
+     `--on-cyan-hover` below -- do not reintroduce a static text/label colour from these two. */
   --on-cyan-strong: #ffffff;
   --on-cyan-number: #633600;
-  --on-cyan-hover: #16342f;
+  /* Tuned dark enough to clear 4.5:1 against `--cyan-hover` (4.58:1) -- see the note above. */
+  --on-cyan-hover: #112925;
   --on-cyan-hover-text: #d7fbfa;
   --on-amber: #241300;
   --amber-border: #ffe291;
@@ -103,9 +108,11 @@
   --text-quiet: #7fce8a;
 
   --on-cyan: #001a05;
+  /* Decorative only -- see the matching note in `:root` above. */
   --on-cyan-strong: #eaffea;
   --on-cyan-number: #003d0d;
-  --on-cyan-hover: #002a08;
+  /* Tuned dark enough to clear 4.5:1 against `--cyan-hover` (4.59:1). */
+  --on-cyan-hover: #001003;
   --on-cyan-hover-text: #d4ffd4;
   --on-amber: #001a05;
   --amber-border: #7bffa0;
@@ -159,9 +166,11 @@
   --text-quiet: #d9ac66;
 
   --on-cyan: #2b1800;
+  /* Decorative only -- see the matching note in `:root` above. */
   --on-cyan-strong: #fff3e0;
   --on-cyan-number: #402200;
-  --on-cyan-hover: #402200;
+  /* Tuned dark enough to clear 4.5:1 against `--cyan-hover` (4.67:1). */
+  --on-cyan-hover: #2c1700;
   --on-cyan-hover-text: #ffe9c8;
   --on-amber: #2b1800;
   --amber-border: #ffd699;
@@ -215,8 +224,21 @@
   --rule-strong: #555555;
   --rule-dashed: #555555;
 
+  /*
+   * `--text-dim` is deliberately brighter than `--text-faint` here, unlike a first pass at
+   * this theme which set both to `#555555` -- the CGA-ish flat black surfaces this theme uses
+   * (`--surface`, `--surface-sunken`, `--page-bg` are all `#000000`) mean anything at `#555`
+   * sits at 2.82:1 against them, well under the 4.5:1 `play.css` already documents as
+   * `--text-dim`'s contract ("the fainter tier does not clear 4.5:1 against `--surface`" --
+   * `play.css`'s `.stat-idle` comment). The other three themes already keep `--text-dim`
+   * meaningfully brighter than `--text-faint` for the same reason; this theme's identical
+   * values were the one place that contract was silently broken. `#808080` clears 4.5:1
+   * (5.32:1) while staying visually distinct from `--text-body`/`--muted`'s `#aaaaaa`, so the
+   * "dim" tier still reads as secondary, just not illegible -- `.bbs-hint` (play.css) is the
+   * always-visible instructional line this was originally caught on.
+   */
   --text-body: #aaaaaa;
-  --text-dim: #555555;
+  --text-dim: #808080;
   --text-faint: #555555;
   --text-receipt: #aaaaaa;
   --text-quiet: #aaaaaa;

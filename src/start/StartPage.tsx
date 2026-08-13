@@ -28,8 +28,30 @@ import {
   type ThemeId,
 } from "../theme";
 import { blockBar, useBranch } from "./branch";
-import { AUTHOR_PATH_ID, BOOT_LINES, CHECK_MARK, PATHS } from "./content";
+import {
+  AUTHOR_PATH_ID,
+  BOOT_LINES,
+  CHECK_MARK,
+  PATHS,
+  type StartPath,
+} from "./content";
 import { Wizard } from "./Wizard";
+
+/** One menu row's contents, shared by the button and link forms above.
+ *
+ *  The explicit spaces are the accessible name: adjacent JSX elements concatenate with
+ *  nothing between them, so without them this reads as
+ *  "A)Play a campaignnothing to install~5 min". */
+function MenuRow({ path }: { readonly path: StartPath }) {
+  return (
+    <>
+      <span className="gs-menu-key gs-amber">{path.key})</span>{" "}
+      <span className="gs-menu-label">{path.title}</span>{" "}
+      <span className="gs-dim">{path.meta}</span>{" "}
+      <span className="gs-menu-time">{path.time}</span>
+    </>
+  );
+}
 
 export function StartPage({ apiUrl }: { readonly apiUrl?: string }) {
   const [theme, setTheme] = useState<ThemeId>(DEFAULT_THEME);
@@ -78,22 +100,25 @@ export function StartPage({ apiUrl }: { readonly apiUrl?: string }) {
                 </div>
 
                 <div className="gs-menu">
-                  {PATHS.map((path) => (
-                    <button
-                      key={path.id}
-                      type="button"
-                      className="gs-menu-row"
-                      onClick={() => pick(path.id)}
-                    >
-                      {/* The explicit spaces are the accessible name: adjacent JSX
-                          elements concatenate with nothing between them, so without them
-                          this reads as "A)Play a campaignnothing to install~5 min". */}
-                      <span className="gs-menu-key gs-amber">{path.key})</span>{" "}
-                      <span className="gs-menu-label">{path.title}</span>{" "}
-                      <span className="gs-dim">{path.meta}</span>{" "}
-                      <span className="gs-menu-time">{path.time}</span>
-                    </button>
-                  ))}
+                  {PATHS.map((path) =>
+                    // A path with an `href` navigates rather than advancing the branch
+                    // machine, so it is a real link -- middle-clickable, copyable, and
+                    // announced as a link -- not a button that calls `location.assign`.
+                    path.href ? (
+                      <a key={path.id} className="gs-menu-row" href={path.href}>
+                        <MenuRow path={path} />
+                      </a>
+                    ) : (
+                      <button
+                        key={path.id}
+                        type="button"
+                        className="gs-menu-row"
+                        onClick={() => pick(path.id)}
+                      >
+                        <MenuRow path={path} />
+                      </button>
+                    ),
+                  )}
                 </div>
 
                 <div className="gs-columns">

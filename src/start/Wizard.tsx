@@ -19,6 +19,7 @@ import { useEffect, useState } from "react";
 import { useIdentity } from "../play/identity";
 import {
   clearDraft,
+  draftDigest,
   emptyAchievement,
   emptyDraft,
   emptyNode,
@@ -38,6 +39,7 @@ import {
 import { describeFinding, useDraftValidation } from "./draft-validation";
 import { useDraftPlaytest } from "./draft-playtest";
 import { Playtest } from "./Playtest";
+import { sampleDraft } from "./sample";
 
 const STEPS = [
   { id: "identity", key: "1", label: "Identity" },
@@ -47,6 +49,13 @@ const STEPS = [
   { id: "playtest", key: "5", label: "Playtest" },
   { id: "submit", key: "6", label: "Submit" },
 ] as const;
+
+const PLAYTEST_STEP = STEPS.findIndex((step) => step.id === "playtest");
+
+/** What an untouched draft digests to. Computed once, from `emptyDraft` itself, so "has the
+ *  author written anything?" cannot drift from what `emptyDraft` actually returns -- and so a
+ *  draft edited back to empty counts as empty, which is the answer the author expects. */
+const EMPTY_DIGEST = draftDigest(emptyDraft());
 
 interface WizardProps {
   readonly apiUrl?: string;
@@ -110,7 +119,17 @@ export function Wizard({ apiUrl, onExit }: WizardProps) {
 
       <div className="gs-dialog-body">
         {step.id === "identity" && (
-          <IdentityStep draft={draft} update={update} />
+          <IdentityStep
+            draft={draft}
+            update={update}
+            hasWork={draftDigest(draft) !== EMPTY_DIGEST}
+            onLoadSample={() => {
+              setDraft(sampleDraft());
+              // Straight to the playtest step: the sample is complete apart from its name,
+              // so the useful next act is running it, not reading six steps of empty form.
+              setStepIndex(PLAYTEST_STEP);
+            }}
+          />
         )}
         {step.id === "stats" && <StatsStep draft={draft} setDraft={setDraft} />}
         {step.id === "scenes" && (
@@ -239,15 +258,84 @@ function Field({
   );
 }
 
+/**
+ * The blank-or-sample fork, offered on the first step rather than as a step of its own.
+ *
+ * The wizard already opens blank, so a pre-step asking "blank or sample?" would put a screen
+ * in front of every author who wanted the blank one -- which is most of them, on every return
+ * visit. Offering the sample here costs the blank path nothing and is on screen at the only
+ * moment it is useful.
+ */
+function SampleLoader({
+  hasWork,
+  onLoad,
+}: {
+  readonly hasWork: boolean;
+  readonly onLoad: () => void;
+}) {
+  const [confirming, setConfirming] = useState(false);
+
+  return (
+    <div className="gs-group">
+      <p className="gs-prose">
+        Blank is a fine place to start. If you would rather take something apart
+        than face an empty form, load the sample — three scenes, one visible
+        stat and two endings, in the same shapes this wizard edits. It opens on
+        the playtest step, and runs as soon as you give it a name.
+      </p>
+      {confirming ? (
+        <>
+          <p className="gs-note" role="alert">
+            This replaces the draft you already have. It is kept only in this
+            browser, so there is no copy to go back to.
+          </p>
+          <div className="gs-actions">
+            <button
+              type="button"
+              className="gs-btn gs-btn-primary"
+              onClick={() => {
+                setConfirming(false);
+                onLoad();
+              }}
+            >
+              REPLACE MY DRAFT ▸
+            </button>
+            <button
+              type="button"
+              className="gs-btn"
+              onClick={() => setConfirming(false)}
+            >
+              Keep what I have
+            </button>
+          </div>
+        </>
+      ) : (
+        <button
+          type="button"
+          className="gs-btn"
+          onClick={() => (hasWork ? setConfirming(true) : onLoad())}
+        >
+          START FROM A SAMPLE ▸
+        </button>
+      )}
+    </div>
+  );
+}
+
 function IdentityStep({
   draft,
   update,
+  hasWork,
+  onLoadSample,
 }: {
   readonly draft: CampaignDraft;
   readonly update: (patch: Partial<CampaignDraft>) => void;
+  readonly hasWork: boolean;
+  readonly onLoadSample: () => void;
 }) {
   return (
     <div className="gs-form">
+      <SampleLoader hasWork={hasWork} onLoad={onLoadSample} />
       <Field label="Title">
         <input
           type="text"

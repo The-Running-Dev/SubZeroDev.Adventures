@@ -3,15 +3,16 @@ description: Break the contract into vertical slices with acceptance criteria
 ---
 
 <!-- companion:start -->
+
 **Per-repo companion:** `.claude/commands/slices-local.md`. Read it now, if it exists — an absent,
 empty, or frontmatter-only file is no companion, and this file then stands alone.
 It may override: `vocabulary`, `document-map`. It may never override anything in
-[`.claude/COMPANIONS.md`](../COMPANIONS.md) § *Never*, which is also where these categories are defined.
+[`.claude/COMPANIONS.md`](../COMPANIONS.md) § _Never_, which is also where these categories are defined.
 <!-- companion:end -->
 
 ## Stop if `design/` is frozen
 
-If `design/FROZEN.md` exists, **stop before doing anything else.** Report its `Frozen because` and `Lifts when` lines verbatim and write nothing. The rule and the marker's format live in `AGENTS.md`, *The design freeze* — not restated here.
+If `design/FROZEN.md` exists, **stop before doing anything else.** Report its `Frozen because` and `Lifts when` lines verbatim and write nothing. The rule and the marker's format live in `AGENTS.md`, _The design freeze_ — not restated here.
 
 This includes **resizing or splitting an existing slice**, which is the edit most likely to look harmless mid-freeze and is the one that renumbers criteria and desyncs the tracker. If a slice turns out to be mis-sized while frozen, say so and stop; it is a real finding, and it is the user's to schedule.
 
@@ -36,6 +37,7 @@ Out of scope: <the adjacent thing an agent will be tempted to also do>
 ```
 
 Rules:
+
 - Acceptance criteria must be checkable without judgement. "Handles errors gracefully" is not a criterion. "Returns `NotFound` and leaves the record untouched when the id does not exist" is. This is where precise, technical detail belongs — measurements, thresholds, exact values — not in `Delivers:`.
 - **Every criterion carries a stable id** — `S3.1`, `S3.2`. The id is what `/track` matches on, so drift detection compares ids rather than prose and a reworded criterion stops reading as a new one.
 - **Ids are never reused and never renumbered.** Removing `S3.2` leaves a gap; the next criterion is `S3.4`. Renumbering silently rewrites what an existing issue's checkbox refers to, which is the one failure this scheme exists to prevent.
@@ -45,12 +47,12 @@ Rules:
 - Target a slice a coding agent can finish in one session without compaction. If a slice needs more, split it.
 - No slice may introduce a signature absent from the contract.
 
-Write the document only. **Do not open issues** — that is `/track`'s job (`AGENTS.md`, *Tracking work*). Say that it should be run next.
+Write the document only. **Do not open issues** — that is `/track`'s job (`AGENTS.md`, _Tracking work_). Say that it should be run next.
 
 ## Re-run
 
-A re-run only appends new slices under `## Outstanding` (`design/30-slices.md`, *How this
-document is kept*) — it never rewrites `## Landed`, and never renumbers or reuses a retired
+A re-run only appends new slices under `## Outstanding` (`design/30-slices.md`, _How this
+document is kept_) — it never rewrites `## Landed`, and never renumbers or reuses a retired
 id, even for a slice that never got an issue. Resizing or splitting a slice that already has an
 open issue desyncs that issue's criteria; that drift is `/track`'s to report against the
 tracker, not this command's to avoid by refusing to ever re-run.

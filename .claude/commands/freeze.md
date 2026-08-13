@@ -3,13 +3,14 @@ description: Create design/FROZEN.md so design/ stops drifting while implementat
 ---
 
 <!-- companion:start -->
+
 **Per-repo companion:** `.claude/commands/freeze-local.md`. Read it now, if it exists — an absent,
 empty, or frontmatter-only file is no companion, and this file then stands alone.
 It may override: `vocabulary`, `document-map`. It may never override anything in
-[`.claude/COMPANIONS.md`](../COMPANIONS.md) § *Never*, which is also where these categories are defined.
+[`.claude/COMPANIONS.md`](../COMPANIONS.md) § _Never_, which is also where these categories are defined.
 <!-- companion:end -->
 
-Write `design/FROZEN.md`. Its existence is the whole mechanism — the rule, what it gates, and the marker's format are owned by `AGENTS.md`, *The design freeze*; this command only produces the file correctly and does not restate the rule.
+Write `design/FROZEN.md`. Its existence is the whole mechanism — the rule, what it gates, and the marker's format are owned by `AGENTS.md`, _The design freeze_; this command only produces the file correctly and does not restate the rule.
 
 ## Refuse if already frozen
 
@@ -44,7 +45,7 @@ Use today's date and the short SHA from above.
 
 ## Commit it
 
-Stage `design/FROZEN.md` by name — never a broad add. Commit and push per `AGENTS.md`, *Git and delivery*: on a non-default branch this is delegated, commit and push without a separate ask; on the default branch, ask before pushing.
+Stage `design/FROZEN.md` by name — never a broad add. Commit and push per `AGENTS.md`, _Git and delivery_: on a non-default branch this is delegated, commit and push without a separate ask; on the default branch, ask before pushing.
 
 ## Report
 

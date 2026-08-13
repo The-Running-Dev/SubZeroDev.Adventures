@@ -3,17 +3,18 @@ description: Discover this repository's gates, run them, and report honestly wha
 ---
 
 <!-- companion:start -->
+
 **Per-repo companion:** `.claude/commands/verify-local.md`. Read it now, if it exists — an absent,
 empty, or frontmatter-only file is no companion, and this file then stands alone.
 It may override: `vocabulary`, `extra-steps`, `gate-commands`. It may never override anything in
-[`.claude/COMPANIONS.md`](../COMPANIONS.md) § *Never*, which is also where these categories are defined.
+[`.claude/COMPANIONS.md`](../COMPANIONS.md) § _Never_, which is also where these categories are defined.
 <!-- companion:end -->
 
 Run the checks this repository actually has, and report the result without softening it.
 
-**`/pr` runs this as its gate phase**, against the branch and worktree its pull request points at, and writes the report below into that PR's `Verified` section **verbatim** — the same three lists, not a summary, rendered from a `.claude/verify-report.json` that `tools/Test-VerifyReport.ps1` has validated (see *Report*). This file owns the procedure; `/pr` owns only where the sequence sits. Invoked on its own, it does the same discovery and the same three lists against whatever tree is checked out, and writes to no pull request.
+**`/pr` runs this as its gate phase**, against the branch and worktree its pull request points at, and writes the report below into that PR's `Verified` section **verbatim** — the same three lists, not a summary, rendered from a `.claude/verify-report.json` that `tools/Test-VerifyReport.ps1` has validated (see _Report_). This file owns the procedure; `/pr` owns only where the sequence sits. Invoked on its own, it does the same discovery and the same three lists against whatever tree is checked out, and writes to no pull request.
 
-**The point of this command is the second half of its report — what did *not* run.** Silence is not success, and a gate that could not run is the most likely place a false "everything passes" comes from.
+**The point of this command is the second half of its report — what did _not_ run.** Silence is not success, and a gate that could not run is the most likely place a false "everything passes" comes from.
 
 ## Discover, do not assume
 
@@ -37,14 +38,14 @@ before running them, so the next `/verify` on this tree does not re-derive the s
 The cache only remembers gates; it never decides what they are — that judgement stays here.
 
 For each flagged step, read its `run:` block and translate it to the equivalent local
-invocation — that translation is still genuine judgement, the flag only says *that* a step
-is a gate, not *how* to reproduce it outside CI. This repository's current flagged steps and
+invocation — that translation is still genuine judgement, the flag only says _that_ a step
+is a gate, not _how_ to reproduce it outside CI. This repository's current flagged steps and
 their local equivalents:
 
-| Flagged step (`.github/workflows/verify.yml`) | Run locally |
-|---|---|
-| `Parse-check PowerShell scripts` | Parse every `*.ps1` with `[System.Management.Automation.Language.Parser]::ParseFile`, as the step does |
-| `Run Pester tests` | `Invoke-Pester -Path tools -Output Detailed -PassThru` |
+| Flagged step (`.github/workflows/verify.yml`) | Run locally                                                                                            |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `Parse-check PowerShell scripts`              | Parse every `*.ps1` with `[System.Management.Automation.Language.Parser]::ParseFile`, as the step does |
+| `Run Pester tests`                            | `Invoke-Pester -Path tools -Output Detailed -PassThru`                                                 |
 
 A repository can gain, lose, or rename flagged steps over time — re-derive this table from
 the workflow files rather than trusting a memorized list; the two rows above describe this
@@ -63,14 +64,14 @@ Test-Path docs.ps1
 
 Common shapes, none of them assumed:
 
-| Found | Run |
-|---|---|
-| `package.json` scripts | `npm run check`, or `typecheck` / `lint` / `test` individually if there is no aggregate |
-| `*.sln` or `*.csproj` | `dotnet build`, `dotnet test` |
-| `build/Test-Documentation.ps1` | run it |
-| `build/Test-DocumentationArtifact.ps1` | run it, after a production docs build |
-| `docs.ps1` | `./docs.ps1 -BuildOnly` — **needs Docker** |
-| any repository | `git diff --check`, `git status --short --branch` |
+| Found                                  | Run                                                                                     |
+| -------------------------------------- | --------------------------------------------------------------------------------------- |
+| `package.json` scripts                 | `npm run check`, or `typecheck` / `lint` / `test` individually if there is no aggregate |
+| `*.sln` or `*.csproj`                  | `dotnet build`, `dotnet test`                                                           |
+| `build/Test-Documentation.ps1`         | run it                                                                                  |
+| `build/Test-DocumentationArtifact.ps1` | run it, after a production docs build                                                   |
+| `docs.ps1`                             | `./docs.ps1 -BuildOnly` — **needs Docker**                                              |
+| any repository                         | `git diff --check`, `git status --short --branch`                                       |
 
 ## Report
 
@@ -89,13 +90,13 @@ Did not run:      <gate> — <why: tool missing, Docker down, no such script>
   silently absent from the report the way a gate nobody thought to search for could be.
   Cross-check the list you are about to write against the flags you found before finishing.
 - **Quote failures.** Paste the failing output into the artifact's `detail` field. A summary of a failure is a claim about a failure — `Test-VerifyReport.ps1` rejects a `detail` too short to plausibly be pasted output.
-- **Never write "all checks pass"** unless every discovered gate is in the first list. If anything is in the third list, the honest sentence names it: *"the three that ran passed; the documentation build did not run because Docker is unavailable."*
+- **Never write "all checks pass"** unless every discovered gate is in the first list. If anything is in the third list, the honest sentence names it: _"the three that ran passed; the documentation build did not run because Docker is unavailable."_
 - **A gate that cannot run locally is not a gate you may report on.** Say so, and say that the corresponding CI check on the pull request is where the answer will come from.
 - If CI runs a check you could not reproduce locally at all, name it explicitly rather than leaving it out.
 
 ## Then ask
 
-**A failing gate ends in a decision, not a report** (`AGENTS.md`, *Working with me*). Do not start fixing. Present each failure with a recommendation — fix here, file an issue, or accept and explain — and what each costs.
+**A failing gate ends in a decision, not a report** (`AGENTS.md`, _Working with me_). Do not start fixing. Present each failure with a recommendation — fix here, file an issue, or accept and explain — and what each costs.
 
 A clean run needs no question. Say it is clean, name what ran, and stop.
 

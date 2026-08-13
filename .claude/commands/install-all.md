@@ -4,10 +4,11 @@ argument-hint: [repo name[,repo name...]]
 ---
 
 <!-- companion:start -->
+
 **Per-repo companion:** `.claude/commands/install-all-local.md`. Read it now, if it exists — an absent,
 empty, or frontmatter-only file is no companion, and this file then stands alone.
 It may override: `extra-steps`, `tightened-authorization`. It may never override anything in
-[`.claude/COMPANIONS.md`](../COMPANIONS.md) § *Never*, which is also where these categories are defined.
+[`.claude/COMPANIONS.md`](../COMPANIONS.md) § _Never_, which is also where these categories are defined.
 <!-- companion:end -->
 
 Run `INSTALL.md`'s reconciliation against every sibling repository, in one unattended pass. **$1**, if given, is an explicit ordered list of repo names (comma-separated) — only those run, in that order. Bare, it discovers every `SubZeroDev.*` sibling of this kit and runs them alphabetically.
@@ -37,7 +38,7 @@ Orient, classify, reconcile — exactly as `INSTALL.md` states them. Running sev
 
 That is most of what this command used to carry across nineteen files per repository, and it is the whole reason the core/companion split exists — read `.claude/COMPANIONS.md` before running against anything.
 
-**Is a named fork with no default** — `INSTALL.md` phase 1's *Occupied* state, `design/` occupied or ambiguous against an existing plans/ADR home, both `AGENTS.md` and `CLAUDE.md` holding content, `.github/ISSUE_TEMPLATE/` already present, a same-named command already present, an `Unmigrated-Blocked` core, and the `settings.json` hooks — `SessionEnd` and `UserPromptSubmit`, both of which `INSTALL.md` requires proposing and waiting on, unconditionally, with no automatic path at all. **Skip that artifact — or, if it blocks classifying the rest, that whole repository — record it as needing a decision, and continue to the next target.** Never pick the answer an unattended run cannot ask about, and never write either hook here.
+**Is a named fork with no default** — `INSTALL.md` phase 1's _Occupied_ state, `design/` occupied or ambiguous against an existing plans/ADR home, both `AGENTS.md` and `CLAUDE.md` holding content, `.github/ISSUE_TEMPLATE/` already present, a same-named command already present, an `Unmigrated-Blocked` core, and the `settings.json` hooks — `SessionEnd` and `UserPromptSubmit`, both of which `INSTALL.md` requires proposing and waiting on, unconditionally, with no automatic path at all. **Skip that artifact — or, if it blocks classifying the rest, that whole repository — record it as needing a decision, and continue to the next target.** Never pick the answer an unattended run cannot ask about, and never write either hook here.
 
 **`Unmigrated-Blocked` is a fork even though its recommended resolution never varies.** Writing the companion is authoring that repository's policy for that command, which is exactly the class of thing an unattended pass does not do on its own authority. Report it and move on.
 

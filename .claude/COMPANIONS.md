@@ -7,7 +7,7 @@ exactly what that companion is allowed to change.
 
 This file is the mechanism. It is kit-owned and installed into every target, and it is the
 single home for the category vocabulary, the never-list, and the absence rule. A core command
-file names *which categories* apply to it; it does not restate any of what is below.
+file names _which categories_ apply to it; it does not restate any of what is below.
 
 ## Why the split exists
 
@@ -27,7 +27,7 @@ not to touch.
 1. **The core enumerates the categories its companion may override.** Anything not enumerated
    is not overridable, whether or not it appears in the never-list below.
 2. **The core states what a companion may never change.** That statement is this file's
-   *Never* section, referenced — never copied into a command.
+   _Never_ section, referenced — never copied into a command.
 3. **The core references its companion by path and does not inline its body.** An agent
    executing the command reads the companion at that path, at that moment. A core that
    quoted its companion's content would be a copy that rots.
@@ -38,13 +38,13 @@ A companion is a Markdown file whose `##` headings are category ids from this ta
 under a heading is that category's override. A heading that is not an id below is a defect —
 `tools/Test-Companion.ps1` rejects it.
 
-| Id | What it may override | Example |
-|---|---|---|
-| `vocabulary` | What this repository calls the things the command manipulates — the instruction file's name, the id scheme for units of work, the word for a unit of work | `AGENTS.md` is named `CLAUDE.md` here; slices are `units` and their ids are `W<n>`, not `S<n>` |
-| `document-map` | Where a document the command reads or writes actually lives, and how to read it | The canonical design docs are compound files with marked blocks; generated pages under `docs/` are evidence only and never the side a drift resolves toward |
-| `extra-steps` | Repository-specific steps to run **in addition to** the core's, and where in the core's sequence they belong | Regenerate the docs site after a design edit; run the codegen pass before the gates |
-| `gate-commands` | The concrete commands a gate runs, where the core discovers rather than hardcodes them | `just verify` rather than the discovered `dotnet test` |
-| `tightened-authorization` | A narrowing of what the command may do without asking | This repository resolves no review thread without a per-thread ask, overriding the batch |
+| Id                        | What it may override                                                                                                                                      | Example                                                                                                                                                     |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `vocabulary`              | What this repository calls the things the command manipulates — the instruction file's name, the id scheme for units of work, the word for a unit of work | `AGENTS.md` is named `CLAUDE.md` here; slices are `units` and their ids are `W<n>`, not `S<n>`                                                              |
+| `document-map`            | Where a document the command reads or writes actually lives, and how to read it                                                                           | The canonical design docs are compound files with marked blocks; generated pages under `docs/` are evidence only and never the side a drift resolves toward |
+| `extra-steps`             | Repository-specific steps to run **in addition to** the core's, and where in the core's sequence they belong                                              | Regenerate the docs site after a design edit; run the codegen pass before the gates                                                                         |
+| `gate-commands`           | The concrete commands a gate runs, where the core discovers rather than hardcodes them                                                                    | `just verify` rather than the discovered `dotnet test`                                                                                                      |
+| `tightened-authorization` | A narrowing of what the command may do without asking                                                                                                     | This repository resolves no review thread without a per-thread ask, overriding the batch                                                                    |
 
 Two properties of the table are load-bearing:
 
@@ -53,7 +53,7 @@ Two properties of the table are load-bearing:
   the validator cannot detect intent, so this is the reviewer's check, and it is the reason the
   category is named for its direction rather than for its subject.
 - **There is no `behaviour` category, and adding one is a decision, not an edit.** The five
-  above are deliberately narrow. A repository that needs a command to *do something else* needs
+  above are deliberately narrow. A repository that needs a command to _do something else_ needs
   a different command, or an amendment to the core — not a companion.
 
 ## Never

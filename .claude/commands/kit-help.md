@@ -4,10 +4,11 @@ argument-hint: [all, or a stage or command name]
 ---
 
 <!-- companion:start -->
+
 **Per-repo companion:** `.claude/commands/kit-help-local.md`. Read it now, if it exists — an absent,
 empty, or frontmatter-only file is no companion, and this file then stands alone.
 It may override: `vocabulary`, `document-map`. It may never override anything in
-[`.claude/COMPANIONS.md`](../COMPANIONS.md) § *Never*, which is also where these categories are defined.
+[`.claude/COMPANIONS.md`](../COMPANIONS.md) § _Never_, which is also where these categories are defined.
 <!-- companion:end -->
 
 Orient the user in this repository's pipeline. **$1** narrows it — `all` shows the whole flow, a stage or command name shows that step. With nothing, work out where the repository actually is and show the current step and the next one.
@@ -31,27 +32,27 @@ Read it this way, and say which signal you used:
 - **On the default branch with slices written** — the next move is a branch, not a command.
 - **The tracker** decides where inside stage 6 they are: no issues means `/track` has never run; an open issue with unticked boxes is the slice in flight.
 
-State it in one line — *"stage 6, S4 open with S4.2 unticked, on `main`"* — then the step. If the evidence is genuinely ambiguous, say what you found and ask rather than picking.
+State it in one line — _"stage 6, S4 open with S4.2 unticked, on `main`"_ — then the step. If the evidence is genuinely ambiguous, say what you found and ask rather than picking.
 
 ## The flow
 
 This is the canonical copy. `README.md` summarises the shape and points here.
 
-**Which model runs each command is in `AGENTS.md`, *Command routing*. Where a session must end is in `AGENTS.md`, *Session boundaries*.** Both are binding policy with one home, and it is not this file — the `fresh` and `same session` tags below are a convenience, and if they ever disagree with `AGENTS.md`, that file is right and this one has drifted.
+**Which model runs each command is in `AGENTS.md`, _Command routing_. Where a session must end is in `AGENTS.md`, _Session boundaries_.** Both are binding policy with one home, and it is not this file — the `fresh` and `same session` tags below are a convenience, and if they ever disagree with `AGENTS.md`, that file is right and this one has drifted.
 
 ### Once per project — stages 0 to 5
 
 Each is its own session. Every one ends in a committed file, and that file is what the next stage reads.
 
-| # | Step | Session | Ends when |
-|---|---|---|---|
-| 0 | Write `design/00-brief.md` **yourself** | — | Problem, non-goals, definition of done, and a `Lifespan` line are all real |
-| 1 | `/brief-check` | fresh | The four lists come back thin. It writes nothing — **you** edit the brief from them |
-| 2 | `/design` | fresh | `10-design.md` has rejected alternatives in every section that needed a choice |
-| 3 | `/redteam` | fresh, **different vendor** | One pass, adjudicated. Never ask for another |
-| 4 | `/contract` | fresh | `20-contract.md` has no `## Unresolved` section left |
-| 5 | `/slices` | fresh | The `Delivers:` lines read as a set, and no slice is too big for one session |
-| — | `/track` | fresh | One issue per slice. Idempotent — run it whenever `design/` changes |
+| #   | Step                                    | Session                     | Ends when                                                                           |
+| --- | --------------------------------------- | --------------------------- | ----------------------------------------------------------------------------------- |
+| 0   | Write `design/00-brief.md` **yourself** | —                           | Problem, non-goals, definition of done, and a `Lifespan` line are all real          |
+| 1   | `/brief-check`                          | fresh                       | The four lists come back thin. It writes nothing — **you** edit the brief from them |
+| 2   | `/design`                               | fresh                       | `10-design.md` has rejected alternatives in every section that needed a choice      |
+| 3   | `/redteam`                              | fresh, **different vendor** | One pass, adjudicated. Never ask for another                                        |
+| 4   | `/contract`                             | fresh                       | `20-contract.md` has no `## Unresolved` section left                                |
+| 5   | `/slices`                               | fresh                       | The `Delivers:` lines read as a set, and no slice is too big for one session        |
+| —   | `/track`                                | fresh                       | One issue per slice. Idempotent — run it whenever `design/` changes                 |
 
 Stages 1 and 3 write nothing, so their output exists only in that session. Act on it before the session ends.
 
@@ -62,7 +63,7 @@ Three of these stop rather than proceed, and that is the cheapest failure availa
 One slice, one branch, one session. Do not start slice N+1 because you noticed something in slice N — that goes in `90-decisions.md` under `## Open`, and `/track` turns it into an issue.
 
 1. **`/slice S3`**, or bare **`/slice`** for the lowest-numbered slice that is neither closed nor fully ticked and whose dependencies are done. Branches, states criteria by id, writes failing tests first, implements against the contract, commits, pushes, opens the PR — **never as a draft** — ticks the `Done when` boxes it confirms, and ends by reporting the ids it believes are met.
-2. **`/pr`** — same session, and the whole of the rest of the branch's life. Three phases in order: writes the real description onto the PR `/slice` opened; runs the gates and puts their three lists — the one that matters is *did not run* — into the `Verified` section **verbatim**, fixing nothing; then works the review threads automatically, fix → push → confirm checks on the **new** head → only then resolve. Resolving is delegated, no ask required (`AGENTS.md`, *Git and delivery*).
+2. **`/pr`** — same session, and the whole of the rest of the branch's life. Three phases in order: writes the real description onto the PR `/slice` opened; runs the gates and puts their three lists — the one that matters is _did not run_ — into the `Verified` section **verbatim**, fixing nothing; then works the review threads automatically, fix → push → confirm checks on the **new** head → only then resolve. Resolving is delegated, no ask required (`AGENTS.md`, _Git and delivery_).
 3. **Merge** — the user's, unless this repository's instruction file explicitly delegates it.
 4. **`/track`** — **new session**, after the merge. Closes the issue if every box is ticked.
 5. **`/done`** — any time after the merge. Switches back to the default branch, deletes the now-merged local slice branch (and any other local branch already merged), and prunes remote-tracking refs for branches gone from `origin`. Optional housekeeping, not a pipeline step — nothing downstream depends on it.
@@ -93,7 +94,7 @@ For something short-lived, the honest minimum is `00-brief.md` with real non-goa
 ## Answering
 
 - **Name the next command, its tier from `AGENTS.md`, and whether it needs a fresh session.** That is the whole answer most of the time.
-- **Where it needs a fresh session, say so as the banner defined in `AGENTS.md`, *Session boundaries*** — set off visibly, not folded into the same sentence as the orientation line. This is the one command whose entire job is telling the user what's next, so it is the last place that banner should be easy to miss.
+- **Where it needs a fresh session, say so as the banner defined in `AGENTS.md`, _Session boundaries_** — set off visibly, not folded into the same sentence as the orientation line. This is the one command whose entire job is telling the user what's next, so it is the last place that banner should be easy to miss.
 - **Do not run the next command.** This orients; it does not act. Ending a session may be the next step, and a command that starts work cannot tell the user to start a new session for it.
 - **Do not invent a step, a stage, or a tier.** If something here does not cover the situation, say so — an invented step in a help command is the one that gets followed.
 

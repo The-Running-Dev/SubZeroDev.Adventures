@@ -3,15 +3,16 @@ description: Lift the design freeze — delete design/FROZEN.md, then run one re
 ---
 
 <!-- companion:start -->
+
 **Per-repo companion:** `.claude/commands/unfreeze-local.md`. Read it now, if it exists — an absent,
 empty, or frontmatter-only file is no companion, and this file then stands alone.
 It may override: `vocabulary`, `document-map`, `extra-steps`. It may never override anything in
-[`.claude/COMPANIONS.md`](../COMPANIONS.md) § *Never*, which is also where these categories are defined.
+[`.claude/COMPANIONS.md`](../COMPANIONS.md) § _Never_, which is also where these categories are defined.
 <!-- companion:end -->
 
-Lift the freeze `/freeze` set. This command runs unattended, without a confirmation prompt — that is a deliberate policy in this repository (`AGENTS.md`, *The design freeze*), not an oversight, so do not add one back.
+Lift the freeze `/freeze` set. This command runs unattended, without a confirmation prompt — that is a deliberate policy in this repository (`AGENTS.md`, _The design freeze_), not an oversight, so do not add one back.
 
-**This command owns the sequence. It does not own the procedure of either phase.** Phase 2 is `.claude/commands/reconcile.md` and phase 3 is `.claude/commands/track.md`, run in full, in this same session. Those files stay the single home for how drift is compared and how the tracker is resynced — this one never restates them (`AGENTS.md`, *Single ownership*). Both remain invocable on their own.
+**This command owns the sequence. It does not own the procedure of either phase.** Phase 2 is `.claude/commands/reconcile.md` and phase 3 is `.claude/commands/track.md`, run in full, in this same session. Those files stay the single home for how drift is compared and how the tracker is resynced — this one never restates them (`AGENTS.md`, _Single ownership_). Both remain invocable on their own.
 
 ## Refuse if not frozen
 
@@ -33,7 +34,7 @@ Delete `design/FROZEN.md`. This command is the one exception to `/reconcile`'s o
 
 ## Commit
 
-If reconciliation touched `design/`, stage those files by name and commit per `AGENTS.md`, *Git and delivery*. The marker's own deletion is part of the same commit, not a separate one.
+If reconciliation touched `design/`, stage those files by name and commit per `AGENTS.md`, _Git and delivery_. The marker's own deletion is part of the same commit, not a separate one.
 
 ## Report
 
@@ -41,7 +42,7 @@ State the freeze is lifted, what `/reconcile` found and changed, and what `/trac
 
 ## Re-run
 
-**Refuses outright on a second run** — *Refuse if not frozen*, above — so there is nothing to
+**Refuses outright on a second run** — _Refuse if not frozen_, above — so there is nothing to
 skip or refresh across repeated invocations; each successful run consumes the one marker
 `/freeze` wrote, and a fresh freeze needs a fresh `/freeze` before this command has anything to
 lift again.

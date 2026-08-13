@@ -3,15 +3,16 @@ description: Switch back to the default branch, delete local branches already me
 ---
 
 <!-- companion:start -->
+
 **Per-repo companion:** `.claude/commands/done-local.md`. Read it now, if it exists — an absent,
 empty, or frontmatter-only file is no companion, and this file then stands alone.
 It may override: `extra-steps`, `tightened-authorization`. It may never override anything in
-[`.claude/COMPANIONS.md`](../COMPANIONS.md) § *Never*, which is also where these categories are defined.
+[`.claude/COMPANIONS.md`](../COMPANIONS.md) § _Never_, which is also where these categories are defined.
 <!-- companion:end -->
 
 Housekeeping for the end of a piece of work: get back to the default branch, remove the local branches that are done, and drop remote-tracking refs for branches deleted on the remote.
 
-**Branch deletion here is carved out of the authorization rule** (`AGENTS.md`, *Git and delivery*) — but only for branches this command independently confirms via `git branch --merged`. It runs automatically, without waiting to be asked, and does not block on a confirmation prompt for that list.
+**Branch deletion here is carved out of the authorization rule** (`AGENTS.md`, _Git and delivery_) — but only for branches this command independently confirms via `git branch --merged`. It runs automatically, without waiting to be asked, and does not block on a confirmation prompt for that list.
 
 ## Run automatically, don't wait to be asked
 
@@ -41,10 +42,10 @@ tools/Invoke-DoneHousekeeping.ps1 -RepoRoot <repo> -SkipPull -DeleteBranches <br
 
 A branch is deleted without a chat confirmation only if **both** named gates pass. Uncertainty on either one counts as failure — it moves the branch out of the automatic path, not into it:
 
-| Gate | What it checks | Failure means |
-|---|---|---|
-| **Merged** | `git branch --merged <default>` lists the branch (`$mergedBranches` in the script) | Not a candidate at all — `gh pr list` showing it merged (e.g. by squash) does not satisfy this gate; report and ask separately |
-| **SafeDelete** | `git branch -d` (never `-D`) exits 0 | The branch is a confirmed candidate but git itself refuses the delete (typically unmerged-relative-to-upstream in a way `--merged` didn't catch) |
+| Gate           | What it checks                                                                     | Failure means                                                                                                                                    |
+| -------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Merged**     | `git branch --merged <default>` lists the branch (`$mergedBranches` in the script) | Not a candidate at all — `gh pr list` showing it merged (e.g. by squash) does not satisfy this gate; report and ask separately                   |
+| **SafeDelete** | `git branch -d` (never `-D`) exits 0                                               | The branch is a confirmed candidate but git itself refuses the delete (typically unmerged-relative-to-upstream in a way `--merged` didn't catch) |
 
 Proceed straight to the delete call; do not stop and wait for a chat confirmation first — the candidate list itself is the authorization, since every entry on it independently passed **Merged**. A name that is not in `--merged`'s list fails **Merged** and is refused, not deleted, even if you pass it.
 

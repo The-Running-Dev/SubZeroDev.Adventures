@@ -4,10 +4,11 @@ argument-hint: [slice id, omit for the next]
 ---
 
 <!-- companion:start -->
+
 **Per-repo companion:** `.claude/commands/slice-local.md`. Read it now, if it exists — an absent,
 empty, or frontmatter-only file is no companion, and this file then stands alone.
 It may override: `vocabulary`, `document-map`, `extra-steps`, `gate-commands`. It may never override anything in
-[`.claude/COMPANIONS.md`](../COMPANIONS.md) § *Never*, which is also where these categories are defined.
+[`.claude/COMPANIONS.md`](../COMPANIONS.md) § _Never_, which is also where these categories are defined.
 <!-- companion:end -->
 
 Implement one slice from `design/30-slices.md`. The slice is **$1**, where that names one. Where it is empty — or, invoked outside Claude Code, still the literal `$1` — select it as below first.
@@ -18,7 +19,7 @@ Implement one slice from `design/30-slices.md`. The slice is **$1**, where that 
 
 **With no id, the next slice is the lowest-numbered one that is not done and whose dependencies are done.** Selection is the whole of the difference — everything after it is identical.
 
-A slice is **done** when its issue is closed, or when every box under `Done when` is ticked. `/slice` ticks a box itself, in the same run it reports the matching criterion met by id (`AGENTS.md`, *Tracking work*), which makes the tracker the only evidence of doneness this kit recognises. **Do not infer it from the working tree, the commit log, or code that appears to already exist** — that is equally what an abandoned attempt looks like.
+A slice is **done** when its issue is closed, or when every box under `Done when` is ticked. `/slice` ticks a box itself, in the same run it reports the matching criterion met by id (`AGENTS.md`, _Tracking work_), which makes the tracker the only evidence of doneness this kit recognises. **Do not infer it from the working tree, the commit log, or code that appears to already exist** — that is equally what an abandoned attempt looks like.
 
 ```powershell
 gh issue list --state all --limit 200 --json number,title,state,body
@@ -43,25 +44,25 @@ Before writing code, read `design/20-contract.md` for every signature you will t
 
 Sequence:
 
-1. **Branch.** `git status --short` must be clean and on the default branch before you touch anything; uncommitted work that is not this slice's is not yours to stash or discard (`AGENTS.md`, *Safe start*) — stop and say so instead. Create and check out `slice/S<n>` from the default branch's latest. **Refuse to implement on the default branch** — `/pr` refuses to open a PR from it, and the branch is one command away.
+1. **Branch.** `git status --short` must be clean and on the default branch before you touch anything; uncommitted work that is not this slice's is not yours to stash or discard (`AGENTS.md`, _Safe start_) — stop and say so instead. Create and check out `slice/S<n>` from the default branch's latest. **Refuse to implement on the default branch** — `/pr` refuses to open a PR from it, and the branch is one command away.
 2. State the slice's acceptance criteria back as a checklist, **by id** — `S3.1`, `S3.2`. One line each. Nothing else.
 3. Write the tests that check those criteria. They must fail for the right reason before you write the implementation.
 4. Implement against the contract signatures exactly. No signature drift, no added parameters, no widened return types.
 5. Run the tests. Run the full suite, not just the new tests.
-6. **Commit, then push.** Stage by named path — never `git add -A`, `git add .`, or a bare directory (`AGENTS.md`, *Git and delivery*).
-7. **Open the pull request. Never as a draft.** Carved out of the authorization rule the same as pushing the branch (`AGENTS.md`, *Git and delivery*). Title it from the slice name; the body can be minimal, since `/pr` writes the real description in this same session and runs the gates and the review threads after it. Check for an existing open PR on this branch first and do not open a second one.
-8. **Tick the `Done when` boxes** on the matching issue for every id this run confirms met. Carved out the same way (`AGENTS.md`, *Tracking work*) — the report in step 9 and the tick are the same claim now, not two.
+6. **Commit, then push.** Stage by named path — never `git add -A`, `git add .`, or a bare directory (`AGENTS.md`, _Git and delivery_).
+7. **Open the pull request. Never as a draft.** Carved out of the authorization rule the same as pushing the branch (`AGENTS.md`, _Git and delivery_). Title it from the slice name; the body can be minimal, since `/pr` writes the real description in this same session and runs the gates and the review threads after it. Check for an existing open PR on this branch first and do not open a second one.
+8. **Tick the `Done when` boxes** on the matching issue for every id this run confirms met. Carved out the same way (`AGENTS.md`, _Tracking work_) — the report in step 9 and the tick are the same claim now, not two.
 9. Report **by criterion id**: which are met, which are not and why, anything you had to decide that the contract did not determine, and the branch name and PR URL.
 
 ## Correcting the document as you go
 
-**Descriptive drift is corrected here, in this slice's commit** — the rule and its boundaries are in `AGENTS.md`, *Hard rules*, and are not restated. What that means in practice:
+**Descriptive drift is corrected here, in this slice's commit** — the rule and its boundaries are in `AGENTS.md`, _Hard rules_, and are not restated. What that means in practice:
 
 - A declaration, parameter list, field name, path, or count in `design/` that the tree now states differently is a **transcription error**. Fix the document by named path, in the same commit as the code, and say in step 9 what you corrected. Do not raise it as a fork and do not log a decision — there is no decision in it.
-- Materialising a `20-contract.md` scaffold is this same correction: once a declaration exists in the tree, **replace the block in the contract with a pointer to the file that now declares it** and keep only what the declaration cannot say (`.claude/commands/contract.md`, *Semantics, not shape*).
+- Materialising a `20-contract.md` scaffold is this same correction: once a declaration exists in the tree, **replace the block in the contract with a pointer to the file that now declares it** and keep only what the declaration cannot say (`.claude/commands/contract.md`, _Semantics, not shape_).
 - **An invariant, a non-goal, an acceptance criterion, or a public interface is not descriptive drift.** Those are the stop conditions below, unchanged.
 - **`design/30-slices.md` is never edited here**, including this slice's own criteria. A criterion that is wrong is a `/slices` matter.
-- **If `design/FROZEN.md` exists, correct nothing.** State the contradiction in the pull request and leave the document alone (`AGENTS.md`, *The design freeze*).
+- **If `design/FROZEN.md` exists, correct nothing.** State the contradiction in the pull request and leave the document alone (`AGENTS.md`, _The design freeze_).
 
 Stop conditions — halt and report rather than proceeding:
 
@@ -72,6 +73,7 @@ Stop conditions — halt and report rather than proceeding:
 - The `Out of scope` line is blocking you. That is information, not an obstacle to route around.
 
 Do not:
+
 - Touch files outside `Touches` without saying why first.
 - Refactor adjacent code.
 - Add dependencies.
@@ -79,11 +81,11 @@ Do not:
 
 ## Not meant to be re-run
 
-**One slice, one session** (`AGENTS.md`, *Session boundaries*). This command does not resume
+**One slice, one session** (`AGENTS.md`, _Session boundaries_). This command does not resume
 itself — it has no notion of picking back up mid-implementation, and does not replay or trust
 what an earlier session on the same slice did from memory. If a session ends before a slice is
 done, the next invocation is a fresh `/slice` (with or without an explicit id) that re-selects
 purely from the tracker's current state — issue open or closed, which boxes are ticked — per
-*Which slice* above, and re-establishes what still fails rather than assuming the unticked
+_Which slice_ above, and re-establishes what still fails rather than assuming the unticked
 criteria are exactly the outstanding work. A session that compacted mid-slice is not resumed
-either; report it as a mis-sized slice, per `AGENTS.md`, *Session boundaries*.
+either; report it as a mis-sized slice, per `AGENTS.md`, _Session boundaries_.

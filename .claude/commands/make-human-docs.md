@@ -3,10 +3,11 @@ description: Generate the human-facing guide from the design docs
 ---
 
 <!-- companion:start -->
+
 **Per-repo companion:** `.claude/commands/make-human-docs-local.md`. Read it now, if it exists — an absent,
 empty, or frontmatter-only file is no companion, and this file then stands alone.
 It may override: `vocabulary`, `document-map`, `extra-steps`. It may never override anything in
-[`.claude/COMPANIONS.md`](../COMPANIONS.md) § *Never*, which is also where these categories are defined.
+[`.claude/COMPANIONS.md`](../COMPANIONS.md) § _Never_, which is also where these categories are defined.
 <!-- companion:end -->
 
 Read `design/10-design.md`, `design/20-contract.md`, and `design/00-brief.md`. Write `docs/docs/guide.md`.
@@ -25,7 +26,7 @@ The file opens with:
 ## Rules
 
 - **Never change technical meaning.** If the design admits two readings, that is a finding: report it and stop. Do not resolve an ambiguity by picking the one that reads better.
-- **Cut internal reasoning.** Decision rationale, rejected alternatives, open questions and the argument for a boundary all belong to `design/`. Keep a rejected alternative **only** where the reader will otherwise ask "why not X?" *and* the answer changes how they use the thing. That is the bar — not whether it is interesting.
+- **Cut internal reasoning.** Decision rationale, rejected alternatives, open questions and the argument for a boundary all belong to `design/`. Keep a rejected alternative **only** where the reader will otherwise ask "why not X?" _and_ the answer changes how they use the thing. That is the bar — not whether it is interesting.
 - **Replace cross-references with the thing itself.** "See §4.2" is useless to someone reading top to bottom. Say the sentence.
 - **Merge and reorder for sequential reading.** The design docs are organised so they can be checked for correctness; this is organised so it can be read once, in order. Merge sections that are separate only because they were written separately.
 - **Link back rather than duplicate detail.** Exact signatures, schemas and error tables stay in `design/20-contract.md` and are linked, never copied. A copied signature is the second copy that drifts.
@@ -44,5 +45,5 @@ Report what you cut, and anything the design left ambiguous.
 
 Overwrites the guide in full from the current design docs — there is no partial regeneration
 and no diffing against the previous version. Re-run whenever `design/` changes underneath it;
-`/reconcile`'s *Generated-guide drift* is what notices when a stale copy was never
+`/reconcile`'s _Generated-guide drift_ is what notices when a stale copy was never
 regenerated, not this command noticing its own staleness.

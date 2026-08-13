@@ -4,10 +4,11 @@ argument-hint: <rough ask>
 ---
 
 <!-- companion:start -->
+
 **Per-repo companion:** `.claude/commands/refine-local.md`. Read it now, if it exists — an absent,
 empty, or frontmatter-only file is no companion, and this file then stands alone.
 It may override: `vocabulary`, `document-map`. It may never override anything in
-[`.claude/COMPANIONS.md`](../COMPANIONS.md) § *Never*, which is also where these categories are defined.
+[`.claude/COMPANIONS.md`](../COMPANIONS.md) § _Never_, which is also where these categories are defined.
 <!-- companion:end -->
 
 Turn **$ARGUMENTS** into a prompt that carries the constraints this repository actually binds an agent to.
@@ -18,20 +19,20 @@ The value here is not better wording. It is that you do not have to remember whi
 
 **If an existing command already covers the ask, name it and stop.** Do not refine. A front door that everything passes through is a cost paid on every request, and most asks in this repository belong to a command that already exists:
 
-| The ask is about | Use |
-|---|---|
-| Which stage this is, or what to run next | `/kit-help` |
-| Whether the brief is sound | `/brief-check` |
-| Architecture, data model, failure modes | `/design` |
-| Types, schemas, signatures, errors | `/contract` |
-| Breaking work into units | `/slices` |
-| Implementing a defined unit | `/slice S<n>` |
-| Whether the code and the docs still agree | `/reconcile` |
-| Running this repository's gates | `/verify` |
-| Issues, milestones, anything on GitHub | `/track` |
-| Opening a pull request | `/pr` |
-| Review comments on a pull request | `/resolve` |
-| Putting the kit into a repository | `/install` |
+| The ask is about                          | Use            |
+| ----------------------------------------- | -------------- |
+| Which stage this is, or what to run next  | `/kit-help`    |
+| Whether the brief is sound                | `/brief-check` |
+| Architecture, data model, failure modes   | `/design`      |
+| Types, schemas, signatures, errors        | `/contract`    |
+| Breaking work into units                  | `/slices`      |
+| Implementing a defined unit               | `/slice S<n>`  |
+| Whether the code and the docs still agree | `/reconcile`   |
+| Running this repository's gates           | `/verify`      |
+| Issues, milestones, anything on GitHub    | `/track`       |
+| Opening a pull request                    | `/pr`          |
+| Review comments on a pull request         | `/resolve`     |
+| Putting the kit into a repository         | `/install`     |
 
 Refine only what falls between them — a change to the kit's own files, a question about the tooling, a fix that is not a slice, a one-off task with no upstream document.
 
@@ -62,8 +63,8 @@ Ends:      <the deliverable — a proposal, a commit, a report>
 
 Rules for the fields:
 
-- **`Binding` carries only constraints you have read, each naming where it lives.** `AGENTS.md` § *Verification* forbids asserting what a command could confirm, and that applies to this command's own output — a plausible-sounding rule with no source is the failure mode here, because the emitted prompt is trusted precisely for carrying rules the reader did not look up.
-- **Three or four binding lines, not ten.** Everything in `AGENTS.md` applies to every session already. List what is easy to miss for *this* ask: a non-goal in `design/00-brief.md`, a decision in `design/90-decisions.md`, a lesson in `agent.md` that cost something here.
+- **`Binding` carries only constraints you have read, each naming where it lives.** `AGENTS.md` § _Verification_ forbids asserting what a command could confirm, and that applies to this command's own output — a plausible-sounding rule with no source is the failure mode here, because the emitted prompt is trusted precisely for carrying rules the reader did not look up.
+- **Three or four binding lines, not ten.** Everything in `AGENTS.md` applies to every session already. List what is easy to miss for _this_ ask: a non-goal in `design/00-brief.md`, a decision in `design/90-decisions.md`, a lesson in `agent.md` that cost something here.
 - **`Out of scope` is the single most effective line.** If nothing is genuinely adjacent, write `nothing adjacent`, do not invent a boundary.
 - Where `design/` does not exist — an install may legitimately skip it — cite `AGENTS.md` and whatever instruction file the repository does have. Say which sources you had.
 
@@ -71,7 +72,7 @@ Rules for the fields:
 
 Hand back the prompt. **Do not then run it in this session.**
 
-The reason is mechanical, not ceremonial: this command runs at `sonnet`/`medium`, the emitted `Tier` is frequently something else, and an agent cannot change its own session model (`AGENTS.md`, *Division of control*). Running it here would silently execute at the wrong tier the prompt itself just named.
+The reason is mechanical, not ceremonial: this command runs at `sonnet`/`medium`, the emitted `Tier` is frequently something else, and an agent cannot change its own session model (`AGENTS.md`, _Division of control_). Running it here would silently execute at the wrong tier the prompt itself just named.
 
 Close by saying which session to run it in. If the emitted tier matches the current session, say so and offer — one line, no argument.
 

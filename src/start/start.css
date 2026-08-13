@@ -283,6 +283,7 @@
 /* ---------------------------------------------------------------- buttons */
 
 .gs-btn {
+  appearance: none;
   background: none;
   border: 1px solid var(--rule);
   color: var(--text-body);

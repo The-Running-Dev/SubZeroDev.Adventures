@@ -486,6 +486,72 @@ file's own header for what changed there).
 Reversibility: cheap — this section and the merged sections above can be edited or removed
 without touching code.
 
+#### 2026-08-15 — `/discussions`: one project-owned token, immediate posting, a `discussions/` seam, and a process-local read cache
+
+Context: a first-party forum page over this repository's GitHub Discussions
+(`server/src/routes/discussions.ts`), reached at `/discussions`. giscus/`@giscus/react` was
+ruled out before design started — it needs a second GitHub sign-in on top of the SubZeroDev
+session a player already holds — so every thread is instead created under one project-owned
+credential and attributed back to the caller's own session. Four choices here are not
+obvious from the diff and are worth a future reader's five minutes rather than a re-read of
+the code.
+
+**Moderation is immediate and retrospective, not queued.** `POST /api/discussions` requires
+`principal.kind === "member"` and a per-player daily cap (`discussion_posts`, migration 014,
+doubles as the rate-limit count — see that file's own header), then posts straight to
+GitHub. This is a real departure from `routes/content.ts:147`'s rule that a player cannot set
+`visibility: public` directly. Rejected: mirroring `content.ts`'s admin-approval queue —
+it would mean a second table holding unpublished threads, a second admin surface, and a
+second place a thread can exist, for content that already has its own moderator tools (the
+repository's maintainers, on GitHub, after the fact) once it's there. Chosen because a
+forum post is not campaign content: it doesn't change what the engine serves, and treating
+every reply as pending would make the channel unusable. Reversibility: expensive to add a
+queue after the fact without a migration for in-flight threads; cheap to tighten the daily
+cap or add an admin "hide" action that maps to GitHub's own moderation, since that reads
+through the same `discussion_posts` row this already writes.
+
+**The vendor name lives in `server/src/discussions/`, mirroring `identity/`.**
+`forum.ts` declares the `DiscussionForum` interface (list/get/create, plain-text only — see
+its own header on why `bodyText` and not `body`/`bodyHTML`); `github.ts` is the one
+implementation, reading no env, exactly as `identity/oidc.ts` reads none; `registry.ts` reads
+`DISCUSSIONS_REPO`/`DISCUSSIONS_TOKEN`/`DISCUSSIONS_CATEGORY` and returns
+`DiscussionForum | undefined`, all-or-nothing, the same predicate `loadIdentityProviders`
+uses. `routes/discussions.ts` names no vendor anywhere in its code, keeping the grep
+CLAUDE.md's identity-seam section describes a clean signal. Rejected: naming GitHub in the
+route directly, which would have been less code but would make that grep stop meaning
+anything. Reversibility: cheap — a second forum backend is a new file behind the same
+interface, not a new design.
+
+**The write gate is `resolvePrincipal` + a manual `kind` check, not `requirePrincipal`.**
+`requirePrincipal` mints a guest for any cookieless request; gating a POST on it would leave
+behind a `players` row every time an anonymous caller was refused. `resolveAdmin`
+(`routes/admin.ts`) already solves this on the read side for the same reason; `requireMember`
+(`routes/discussions.ts`) is its write-side twin. Confirmed by reverting the check in
+`routes/discussions.ts` and watching the guest-POST test in `routes/discussions.test.ts`
+fail, per CLAUDE.md's "a regression test is verified by reverting the fix."
+
+**Reads go through a process-local TTL cache (`discussions/cache.ts`), which `routes/
+stats.ts:7-10` argues against for a different case.** That comment rejects per-request
+memoization of this server's own database reads — a resource this server owns outright, and
+one that is already live by construction. `/api/discussions` reads a _third party's_ shared,
+finite budget instead: GitHub's GraphQL rate limit is per-token, this deployment has exactly
+one project-owned token, and that same budget backs `createThread`. An unauthenticated
+crawler looping on the public `GET` routes could exhaust the budget posting also depends on
+— reading would disable writing, which has no equivalent on `/api/stats`. Rejected: a
+Postgres-backed cache, `transfer.ts`'s pattern for its rate limit — that argument is about a
+_budget_ where two independent counters can each let through the full limit (a correctness
+bound), and it does not transfer to a read cache, where divergence between replicas can only
+make an entry cold, never wrong; this deployment also runs exactly one API container
+(`docker-compose.yml`), so the replica problem the DB-backed pattern solves does not exist
+here to begin with. A DB cache would also make every anonymous read a write, the opposite of
+`routes/profile.ts`'s "a stranger's read must never write" posture. Chosen: single-flight,
+serve-stale-on-error, a short failure cooldown, no `setInterval` and no background refresh —
+freshness is evaluated lazily on read, the same shape every other TTL in this codebase uses
+(a stored timestamp compared against `now()`), just held in memory instead of a column, since
+the thing being bounded is a network budget rather than a durable invariant. Reversibility:
+cheap — the whole cache is one decorator applied in `discussions/registry.ts`; dropping it is
+a one-line change, at the cost of every anonymous crawl spending real GraphQL quota again.
+
 ## Validation
 
 ```bash

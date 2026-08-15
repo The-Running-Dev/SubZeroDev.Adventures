@@ -181,6 +181,17 @@ export async function mergePlayers(
       `update saves set profile_id = $1 where profile_id = $2`,
       [toPlayerId, fromPlayerId],
     );
+    // Straight repoint, not the copy-with-`on conflict` achievements/badges need below --
+    // `discussion_posts`'s primary key is `discussion_ref` (discussions/forum.ts's opaque
+    // thread id), which cannot collide between two players the way a shared achievement or
+    // badge id can. Without this, a member who links a second identity already claimed by
+    // another player -- the "existing" branch below -- would have their own attribution
+    // rows deleted along with `fromPlayerId`'s row (`on delete cascade`, migration 014),
+    // leaving their own threads on the forum permanently unattributed.
+    await client.query(
+      `update discussion_posts set player_id = $1 where player_id = $2`,
+      [toPlayerId, fromPlayerId],
+    );
     // Copied, not repointed with an `update` like sessions/saves above -- the primary key
     // is `(player_id, campaign_id, achievement_id)`, so a straight repoint would collide
     // wherever both players had already unlocked the same achievement. `on conflict do

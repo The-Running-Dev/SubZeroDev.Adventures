@@ -1,6 +1,7 @@
 import { Pool } from "pg";
 import { buildApp } from "./app.js";
 import { createMultiSourceCampaignSource } from "./campaigns/multi-source.js";
+import { loadDiscussionForum } from "./discussions/registry.js";
 
 const port = Number(process.env.PORT ?? 8787);
 const siteUrl = process.env.SITE_URL ?? "http://localhost:5173";
@@ -39,11 +40,16 @@ const campaignSource = createMultiSourceCampaignSource(pool, {
   url: "https://the-running-dev.github.io/SubZeroDev.Adventures.Content/",
 });
 
+// Reads DISCUSSIONS_REPO/DISCUSSIONS_TOKEN/DISCUSSIONS_CATEGORY -- unset (any of the
+// three) means the feature is off, not a startup failure (discussions/registry.ts).
+const discussionForum = loadDiscussionForum();
+
 const app = await buildApp(pool, {
   siteUrl,
   apiUrl,
   previewOrigins,
   campaignSource,
+  discussionForum,
 });
 
 await app.listen({ port, host: "0.0.0.0" });

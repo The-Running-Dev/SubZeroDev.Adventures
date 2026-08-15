@@ -401,6 +401,31 @@ Reversibility: cheap | expensive
 
 ### Why it is installed this way
 
+#### 2026-08-15 — `sync:campaigns` deep-imports the engine's unexported `digestManifestResolution`
+
+Context: the script splices the hand-authored `getting-started` campaign back into the
+manifest the engine's exporter just wrote, which invalidates that manifest's `resolution` —
+a digest over the ordered `{id, version}` list (`portable/format.ts`'s own doc comment), so
+adding a campaign changes it by definition. Leaving the exporter's value publishes a
+10-campaign manifest under a 9-campaign digest. `digestManifestResolution` is deliberately
+absent from `engine/src/engine/src/index.ts`'s public surface, which names it author-time-only.
+
+Chosen: import it by relative path from the built submodule
+(`../engine/src/engine/dist/portable/digest.js`), the same way the engine's own
+`scripts/export-campaigns.ts` reaches it and for the same reason — this script is author-time
+tooling too. It adds no precondition: the public `digestPortableCampaign` import already
+resolves into `dist/`, so `npm run setup` was required either way.
+
+Rejected: restating the recipe locally (a second copy of "sha-256 over the canonical ordered
+`{id, version}` list", free to drift from the one the manifest's own contract names — and
+"reference, never restate" exists for exactly this); leaving `resolution` stale and
+documenting that nothing in this repo reads it (true today, but it makes the committed
+fixture disagree with the format it claims to be in, and the next reader has to rediscover
+that the mismatch is deliberate).
+
+Reversibility: cheap — the fallback is the rejected local restatement, or asking upstream to
+export it.
+
 #### 2026-08-13 — `/start` and the authoring wizard validate through `hydrateCatalog`
 
 Context: the wizard has to tell an author whether their draft is a legal campaign, on every

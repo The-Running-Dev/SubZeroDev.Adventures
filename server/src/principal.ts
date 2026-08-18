@@ -141,6 +141,35 @@ export function resolvePrincipal(pool: Pool) {
   };
 }
 
+/**
+ * Builds a read-only guard: resolves an existing principal (never minting a guest, exactly
+ * like `resolvePrincipal`) and checks it against `predicate`, refusing with a 403 and
+ * `errorBody` when there is no principal or the predicate fails. `resolveAdmin`
+ * (routes/admin.ts) and `requireMember` (routes/discussions.ts) are both this same shape --
+ * "resolve, then gate on a principal property" -- so a fix to the shape itself has one place
+ * to change instead of two hand-copies.
+ */
+export function guardPrincipal(
+  pool: Pool,
+  predicate: (principal: Principal) => boolean | Promise<boolean>,
+  errorBody: { readonly operation: string; readonly code: string },
+) {
+  const resolve = resolvePrincipal(pool);
+  return async (
+    request: FastifyRequest,
+    reply: FastifyReply,
+  ): Promise<void> => {
+    await resolve(request);
+    const principal = request.principalOrNull;
+    if (!principal || !(await predicate(principal))) {
+      reply.code(403);
+      await reply.send({ error: errorBody });
+      return;
+    }
+    request.principal = principal;
+  };
+}
+
 export async function logout(
   pool: Pool,
   request: FastifyRequest,
@@ -179,6 +208,17 @@ export async function mergePlayers(
     );
     await client.query(
       `update saves set profile_id = $1 where profile_id = $2`,
+      [toPlayerId, fromPlayerId],
+    );
+    // Straight repoint, not the copy-with-`on conflict` achievements/badges need below --
+    // `discussion_posts`'s primary key is `discussion_ref` (discussions/forum.ts's opaque
+    // thread id), which cannot collide between two players the way a shared achievement or
+    // badge id can. Without this, a member who links a second identity already claimed by
+    // another player -- the "existing" branch below -- would have their own attribution
+    // rows deleted along with `fromPlayerId`'s row (`on delete cascade`, migration 014),
+    // leaving their own threads on the forum permanently unattributed.
+    await client.query(
+      `update discussion_posts set player_id = $1 where player_id = $2`,
       [toPlayerId, fromPlayerId],
     );
     // Copied, not repointed with an `update` like sessions/saves above -- the primary key

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { BrowserDemo } from "./composition";
+import { formatTimestamp } from "../format";
 
 interface AdminPanelProps {
   readonly demo: BrowserDemo;
@@ -49,14 +50,6 @@ interface AdminContentStatus {
   readonly campaigns: readonly AdminCampaignStatus[];
   readonly extensions: readonly AdminExtensionStatus[];
   readonly sources: readonly AdminSourceStatus[];
-}
-
-/** Short, no year -- an operator reading this is looking at "did that just happen," not an
- *  audit trail. `undefined` (a digest that's never been set, or a server that never fails)
- *  renders as an em dash rather than "Invalid Date". */
-function formatTimestamp(iso: string | undefined): string {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleString();
 }
 
 /**

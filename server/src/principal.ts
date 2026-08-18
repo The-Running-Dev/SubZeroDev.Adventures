@@ -141,6 +141,35 @@ export function resolvePrincipal(pool: Pool) {
   };
 }
 
+/**
+ * Builds a read-only guard: resolves an existing principal (never minting a guest, exactly
+ * like `resolvePrincipal`) and checks it against `predicate`, refusing with a 403 and
+ * `errorBody` when there is no principal or the predicate fails. `resolveAdmin`
+ * (routes/admin.ts) and `requireMember` (routes/discussions.ts) are both this same shape --
+ * "resolve, then gate on a principal property" -- so a fix to the shape itself has one place
+ * to change instead of two hand-copies.
+ */
+export function guardPrincipal(
+  pool: Pool,
+  predicate: (principal: Principal) => boolean | Promise<boolean>,
+  errorBody: { readonly operation: string; readonly code: string },
+) {
+  const resolve = resolvePrincipal(pool);
+  return async (
+    request: FastifyRequest,
+    reply: FastifyReply,
+  ): Promise<void> => {
+    await resolve(request);
+    const principal = request.principalOrNull;
+    if (!principal || !(await predicate(principal))) {
+      reply.code(403);
+      await reply.send({ error: errorBody });
+      return;
+    }
+    request.principal = principal;
+  };
+}
+
 export async function logout(
   pool: Pool,
   request: FastifyRequest,

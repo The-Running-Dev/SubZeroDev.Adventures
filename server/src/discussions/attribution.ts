@@ -74,3 +74,32 @@ export async function recordPost(
     [discussionRef, playerId, title],
   );
 }
+
+const postLocks = new Map<string, Promise<void>>();
+
+/**
+ * Serializes one player's post attempts so the daily-cap check-then-act sequence in
+ * `routes/discussions.ts` (count, then a network round trip to create the thread, then the
+ * insert that records it) cannot let two concurrent requests from the same player both pass
+ * the check before either is recorded. Process-local, the same posture `discussions/cache.ts`
+ * argues for its own TTL cache: this deployment runs exactly one API container
+ * (docker-compose.yml), so there is no second replica for a lock like this to miss, and a DB
+ * advisory lock would otherwise have to hold a pooled connection open across the network call
+ * to the forum -- a worse tradeoff for a soft anti-spam cap than a plain in-process mutex.
+ */
+export function withPlayerPostLock<T>(
+  playerId: string,
+  fn: () => Promise<T>,
+): Promise<T> {
+  const previous = postLocks.get(playerId) ?? Promise.resolve();
+  const result = previous.then(fn, fn);
+  const marker = result.then(
+    () => undefined,
+    () => undefined,
+  );
+  postLocks.set(playerId, marker);
+  void marker.finally(() => {
+    if (postLocks.get(playerId) === marker) postLocks.delete(playerId);
+  });
+  return result;
+}

@@ -33,7 +33,9 @@ const isOwnProfile = path === "/profile";
 const isMyContent = path === "/content";
 const isStart = path === "/start";
 const isDiscussions = path === "/discussions";
-const discussionThreadId = path.match(/^\/discussions\/(\d+)$/)?.[1];
+const discussionThreadId = path.match(
+  /^\/discussions\/([A-Za-z0-9_-]{1,64})$/,
+)?.[1];
 const profileSlug = path.match(/^\/u\/([^/]+)$/)?.[1];
 
 // Read once, here, and passed down as a prop -- not read again inside PublicProfile or

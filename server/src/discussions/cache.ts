@@ -117,7 +117,20 @@ export function cachedDiscussionForum(
   const maxThreads = options.maxThreads ?? 64;
   const now = options.now ?? (() => Date.now());
 
-  let listState: CacheState<DiscussionThreadPage> = {};
+  // Keyed by the requested `limit` (a caller-controlled, tested query param) so a page
+  // cached for one limit is never handed back to a caller asking for a different one.
+  const listStates = new Map<string, CacheState<DiscussionThreadPage>>();
+  function listStateFor(
+    limit: number | undefined,
+  ): CacheState<DiscussionThreadPage> {
+    const key = limit === undefined ? "default" : String(limit);
+    let state = listStates.get(key);
+    if (!state) {
+      state = {};
+      listStates.set(key, state);
+    }
+    return state;
+  }
 
   // Insertion order doubles as recency order: `getOrCreateThreadState` re-inserts a
   // touched key at the end, so eviction (from the front) drops the least-recently-touched
@@ -150,7 +163,8 @@ export function cachedDiscussionForum(
 
     listThreads(listOptions) {
       if (listOptions?.cursor) return inner.listThreads(listOptions);
-      return withCache(listState, now, ttlMs, staleMs, failureCooldownMs, () =>
+      const state = listStateFor(listOptions?.limit);
+      return withCache(state, now, ttlMs, staleMs, failureCooldownMs, () =>
         inner.listThreads(listOptions),
       );
     },
@@ -164,10 +178,10 @@ export function cachedDiscussionForum(
 
     async createThread(input: CreateThreadInput) {
       const thread = await inner.createThread(input);
-      // Never cached itself, and it invalidates the list cache on success -- a player who
-      // just posted and lands back on the list must see their own thread, which is the one
-      // staleness the TTL is not allowed to cover.
-      listState = {};
+      // Never cached itself, and it invalidates every list-cache entry (every limit) on
+      // success -- a player who just posted and lands back on the list must see their own
+      // thread, which is the one staleness the TTL is not allowed to cover.
+      listStates.clear();
       return thread;
     },
   };

@@ -133,6 +133,32 @@ export function Discussions({
     // does not need to be in this dependency list.
   }, [apiUrl, threadId, refreshToken]);
 
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  async function handleLoadMore(): Promise<void> {
+    if (stage.kind !== "list" || !stage.data.nextCursor || !apiUrl) return;
+    setLoadingMore(true);
+    try {
+      const url = `${apiUrl}/api/discussions?cursor=${encodeURIComponent(stage.data.nextCursor)}`;
+      const response = await fetch(url, { credentials: "include" });
+      if (!response.ok) return;
+      const body = (await response.json()) as DiscussionListData;
+      setStage((current) =>
+        current.kind === "list"
+          ? {
+              kind: "list",
+              data: {
+                ...body,
+                threads: [...current.data.threads, ...body.threads],
+              },
+            }
+          : current,
+      );
+    } finally {
+      setLoadingMore(false);
+    }
+  }
+
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [posting, setPosting] = useState(false);
@@ -234,6 +260,17 @@ export function Discussions({
         </div>
 
         {stage.kind === "list" && <ThreadList data={stage.data} />}
+        {stage.kind === "list" && stage.data.nextCursor && (
+          <p>
+            <button
+              type="button"
+              onClick={() => void handleLoadMore()}
+              disabled={loadingMore}
+            >
+              {loadingMore ? "Loading…" : "Load more"}
+            </button>
+          </p>
+        )}
         {stage.kind === "thread" && <ThreadDetail data={stage.data} />}
 
         {!threadId && stage.kind === "list" && (

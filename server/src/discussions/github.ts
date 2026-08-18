@@ -225,6 +225,11 @@ const IDS_QUERY = `
   }
 `;
 
+// Shared by every query/mutation below whose response feeds `toThread()` -- keeping this in
+// one place means a field `toThread` needs (or stops needing) only has to change here, not
+// in each of the three GraphQL operations that ask for it.
+const DISCUSSION_CORE_FIELDS = `number title bodyText url createdAt updatedAt author { login }`;
+
 const LIST_QUERY = `
   query ForumThreads($owner: String!, $name: String!, $categoryId: ID!, $first: Int!, $after: String) {
     repository(owner: $owner, name: $name) {
@@ -236,8 +241,7 @@ const LIST_QUERY = `
       ) {
         pageInfo { hasNextPage endCursor }
         nodes {
-          number title bodyText url createdAt updatedAt
-          author { login }
+          ${DISCUSSION_CORE_FIELDS}
           comments { totalCount }
         }
       }
@@ -249,9 +253,8 @@ const THREAD_QUERY = `
   query ForumThread($owner: String!, $name: String!, $number: Int!, $comments: Int!) {
     repository(owner: $owner, name: $name) {
       discussion(number: $number) {
-        number title bodyText url createdAt updatedAt
+        ${DISCUSSION_CORE_FIELDS}
         category { id }
-        author { login }
         comments(first: $comments) {
           totalCount
           pageInfo { hasNextPage }
@@ -271,8 +274,7 @@ const CREATE_MUTATION = `
       body: $body
     }) {
       discussion {
-        number title bodyText url createdAt updatedAt
-        author { login }
+        ${DISCUSSION_CORE_FIELDS}
         comments { totalCount }
       }
     }

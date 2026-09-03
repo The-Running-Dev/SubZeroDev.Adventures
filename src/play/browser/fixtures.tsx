@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 import PlayApp from "../PlayApp";
+import { StartPage } from "../../start/StartPage";
 
 /**
  * Shared real-UI state fixtures for W65's accessibility (W65.4) and visual
@@ -159,3 +160,89 @@ export async function reachPersistenceWarning(): Promise<
   );
   return { ...reached, restore: () => spy.mockRestore() };
 }
+
+/**
+ * `/start` and the authoring wizard (`src/start/`).
+ *
+ * Rendered here, alongside `PlayApp`'s fixtures, rather than in a spec file of their own:
+ * `vitest.browser.config.ts`'s Windows exclusion and
+ * `.github/workflows/update-visual-baselines.yml`'s upload and `git add` paths are both
+ * written against one screenshot directory, and that directory is derived from the *spec
+ * file's* name. A second spec would mean maintaining that path in three more places for no
+ * gain -- so these render into the same baseline set the shipped `/play/` states do.
+ *
+ * The theme is pinned for the same reason `mountAndOpen` pins it: what the baseline is about
+ * should not change because the app's default display mode did.
+ */
+export function reachStartLanding(): Reached {
+  localStorage.setItem("subzerodev.play.theme.v1", "dos");
+  const user = userEvent.setup();
+  const { container, unmount } = render(<StartPage />);
+  return { container, unmount, user };
+}
+
+/** The wizard on its scenes step, holding a complete draft -- the densest thing it renders,
+ *  and the one whose layout a CSS change is most likely to break. */
+export async function reachAuthoringWizard(): Promise<Reached> {
+  localStorage.setItem("subzerodev.play.theme.v1", "dos");
+  localStorage.setItem(
+    "subzerodev.play.draft.v1",
+    JSON.stringify(baselineDraft),
+  );
+  const user = userEvent.setup();
+  const { container, unmount } = render(<StartPage />);
+  await user.click(
+    await screen.findByRole("button", { name: /Write a campaign/i }),
+  );
+  await user.click(await screen.findByRole("button", { name: /^3\) Scenes$/ }));
+  return { container, unmount, user };
+}
+
+/** Fixed content, so the capture is a function of the CSS and nothing else. */
+const baselineDraft = {
+  id: "harbour-night",
+  title: "Harbour Night",
+  description: "A short walk by the water.",
+  duration: "~3 min",
+  contentNotice: "",
+  version: "1.0.0",
+  startNodeId: "start",
+  variables: [
+    {
+      name: "nerve",
+      type: "int",
+      initial: "2",
+      values: "",
+      min: "0",
+      max: "5",
+      visible: true,
+      label: "Nerve",
+    },
+  ],
+  nodes: [
+    {
+      id: "start",
+      kind: "choice",
+      text: "The dock lights buzz. Nerve: {nerve}",
+      choices: [
+        {
+          id: "walk",
+          label: "Walk to the end of the pier.",
+          goto: "pier",
+          effects: [{ variable: "nerve", op: "increment", value: "1" }],
+        },
+      ],
+      endingId: "",
+      outcome: "neutral",
+    },
+    {
+      id: "pier",
+      kind: "ending",
+      text: "You reach the end. The water is very black.",
+      choices: [],
+      endingId: "pier_end",
+      outcome: "win",
+    },
+  ],
+  achievements: [],
+};

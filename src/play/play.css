@@ -47,9 +47,10 @@
   gap: 0.6rem;
 }
 
-/* "Disk library", the loaded story's title while playing, and "Standings" -- pushed to
-   the far left of the bar, opposite the account menu and display-mode select. Wraps: a
-   long story title is the one item here without a fixed short label. */
+/* "Disk library", the loaded story's title while playing, "Standings", "My content",
+   "Getting started", and "Discussions" -- pushed to the far left of the bar, opposite the
+   account menu and display-mode select. Wraps: a long story title is the one item here
+   without a fixed short label. */
 .system-bar-nav {
   align-items: center;
   display: flex;
@@ -493,10 +494,15 @@
   top: 1.65rem;
 }
 
+/* `--on-cyan-hover`, not `--on-cyan-hover-text` -- the latter is near-white in DOS/Matrix/
+   Amber (`--on-cyan-strong`'s sibling token, meant for a large glowing headline) and fails
+   4.5:1 against `--cyan-hover` in every theme but BBS (2.86-3.86:1). Masked here on this
+   container itself only because `.dossier strong`/`.dossier-number` below set their own
+   colour, but a future child that doesn't would inherit unreadable near-white-on-teal text. */
 .dossier:hover,
 .dossier.is-selected {
   background: var(--cyan-hover);
-  color: var(--on-cyan-hover-text);
+  color: var(--on-cyan-hover);
 }
 
 .dossier:focus-visible {
@@ -540,9 +546,14 @@
   text-transform: uppercase;
 }
 
+/* `--on-cyan-hover`, not `--on-cyan-strong`: the latter is white or near-white in DOS
+   (#ffffff), Matrix (#eaffea) and Amber (#fff3e0), and against `--cyan-hover` that measures
+   3.33-4.05:1 -- the featured/selected story card's own title, in white-on-teal, was the
+   concrete "white text in blue buttons" report this fixes. `--on-cyan-hover` is the same
+   pairing `.dossier-number` right above already uses on hover. */
 .dossier:hover strong,
 .dossier.is-selected strong {
-  color: var(--on-cyan-strong);
+  color: var(--on-cyan-hover);
 }
 
 /*
@@ -2442,4 +2453,66 @@
   margin-bottom: 0.5rem;
   resize: vertical;
   width: 100%;
+}
+
+/* `/discussions` (src/discussions/Discussions.tsx). Reuses `.archive`/`.eyebrow`/
+   `.profile-unavailable` for the shared page chrome and `.admin-heading`/`.admin-notice`/
+   `.admin-error`/`.admin-form-row`/`.admin-paste` for the compose form -- only the thread
+   list and thread-detail rendering below is new to this page. */
+.discussions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.discussions-list-item {
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 1rem;
+}
+
+.discussions-list-item a {
+  font-weight: bold;
+}
+
+.discussions-excerpt {
+  color: var(--ink);
+  margin: 0.4rem 0;
+}
+
+.discussions-meta {
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin: 0;
+}
+
+/* Plain text, never markup -- see this file's header on why (no markdown renderer, no
+   `dangerouslySetInnerHTML` anywhere in this codebase). `pre-wrap` is what lets a body a
+   player typed with blank lines and manual line breaks render the way they typed it. */
+.discussions-body {
+  margin: 0.6rem 0;
+  white-space: pre-wrap;
+}
+
+.discussions-comments {
+  border-top: 1px solid var(--rule);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  list-style: none;
+  margin: 0.6rem 0 0;
+  padding: 1rem 0 0;
+}
+
+.discussions-comment {
+  border-left: 2px solid var(--rule);
+  padding-left: 0.8rem;
+}
+
+.discussions-compose {
+  border-top: 1px solid var(--rule);
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
 }

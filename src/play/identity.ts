@@ -110,6 +110,53 @@ export interface RankingData {
   readonly totalRanked: number;
 }
 
+/** One row of `GET /api/discussions`, and the shape `POST /api/discussions` echoes back
+ *  for the thread it just created -- mirrors `server/src/routes/discussions.ts`'s
+ *  `threadEntry` exactly. `authorKind` is `"player"` when a local SubZeroDev session
+ *  wrote it (name already resolved server-side through `maskDisplayName`) and `"forum"`
+ *  when it did not -- there is nothing for this page to compute from that beyond which
+ *  label to show. */
+export interface DiscussionSummaryData {
+  readonly id: string;
+  readonly title: string;
+  readonly excerpt: string;
+  readonly authorName: string;
+  readonly authorKind: "player" | "forum";
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  readonly commentCount: number;
+  readonly url: string;
+}
+
+export interface DiscussionCommentData {
+  readonly id: string;
+  readonly body: string;
+  readonly authorName: string;
+  readonly createdAt: string;
+  readonly url: string;
+}
+
+// Named DiscussionListData, not DiscussionList -- src/discussions/Discussions.tsx's
+// component export would otherwise collide with this type's name, the same reason
+// PublicProfileData is named the way it is above.
+export interface DiscussionListData {
+  readonly configured: boolean;
+  readonly forum: string;
+  readonly canPost: boolean;
+  readonly threads: readonly DiscussionSummaryData[];
+  readonly nextCursor?: string;
+}
+
+export interface DiscussionThreadData {
+  readonly configured: boolean;
+  readonly forum: string;
+  readonly canPost: boolean;
+  readonly thread: DiscussionSummaryData;
+  readonly body: string;
+  readonly comments: readonly DiscussionCommentData[];
+  readonly moreComments: boolean;
+}
+
 const anonymousIdentity: Identity = {
   playerId: null,
   kind: "anonymous",

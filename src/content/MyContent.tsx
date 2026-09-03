@@ -175,13 +175,13 @@ export function MyContent({ apiUrl }: { apiUrl?: string }) {
     if (!json?.refresh || json.refresh.ok) {
       return {
         tone: "ok",
-        text: "Submitted. It's live now, privately -- you can play it right away. Request review below to make it public.",
+        text: "Submitted. It's live now, privately -- you can play it right away, and it's already queued for review. It becomes public if an admin approves it.",
       };
     }
     if (json.source?.lastError) {
       return {
         tone: "error",
-        text: `Saved, but it failed to load: ${json.source.lastError}. Fix the content and try again, or edit it below.`,
+        text: `Saved, but it failed to load: ${json.source.lastError}. Fix the content, then delete this row below and submit it again.`,
       };
     }
     return {
@@ -321,8 +321,8 @@ export function MyContent({ apiUrl }: { apiUrl?: string }) {
           <h1 id="content-title">My content</h1>
           <p className="admin-note">
             Submit your own campaign or extension. It's playable by you the
-            moment it validates, privately — nobody else sees it until you
-            request review and an admin approves it.
+            moment it validates, privately, and it goes into the review queue
+            automatically — nobody else sees it unless an admin approves it.
           </p>
 
           {!apiUrl && (
@@ -403,7 +403,7 @@ export function MyContent({ apiUrl }: { apiUrl?: string }) {
                                 }
                                 disabled={busyId === submission.id}
                               >
-                                Request review
+                                Request another review
                               </button>
                             )}
                           <button

@@ -22,6 +22,7 @@ public/campaigns/       test-fixture campaign JSON, committed — see "Campaign 
 src/
   main.tsx, index.css, site.css, shared.tsx    app shell
   play/                  the game itself: PlayApp.tsx, composition.ts, browser-client.ts, play.css
+  start/                 `/start`: the getting-started page and the campaign-authoring wizard
   test/                  jsdom + real-browser test setup and shared assertion helpers
 shared/                 code both compositions import — environment-neutral, no DOM, no Node
 server/                 the hosted Node API: its own npm project, its own Dockerfile
@@ -127,21 +128,28 @@ point at.
 
 ## Visual Baselines — The One Real Gotcha
 
-`src/play/browser/__screenshots__/visual-baseline.browser.test.tsx/` holds 16 PNGs, one per
-snapshot, all suffixed `chromium-linux`. **CI runs on `ubuntu-latest` with Playwright's
-managed Chromium** and that `-linux` set is the only baseline the repo maintains — no
-`chromium-win32` set is committed. `vitest.browser.config.ts` excludes
-`visual-baseline.browser.test.tsx` from the run when `os.platform() === "win32"` (checked at
+`src/play/browser/__screenshots__/visual-baseline.browser.test.tsx/` holds 24 PNGs, one per
+snapshot, all suffixed `chromium-linux`. Four states of `/play/` and two of `/start`
+(`src/start/`, whose fixtures live alongside `PlayApp`'s in `src/play/browser/fixtures.tsx`
+rather than in a spec of their own — the screenshot directory is derived from the spec file's
+name, and a second one would have to be registered in the config exclusion below _and_ twice
+in the workflow further down), at four widths each. **CI runs on `ubuntu-latest` with
+Playwright's managed Chromium** and that `-linux` set is the only baseline the repo maintains
+— no `chromium-win32` or `chromium-darwin` set is committed. `vitest.browser.config.ts`
+excludes `visual-baseline.browser.test.tsx` from the run on **any non-Linux host** (checked at
 config load, in Node — the spec file itself also runs inside the real browser tab it tests
 in, where there is no equivalent platform check), so running `npm run test:browser` natively
-on Windows silently skips these specs instead of failing on baselines that don't exist for
-that platform. That means a Windows contributor gets no local visual-regression signal before
-pushing — the tradeoff for not having to keep two baseline sets in sync — so treat CI as the
-first real check for a visual change made on Windows.
+on Windows or macOS silently skips these specs instead of failing on baselines that don't
+exist for that platform. Vitest suffixes a reference by _host_ platform and writes a fresh one
+when none is found, so without that exclusion a non-Linux run both fails every visual spec and
+leaves a full second baseline set in the working tree. That means a Windows or macOS
+contributor gets no local visual-regression signal before pushing — the tradeoff for not
+having to keep several baseline sets in sync — so treat CI as the first real check for a
+visual change made off Linux.
 
 If a UI change legitimately changes rendered output, regenerate the `chromium-linux` set from
-Windows (there is no other set to regenerate) by running it inside a Linux container so the
-pixels actually match what CI will compare against:
+Windows or macOS (there is no other set to regenerate) by running it inside a Linux container
+so the pixels actually match what CI will compare against:
 
 ```bash
 npm run baselines:update
@@ -393,6 +401,92 @@ Reversibility: cheap | expensive
 
 ### Why it is installed this way
 
+#### 2026-08-15 — `sync:campaigns` deep-imports the engine's unexported `digestManifestResolution`
+
+Context: the script splices the hand-authored `getting-started` campaign back into the
+manifest the engine's exporter just wrote, which invalidates that manifest's `resolution` —
+a digest over the ordered `{id, version}` list (`portable/format.ts`'s own doc comment), so
+adding a campaign changes it by definition. Leaving the exporter's value publishes a
+10-campaign manifest under a 9-campaign digest. `digestManifestResolution` is deliberately
+absent from `engine/src/engine/src/index.ts`'s public surface, which names it author-time-only.
+
+Chosen: import it by relative path from the built submodule
+(`../engine/src/engine/dist/portable/digest.js`), the same way the engine's own
+`scripts/export-campaigns.ts` reaches it and for the same reason — this script is author-time
+tooling too. It adds no precondition: the public `digestPortableCampaign` import already
+resolves into `dist/`, so `npm run setup` was required either way.
+
+Rejected: restating the recipe locally (a second copy of "sha-256 over the canonical ordered
+`{id, version}` list", free to drift from the one the manifest's own contract names — and
+"reference, never restate" exists for exactly this); leaving `resolution` stale and
+documenting that nothing in this repo reads it (true today, but it makes the committed
+fixture disagree with the format it claims to be in, and the next reader has to rediscover
+that the mismatch is deliberate).
+
+Reversibility: cheap — the fallback is the rejected local restatement, or asking upstream to
+export it.
+
+#### 2026-08-13 — `/start` and the authoring wizard validate through `hydrateCatalog`
+
+Context: the wizard has to tell an author whether their draft is a legal campaign, on every
+edit. The obvious-looking entry points are not validators: `fromPortable` states in its own
+header that it validates nothing, and `digestPortableCampaign` is a sha-256 over canonical
+JSON, so it answers "did this change?" and never "is this correct?". The real validator is
+`buildValidatedContentRegistry`, and the only non-throwing wrapper around it was
+`hydrateCatalog`, private to `shared/campaign-registry.ts`.
+
+Chosen: export `hydrateCatalog` and route the wizard through it, carrying the engine's own
+`ValidationError[]`/`ValidationWarning[]` on the result instead of only the flattened string
+existing callers read. That makes the wizard fail on exactly what `/api/content` will fail on,
+since `buildTieredCatalog` reaches the same function. `digestPortableCampaign` is still used,
+for what it is actually for: deciding when the playtest runtime is stale and when a validation
+result is still current.
+
+Rejected: a wizard-local validator (a second opinion about what a campaign is, guaranteed to
+drift from the server's — and the exact thing routing through the engine avoids); gating each
+step on validity (a story graph is invalid for most of its authoring life, and classifying
+which errors are "expected at this step" rebuilds that second validator by the back door — so
+validation runs continuously and only playtest and submit are gated on it).
+
+Reversibility: cheap for the export; expensive to unpick if a second validator is ever written
+against it, which is the outcome this exists to prevent.
+
+#### 2026-08-13 — The wizard's draft is browser-local, and submits down the existing route
+
+Context: an author needs their work to survive a reload, and a finished campaign needs to
+reach the review queue.
+
+Chosen: `localStorage` under `subzerodev.play.draft.v1`, read as lazy initial state (not in a
+mount effect — see `Wizard.tsx`'s note on the clobber that cost an author their draft), and
+submitted as a `{kind: "pasted"}` `POST /api/content` — the same request `MyContent.tsx`'s
+paste form already sends. No new server route, so an authored campaign inherits the submission
+tier's fail-open quarantine and the admin review queue exactly as a pasted one does.
+
+Rejected: server-side draft persistence (`content_sources` holds submissions, not works in
+progress; adding a second thing it holds is a schema decision this feature does not need to
+make, and it would put unreviewed half-campaigns in the same table as reviewed ones); an
+authoring-specific API route (a second door into the same queue, with its own trust posture to
+keep in sync).
+
+Reversibility: cheap.
+
+#### 2026-08-13 — One mocked direction, rendered through the theme system; authoring unlocked
+
+Context: the design bundle offered five getting-started directions, each drawn in one fixed
+palette, and locked its "write a campaign" door behind "finish a run first".
+
+Chosen: build direction 2b's chrome (setup dialog, numbered menu, block bar, F-key legend) and
+colour it entirely from `themes.css` variables, so the page renders in all four display modes
+like every other page. Leave the authoring door open.
+
+Rejected: shipping all five directions (they differ only in landing chrome — the walkthrough
+body is shared markup — so four of them are a palette-and-framing choice, not a feature);
+pinning the page to the mocked DOS Blue (it would be the only page on the site that ignores
+the display mode); keeping the door locked (the mockup wrote that before the wizard existed,
+and honouring it means inventing cross-session progress tracking purely to gate against).
+
+Reversibility: cheap.
+
 #### 2026-08-13 — Kit installed without `design/`, `AGENTS.md` merged into `CLAUDE.md`
 
 Context: `/install` from `SubZeroDev.AgentKit`. This repository already states, in its own
@@ -416,6 +510,72 @@ file's own header for what changed there).
 
 Reversibility: cheap — this section and the merged sections above can be edited or removed
 without touching code.
+
+#### 2026-08-15 — `/discussions`: one project-owned token, immediate posting, a `discussions/` seam, and a process-local read cache
+
+Context: a first-party forum page over this repository's GitHub Discussions
+(`server/src/routes/discussions.ts`), reached at `/discussions`. giscus/`@giscus/react` was
+ruled out before design started — it needs a second GitHub sign-in on top of the SubZeroDev
+session a player already holds — so every thread is instead created under one project-owned
+credential and attributed back to the caller's own session. Four choices here are not
+obvious from the diff and are worth a future reader's five minutes rather than a re-read of
+the code.
+
+**Moderation is immediate and retrospective, not queued.** `POST /api/discussions` requires
+`principal.kind === "member"` and a per-player daily cap (`discussion_posts`, migration 014,
+doubles as the rate-limit count — see that file's own header), then posts straight to
+GitHub. This is a real departure from `routes/content.ts:147`'s rule that a player cannot set
+`visibility: public` directly. Rejected: mirroring `content.ts`'s admin-approval queue —
+it would mean a second table holding unpublished threads, a second admin surface, and a
+second place a thread can exist, for content that already has its own moderator tools (the
+repository's maintainers, on GitHub, after the fact) once it's there. Chosen because a
+forum post is not campaign content: it doesn't change what the engine serves, and treating
+every reply as pending would make the channel unusable. Reversibility: expensive to add a
+queue after the fact without a migration for in-flight threads; cheap to tighten the daily
+cap or add an admin "hide" action that maps to GitHub's own moderation, since that reads
+through the same `discussion_posts` row this already writes.
+
+**The vendor name lives in `server/src/discussions/`, mirroring `identity/`.**
+`forum.ts` declares the `DiscussionForum` interface (list/get/create, plain-text only — see
+its own header on why `bodyText` and not `body`/`bodyHTML`); `github.ts` is the one
+implementation, reading no env, exactly as `identity/oidc.ts` reads none; `registry.ts` reads
+`DISCUSSIONS_REPO`/`DISCUSSIONS_TOKEN`/`DISCUSSIONS_CATEGORY` and returns
+`DiscussionForum | undefined`, all-or-nothing, the same predicate `loadIdentityProviders`
+uses. `routes/discussions.ts` names no vendor anywhere in its code, keeping the grep
+CLAUDE.md's identity-seam section describes a clean signal. Rejected: naming GitHub in the
+route directly, which would have been less code but would make that grep stop meaning
+anything. Reversibility: cheap — a second forum backend is a new file behind the same
+interface, not a new design.
+
+**The write gate is `resolvePrincipal` + a manual `kind` check, not `requirePrincipal`.**
+`requirePrincipal` mints a guest for any cookieless request; gating a POST on it would leave
+behind a `players` row every time an anonymous caller was refused. `resolveAdmin`
+(`routes/admin.ts`) already solves this on the read side for the same reason; `requireMember`
+(`routes/discussions.ts`) is its write-side twin. Confirmed by reverting the check in
+`routes/discussions.ts` and watching the guest-POST test in `routes/discussions.test.ts`
+fail, per CLAUDE.md's "a regression test is verified by reverting the fix."
+
+**Reads go through a process-local TTL cache (`discussions/cache.ts`), which `routes/
+stats.ts:7-10` argues against for a different case.** That comment rejects per-request
+memoization of this server's own database reads — a resource this server owns outright, and
+one that is already live by construction. `/api/discussions` reads a _third party's_ shared,
+finite budget instead: GitHub's GraphQL rate limit is per-token, this deployment has exactly
+one project-owned token, and that same budget backs `createThread`. An unauthenticated
+crawler looping on the public `GET` routes could exhaust the budget posting also depends on
+— reading would disable writing, which has no equivalent on `/api/stats`. Rejected: a
+Postgres-backed cache, `transfer.ts`'s pattern for its rate limit — that argument is about a
+_budget_ where two independent counters can each let through the full limit (a correctness
+bound), and it does not transfer to a read cache, where divergence between replicas can only
+make an entry cold, never wrong; this deployment also runs exactly one API container
+(`docker-compose.yml`), so the replica problem the DB-backed pattern solves does not exist
+here to begin with. A DB cache would also make every anonymous read a write, the opposite of
+`routes/profile.ts`'s "a stranger's read must never write" posture. Chosen: single-flight,
+serve-stale-on-error, a short failure cooldown, no `setInterval` and no background refresh —
+freshness is evaluated lazily on read, the same shape every other TTL in this codebase uses
+(a stored timestamp compared against `now()`), just held in memory instead of a column, since
+the thing being bounded is a network budget rather than a durable invariant. Reversibility:
+cheap — the whole cache is one decorator applied in `discussions/registry.ts`; dropping it is
+a one-line change, at the cost of every anonymous crawl spending real GraphQL quota again.
 
 ## Validation
 

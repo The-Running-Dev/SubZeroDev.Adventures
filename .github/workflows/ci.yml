@@ -32,6 +32,7 @@ jobs:
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
 
+      # verification: true
       - name: Check (format, lint, typecheck, unit + browser tests, build)
         run: npm run check
 
@@ -95,14 +96,17 @@ jobs:
       - name: Link shared/ module resolution
         run: ln -s server/node_modules node_modules
 
+      # verification: true
       - name: Verify vendored contract artifact matches Platform's
         run: npm run verify:contract --prefix server
 
+      # verification: true
       - name: Typecheck
         run: npm run typecheck --prefix server
 
       - name: Run migrations
         run: npm run migrate --prefix server up
 
+      # verification: true
       - name: Test
         run: npm test --prefix server

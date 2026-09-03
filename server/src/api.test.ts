@@ -493,6 +493,76 @@ describeIfDb("server API", () => {
     expect(stillAfterAction).toEqual(afterActionScene);
   });
 
+  it("lists and deletes a player's own saves through the store, not a bespoke query", async () => {
+    const cookie = await guestCookie();
+    const created = await app
+      .inject({
+        method: "POST",
+        url: "/api/sessions",
+        headers: { cookie },
+        payload: { campaignId: "what-would-lucifer-do", seed: "list-seed" },
+      })
+      .then((r) => r.json() as { sessionId: string });
+    const saved = await app
+      .inject({
+        method: "POST",
+        url: `/api/sessions/${created.sessionId}/save`,
+        headers: { cookie },
+      })
+      .then((r) => r.json() as { saveId: string; savedAtSeq: number });
+
+    const listed = await app
+      .inject({ method: "GET", url: "/api/saves", headers: { cookie } })
+      .then(
+        (r) =>
+          r.json() as {
+            saves: { saveId: string; campaignId: string; savedAt: string }[];
+          },
+      );
+    const listedSave = listed.saves.find((s) => s.saveId === saved.saveId);
+    expect(listedSave).toMatchObject({ campaignId: "what-would-lucifer-do" });
+    expect(listedSave?.savedAt).toBeTruthy();
+
+    const strangerCookie = await guestCookie();
+    const deniedDelete = await app.inject({
+      method: "DELETE",
+      url: `/api/saves/${saved.saveId}`,
+      headers: { cookie: strangerCookie },
+      payload: { expectedSavedAt: listedSave!.savedAt },
+    });
+    expect(deniedDelete.statusCode).toBe(403);
+
+    // The engine's own `deleteSave` compares `expectedSavedAt` against the stored record
+    // before ever reaching persistence -- a stale precondition is `concurrent_modification`
+    // (409), not a silent no-op, and the save is still listed afterward.
+    const wrongPrecondition = await app.inject({
+      method: "DELETE",
+      url: `/api/saves/${saved.saveId}`,
+      headers: { cookie },
+      payload: { expectedSavedAt: "1970-01-01T00:00:00.000Z" },
+    });
+    expect(wrongPrecondition.statusCode).toBe(409);
+    const stillListed = await app
+      .inject({ method: "GET", url: "/api/saves", headers: { cookie } })
+      .then((r) => r.json() as { saves: { saveId: string }[] });
+    expect(stillListed.saves.map((s) => s.saveId)).toContain(saved.saveId);
+
+    const deleted = await app.inject({
+      method: "DELETE",
+      url: `/api/saves/${saved.saveId}`,
+      headers: { cookie },
+      payload: { expectedSavedAt: listedSave!.savedAt },
+    });
+    expect(deleted.statusCode).toBe(200);
+
+    const afterDelete = await app
+      .inject({ method: "GET", url: "/api/saves", headers: { cookie } })
+      .then((r) => r.json() as { saves: { saveId: string }[] });
+    expect(afterDelete.saves.map((s) => s.saveId)).not.toContain(
+      saved.saveId,
+    );
+  });
+
   // The internal `players.player_id` is what keeps the eventual Platform identity handover
   // (SubZeroDev.Platform design/90-decisions.md) a retrofit rather than a migration -- that
   // only holds if nothing outside `/api/me` ever echoes it back to the client, in a

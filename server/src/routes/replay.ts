@@ -1,6 +1,9 @@
 /**
- * Replay routes: scene-by-scene playback, deterministic verification, and branching --
- * built on `replay.ts`, which uses exported engine API only.
+ * Replay routes: scene-by-scene playback and deterministic verification -- built on
+ * `replay.ts`, which uses exported engine API only. Branching moved to
+ * `routes/session.ts`'s `POST /api/sessions/:id/branch`, now that `SessionStore` has its
+ * own `branchSession` (engine 0.10.0, W99) -- this file keeps only the two operations that
+ * genuinely need the raw stored record outside that store's projection-only surface.
  */
 import type { FastifyInstance } from "fastify";
 import type { Pool } from "pg";
@@ -72,61 +75,6 @@ export function registerReplayRoutes(
         record.blob,
         record.replayCompatible,
       );
-    },
-  );
-
-  /**
-   * `branch` writes straight to `persistence.sessions.put` instead of through
-   * `SessionStore` -- the ten-operation contract has no `branchSession`, so there is
-   * nothing on the store to call. This is a known, deliberate deviation, not an
-   * oversight: the fix is a new engine operation (`branchSession(sessionId, atSeq) ->
-   * SessionHandle`, following the `previewAction` precedent), proposed upstream at
-   * The-Running-Dev/SubZeroDev.GameEngine#274, not client-side code working around the
-   * missing one. Until that lands, `newSessionId` is still minted through
-   * `demo.recordIds` -- the same `RecordIdSource` the store itself uses -- so a branched
-   * session at least carries the same unguessable-id property every other session gets,
-   * even while the write path stays local.
-   */
-  app.post(
-    "/api/sessions/:id/branch",
-    { preHandler: auth },
-    async (request) => {
-      const { id } = request.params as { id: string };
-      const body = request.body as { atSeq: number };
-      const record = await loadSessionRow(
-        pool,
-        id,
-        request.principal.playerId,
-        "branch",
-      );
-      const demo = cell.current();
-      const result = replay(
-        demo.engine,
-        demo.createReplayEngine,
-        record.blob,
-        body.atSeq,
-      );
-
-      const now = new Date().toISOString();
-      const newSessionId = demo.recordIds.newSessionId();
-      const persistence = createPostgresPersistence(pool, KINDS);
-      const branched: StoredSessionRecord = {
-        sessionId: newSessionId,
-        blob: result.finalBlob,
-        audience: record.audience,
-        attemptCounter: body.atSeq,
-        replayCompatible: record.replayCompatible,
-        createdAt: now,
-        updatedAt: now,
-        ...(record.profileId ? { profileId: record.profileId } : {}),
-      };
-      await persistence.sessions.put(branched);
-
-      const scene =
-        result.steps.length > 0
-          ? result.steps[result.steps.length - 1]!.scene
-          : demo.engine.scene(demo.engine.deserialize(result.finalBlob).value!);
-      return { sessionId: newSessionId, scene };
     },
   );
 }

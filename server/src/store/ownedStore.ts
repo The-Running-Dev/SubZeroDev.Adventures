@@ -86,6 +86,17 @@ export function ownedStore(
 ): SessionStore {
   return {
     listCampaigns: () => store.listCampaigns(),
+    // No id to own yet -- `profileId` here is always `request.principal.playerId`, never
+    // client-supplied, so there is nothing for a caller to forge their way past.
+    listSaves: (profileId) => store.listSaves(profileId),
+    async deleteSave(profileId, saveId, expectedSavedAt) {
+      await assertSaveOwned(pool, saveId, playerId, "deleteSave");
+      return store.deleteSave(profileId, saveId, expectedSavedAt);
+    },
+    async branchSession(sessionId, atActionCount) {
+      await assertSessionOwned(pool, sessionId, playerId, "branchSession");
+      return store.branchSession(sessionId, atActionCount);
+    },
     async createSession(config) {
       const accessible = demo.accessibleCampaignIds(playerId);
       const registered = demo.all.some(

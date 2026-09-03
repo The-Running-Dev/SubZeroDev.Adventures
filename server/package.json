@@ -23,7 +23,7 @@
     "pg": "^8.13.1"
   },
   "devDependencies": {
-    "@subzerodev/service-contract": "file:./vendor/subzerodev-service-contract-0.2.0.tgz",
+    "@subzerodev/service-contract": "file:./vendor/subzerodev-service-contract-0.6.0.tgz",
     "@types/node": "^24.13.3",
     "@types/pg": "^8.11.10",
     "jose": "^5.10.0",

@@ -1,15 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
-  buildBulgariaBureaucracyCampaign,
-  buildBulgariaDrivingCampaign,
-  buildBulgariaEnterpriseCampaign,
-  buildBulgariaInheritanceCampaign,
-  buildBulgariaReturnCampaign,
   buildValidatedContentRegistry,
-  buildLuciferChroniclesCampaign,
   createCountingIds,
   createEngine,
   createInMemorySessionStore,
+  fromPortable,
   storyGraphKind,
   TextClient,
   type ActionParams,
@@ -17,6 +12,7 @@ import {
   type CreateSessionConfig,
   type Engine,
   type KindRegistry,
+  type PortableCampaign,
 } from "@the-running-dev/game-engine";
 import type { BrowserDemo } from "./composition";
 import { BrowserClient } from "./browser-client";
@@ -88,9 +84,14 @@ function recordStoreCalls(store: BrowserDemo["store"]): {
   return {
     store: {
       listCampaigns: () => store.listCampaigns(),
+      listSaves: (profileId) => store.listSaves(profileId),
       getScene: (sessionId) => store.getScene(sessionId),
       getView: (sessionId) => store.getView(sessionId),
       getStrings: (sessionId) => store.getStrings(sessionId),
+      deleteSave: (profileId, saveId, expectedSavedAt) =>
+        store.deleteSave(profileId, saveId, expectedSavedAt),
+      branchSession: (sessionId, atActionCount) =>
+        store.branchSession(sessionId, atActionCount),
       createSession: (config) => {
         created.push(config);
         return store.createSession(config);
@@ -141,26 +142,30 @@ function observeSerializations(engine: Engine): {
   return { engine: wrap(engine), lastSerialized: () => observer.value };
 }
 
+// The removed campaign *builders* (`buildBulgariaBureaucracyCampaign` et al.) moved to
+// `SubZeroDev.Adventures.Content`'s own authoring pipeline (engine `90-decisions.md`,
+// "Published narrative content moves to Adventures.Content through an authoring seam") --
+// this fixture hydrates the same six campaigns from the portable JSON already imported
+// above (the exact files `createBrowserDemo` fetches at runtime) via `fromPortable`,
+// matching `shared/campaign-registry.ts`'s own hydration path.
+const STORY_PORTABLES = [
+  bulgariaBureaucracyJson,
+  bulgariaDrivingJson,
+  bulgariaEnterpriseJson,
+  bulgariaInheritanceJson,
+  bulgariaReturnJson,
+  luciferChroniclesJson,
+] as unknown as PortableCampaign[];
+
 function makeParityFixture(): {
   client: TextClient;
   engine: Engine;
   registry: ContentRegistry;
   lastSerialized(): string | undefined;
 } {
-  const built = [
-    buildBulgariaBureaucracyCampaign(),
-    buildBulgariaDrivingCampaign(),
-    buildBulgariaEnterpriseCampaign(),
-    buildBulgariaInheritanceCampaign(),
-    buildBulgariaReturnCampaign(),
-    buildLuciferChroniclesCampaign(),
-  ];
-  if (built.some((campaign) => !campaign.ok || campaign.value === undefined)) {
-    throw new Error("expected the story campaigns to build");
-  }
   const kinds = { "story-graph": storyGraphKind } as unknown as KindRegistry;
   const registryResult = buildValidatedContentRegistry(
-    built.map((campaign) => campaign.value!),
+    STORY_PORTABLES.map((portable) => fromPortable(portable).built),
     kinds,
   );
   if (!registryResult.ok || registryResult.value === undefined) {
@@ -191,7 +196,8 @@ const STORY_CAMPAIGN_IDS = [
 
 describe("BrowserClient — the API coverage checklist (09-clients.md §4, W61.8)", () => {
   it("1. listCampaigns — returns the configured Bureaucracy campaign", async () => {
-    expect((await makeBrowserClient()).listCampaigns()).toContainEqual(
+    const catalog = await (await makeBrowserClient()).listCampaigns();
+    expect(catalog.campaigns).toContainEqual(
       expect.objectContaining({ campaignId: "bulgaria-bureaucracy" }),
     );
   });

@@ -25,17 +25,32 @@ export function createPostgresProfileStore(pool: Pool): ProfileStore {
       );
       return {
         profile: {
-          formatVersion: 1,
+          formatVersion: 3,
           profileId,
           achievements: rows.map((row) => ({
             campaignId: row.campaign_id as string,
             achievementId: row.achievement_id as string,
           })),
+          // Not yet persisted here -- see this function's own header. `listCampaigns`'s
+          // `CampaignProgress.discovered` will read as 0 until a real store lands for
+          // these; nothing else in this server currently reads either field back off a
+          // loaded `PlayerProfile` (records.ts derives "discovered endings" from
+          // `sessions.ending_id` directly, not through this port).
+          terminals: [],
+          kindData: [],
         },
         warnings: [],
       };
     },
 
+    /**
+     * `profile.terminals` and `profile.kindData` (engine 0.10.0, `PlayerProfile`
+     * formatVersion 3 -- W98's terminal identity and W101/W102's kind profile chains) are
+     * silently dropped here, same posture as `load` reporting them empty: this store still
+     * only durably tracks achievements. Persisting the other two is a real, separate
+     * schema decision (a `terminals` table shaped like `achievements`, and a `kind_data`
+     * table keyed by `(player_id, kind_id)` for the opaque per-kind blob) -- not made here.
+     */
     async save(profile: PlayerProfile): Promise<ProfileSaveResult> {
       const client = await pool.connect();
       try {

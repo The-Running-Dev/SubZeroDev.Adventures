@@ -23,12 +23,15 @@ const SERVED_STORE_METHODS: Record<keyof SessionStore, true> = {
   getScene: true,
   getView: true,
   getStrings: true,
+  listSaves: true,
   previewAction: true,
   createSession: true,
   resumeSession: true,
   submitAction: true,
   saveGame: true,
   loadGame: true,
+  deleteSave: true,
+  branchSession: true,
 };
 
 describe("service contract conformance", () => {

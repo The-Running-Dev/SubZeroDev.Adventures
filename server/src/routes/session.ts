@@ -12,7 +12,6 @@ import {
 } from "@the-running-dev/game-engine";
 import type { ContentCell } from "../content-cell.js";
 import { requirePrincipal, resolvePrincipal, logout } from "../principal.js";
-import { listSavesForPlayer } from "../persistence.js";
 import { OwnershipError, ownedStore } from "../store/ownedStore.js";
 import type { IdentityProvider } from "../identity/provider.js";
 
@@ -25,6 +24,8 @@ const ERROR_STATUS: Record<string, number> = {
   unknown_kind: 409,
   save_requires_migration: 409,
   migration_failed: 409,
+  concurrent_modification: 409,
+  invalid_fork_point: 409,
 };
 
 function statusFor(code: string): number {
@@ -109,6 +110,7 @@ export function registerSessionRoutes(
     const demo = cell.current();
     const playerId = request.principalOrNull?.playerId ?? null;
     const accessible = demo.accessibleCampaignIds(playerId);
+    const catalog = await demo.store.listCampaigns();
     reply.header("Vary", "Cookie");
     reply.header("Cache-Control", "private, no-cache");
     return {
@@ -123,9 +125,9 @@ export function registerSessionRoutes(
             visibility: entry.visibility,
           };
         }),
-      summaries: demo.store
-        .listCampaigns()
-        .filter((summary) => accessible.has(summary.campaignId)),
+      summaries: catalog.campaigns.filter((summary) =>
+        accessible.has(summary.campaignId),
+      ),
     };
   });
 
@@ -160,9 +162,24 @@ export function registerSessionRoutes(
 
   app.get("/api/saves", { preHandler: resolve }, async (request) => ({
     saves: request.principalOrNull
-      ? await listSavesForPlayer(pool, request.principalOrNull.playerId)
+      ? await cell.current().store.listSaves(request.principalOrNull.playerId)
       : [],
   }));
+
+  app.delete(
+    "/api/saves/:saveId",
+    { preHandler: [auth, owned] },
+    async (request) => {
+      const { saveId } = request.params as { saveId: string };
+      const body = request.body as { expectedSavedAt: string };
+      await request.store.deleteSave(
+        request.principal.playerId,
+        saveId,
+        body.expectedSavedAt,
+      );
+      return { ok: true };
+    },
+  );
 
   // `[auth, owned]`, not just `auth` -- `owned` is what attaches a store decorated for the
   // access check `ownedStore.createSession` now does (store/ownedStore.ts), so this creates
@@ -241,5 +258,17 @@ export function registerSessionRoutes(
     { preHandler: [auth, owned] },
     async (request) =>
       request.store.loadGame((request.params as { saveId: string }).saveId),
+  );
+
+  // Wire field stays `atSeq` (not the store's own `atActionCount`) -- no reason to break
+  // existing callers over an internal rename.
+  app.post(
+    "/api/sessions/:id/branch",
+    { preHandler: [auth, owned] },
+    async (request) => {
+      const { id } = request.params as { id: string };
+      const body = request.body as { atSeq: number };
+      return request.store.branchSession(id, body.atSeq);
+    },
   );
 }

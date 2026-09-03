@@ -1,9 +1,9 @@
 /**
- * `SessionStore` over HTTP -- the browser side of the server's ten routes
- * (`server/src/routes/session.ts`), which mirror the upstream MCP server's
- * `createMcpTools` delegation pattern one-to-one. Every method here is a direct `fetch`,
- * no game logic -- the same "thin adapter" property the in-browser
- * `createInMemorySessionStore` and the local `BrowserClient` already hold.
+ * `SessionStore` over HTTP -- the browser side of `server/src/routes/session.ts`'s
+ * thirteen operations, which mirror the upstream MCP server's `createMcpTools` delegation
+ * pattern one-to-one. Every method here is a direct `fetch`, no game logic -- the same
+ * "thin adapter" property the in-browser `createInMemorySessionStore` and the local
+ * `BrowserClient` already hold.
  *
  * Every request carries `credentials: "include"` so the `httpOnly` guest/player cookie
  * (`server/src/auth.ts`) travels with it -- the server, not this module, is what turns a
@@ -12,10 +12,12 @@
 import {
   SessionStoreError,
   type ActionParams,
+  type CampaignCatalog,
   type CampaignSummary,
   type CreateSessionConfig,
   type PlayerView,
   type SaveHandle,
+  type SaveSummary,
   type Scene,
   type SessionActionResult,
   type SessionHandle,
@@ -72,17 +74,41 @@ function postJson<T>(
 }
 
 /**
- * `listCampaigns()` is synchronous on the `SessionStore` contract (`04-core.md`), so it
- * cannot itself be a network call -- `summaries` is prefetched by whoever composes this
- * store (`composition.ts`'s `createRemoteDemo`) from the same `/api/campaigns` response
- * the catalog projection comes from.
+ * `listCampaigns()` is session-free but still async on the `SessionStore` contract
+ * (`04-core.md`) -- `summaries` is prefetched by whoever composes this store
+ * (`composition.ts`'s `createRemoteBrowserDemo`) from the same `/api/campaigns` response
+ * the catalog projection comes from, so this wraps it rather than making a second request.
+ * `strings` is empty: nothing downstream reads it off this call -- every summary's
+ * `titleKey` is already resolved into `CatalogEntry.title` by the server before it reaches
+ * `/api/campaigns` (`shared/campaign-registry.ts`'s `buildCatalog`).
  */
 export function createRemoteSessionStore(
   baseUrl: string,
   summaries: readonly CampaignSummary[],
 ): SessionStore {
   return {
-    listCampaigns: () => [...summaries],
+    listCampaigns: () =>
+      Promise.resolve<CampaignCatalog>({
+        campaigns: [...summaries],
+        strings: {},
+      }),
+
+    listSaves: () =>
+      apiFetch<{ saves: SaveSummary[] }>(baseUrl, "/api/saves").then(
+        (body) => body.saves,
+      ),
+
+    deleteSave: (_profileId, saveId, expectedSavedAt) =>
+      apiFetch<{ ok: true }>(baseUrl, `/api/saves/${saveId}`, {
+        method: "DELETE",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ expectedSavedAt }),
+      }).then(() => undefined),
+
+    branchSession: (sessionId, atActionCount) =>
+      postJson<SessionHandle>(baseUrl, `/api/sessions/${sessionId}/branch`, {
+        atSeq: atActionCount,
+      }),
 
     getScene: (sessionId) =>
       apiFetch<Scene>(baseUrl, `/api/sessions/${sessionId}/scene`),
@@ -131,18 +157,13 @@ export function createRemoteSessionStore(
   };
 }
 
-export interface RemoteSave {
-  readonly saveId: string;
-  readonly campaignId: string;
-  readonly savedAtSeq: number;
-}
-
-/** The per-player resume query `SessionStore` has no operation for -- fetched once at
- *  composition time and refreshed after every `saveGame` (`composition.ts`). */
+/** The per-player resume query used at composition time (`composition.ts`), and refreshed
+ *  after every `saveGame` -- the same `/api/saves` response `SessionStore.listSaves()`
+ *  above wraps, fetched directly here since composition time has no session store yet. */
 export async function fetchSaveIndex(
   baseUrl: string,
-): Promise<readonly RemoteSave[]> {
-  const { saves } = await apiFetch<{ saves: RemoteSave[] }>(
+): Promise<readonly SaveSummary[]> {
+  const { saves } = await apiFetch<{ saves: SaveSummary[] }>(
     baseUrl,
     "/api/saves",
   );

@@ -10,7 +10,6 @@ import {
   createInMemorySessionStore,
   defaultRecordIdSource,
   type Engine,
-  type RecordIdSource,
   type SessionStore,
 } from "@the-running-dev/game-engine";
 import {
@@ -96,14 +95,6 @@ export interface ServerDemo {
    * every call.
    */
   createReplayEngine(gameId: string): Engine;
-  /**
-   * The same `RecordIdSource` `store` is built with -- exposed so `routes/replay.ts`'s
-   * `branch` can mint its new session id through the engine's own identifier source
-   * rather than calling `randomUUID()` on the side (issue #11). Branch still writes to
-   * `persistence.sessions.put` directly instead of through `SessionStore`, since there is
-   * no store operation for it yet; this only closes the id-minting half.
-   */
-  readonly recordIds: RecordIdSource;
   /**
    * A digest over everything currently serving, core and submissions together, for the admin
    * page (`routes/admin.ts`) to show *what* is currently serving without dumping the whole
@@ -252,7 +243,6 @@ export async function createServerDemo(
           },
         },
       }),
-    recordIds,
     store: createInMemorySessionStore({
       engine,
       registry,

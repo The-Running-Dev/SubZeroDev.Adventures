@@ -90,6 +90,7 @@ function toSaveRecord(row: {
   save_id: string;
   campaign_id: string;
   blob: string;
+  saved_at: string;
   saved_at_seq: number;
   audience: string;
   profile_id: string | null;
@@ -98,6 +99,7 @@ function toSaveRecord(row: {
     saveId: row.save_id,
     campaignId: row.campaign_id,
     blob: row.blob,
+    savedAt: row.saved_at,
     savedAtSeq: row.saved_at_seq,
     audience: row.audience as StoredSaveRecord["audience"],
     ...(row.profile_id ? { profileId: row.profile_id } : {}),
@@ -181,7 +183,7 @@ export function createPostgresPersistence(
     saves: {
       async get(saveId) {
         const { rows } = await pool.query(
-          `select save_id, campaign_id, blob, saved_at_seq, audience, profile_id
+          `select save_id, campaign_id, blob, saved_at, saved_at_seq, audience, profile_id
            from saves where save_id = $1`,
           [saveId],
         );
@@ -189,11 +191,12 @@ export function createPostgresPersistence(
       },
       async put(record) {
         await pool.query(
-          `insert into saves (save_id, campaign_id, blob, saved_at_seq, audience, profile_id)
-           values ($1, $2, $3, $4, $5, $6)
+          `insert into saves (save_id, campaign_id, blob, saved_at, saved_at_seq, audience, profile_id)
+           values ($1, $2, $3, $4, $5, $6, $7)
            on conflict (save_id) do update set
              campaign_id = excluded.campaign_id,
              blob = excluded.blob,
+             saved_at = excluded.saved_at,
              saved_at_seq = excluded.saved_at_seq,
              audience = excluded.audience,
              profile_id = excluded.profile_id`,
@@ -201,14 +204,35 @@ export function createPostgresPersistence(
             record.saveId,
             record.campaignId,
             record.blob,
+            record.savedAt,
             record.savedAtSeq,
             record.audience,
             record.profileId ?? null,
           ],
         );
       },
-      async delete(saveId) {
-        await pool.query(`delete from saves where save_id = $1`, [saveId]);
+      /** §7.4: conditional -- only when `saved_at` still matches what the caller last read,
+       *  the same optimistic-lock shape `sessions.put`'s `attempt_counter` compare-and-swap
+       *  uses. 0 rows affected (already deleted, or raced by another write) is silent here,
+       *  same as it always was for this method -- the engine's own `deleteSave` is what
+       *  turns that into `concurrent_modification` for the caller, by re-reading the save
+       *  first and comparing `expectedSavedAt` before ever calling this. */
+      async delete(saveId, expectedSavedAt) {
+        await pool.query(
+          `delete from saves where save_id = $1 and saved_at = $2`,
+          [saveId, expectedSavedAt],
+        );
+      },
+      /** §7.4. Every record this adapter holds for one profile -- the engine's own
+       *  `listSaves` does the `savedAt` descending / `saveId` ascending sort, so this
+       *  returns rows in any order. */
+      async listByProfile(profileId) {
+        const { rows } = await pool.query(
+          `select save_id, campaign_id, blob, saved_at, saved_at_seq, audience, profile_id
+           from saves where profile_id = $1`,
+          [profileId],
+        );
+        return rows.map(toSaveRecord);
       },
     },
   };

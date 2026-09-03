@@ -78,6 +78,14 @@ function localPersistence(): SessionPersistence {
         )
           localStorage.removeItem(campaignSaveIndexKey(raw.campaignId));
       },
+      // Local mode has no profile concept -- every record here is unprofiled (`put` is
+      // always called with whatever `createLocalBrowserDemo`'s anonymous sessions produce,
+      // and `createSession` never sets one below) -- so this satisfies `SaveRecordStore`
+      // without ever matching anything. `findLocalSave`'s per-campaign index above remains
+      // the resume query this composition actually uses locally.
+      async listByProfile() {
+        return [];
+      },
     },
   };
 }
@@ -219,13 +227,29 @@ interface CampaignsResponse {
 }
 
 /**
- * `SessionStore.listCampaigns()` and `BrowserDemo.findLocalSave()` are both synchronous
- * (04-core.md; `PlayApp.tsx` calls `findLocalSave` during render) and neither can become a
- * network call, so both are resolved up front here: `/api/campaigns` carries the catalog
- * projection *and* the raw `CampaignSummary[]` the store contract needs, and `/api/saves`
- * seeds the save index. The index is a `let`, refreshed after every `saveGame` -- the one
- * piece of remote state this composition owns rather than delegating to `remote-store.ts`.
+ * `BrowserDemo.findLocalSave()` is synchronous (`PlayApp.tsx` calls it during render) and
+ * cannot become a network call, so the save index is resolved up front here rather than
+ * queried lazily through `SessionStore.listSaves()`: `/api/campaigns` carries the catalog
+ * projection *and* the raw `CampaignSummary[]` `createRemoteSessionStore` wraps as its own
+ * (now-async) `listCampaigns()`, and `/api/saves` seeds the save index. The index is a
+ * `let`, refreshed after every `saveGame` -- the one piece of remote state this composition
+ * owns rather than delegating to `remote-store.ts`.
  */
+/** `/api/saves` now serves the engine's own `listSaves` -- every save a profile has, sorted
+ *  `savedAt` descending -- rather than a server-side query pre-collapsed to one row per
+ *  campaign. This composition still only wants the resume affordance's "most recent save
+ *  per campaign", so it collapses client-side: the first entry seen per `campaignId` wins,
+ *  which is the most recent given the store's own sort order. */
+function latestSaveIdByCampaign(
+  saves: readonly { campaignId: string; saveId: string }[],
+): Map<string, string> {
+  const index = new Map<string, string>();
+  for (const save of saves) {
+    if (!index.has(save.campaignId)) index.set(save.campaignId, save.saveId);
+  }
+  return index;
+}
+
 async function createRemoteBrowserDemo(apiUrl: string): Promise<BrowserDemo> {
   const response = await fetch(`${apiUrl}/api/campaigns`, {
     credentials: "include",
@@ -235,24 +259,14 @@ async function createRemoteBrowserDemo(apiUrl: string): Promise<BrowserDemo> {
   const { campaigns: all, summaries } =
     (await response.json()) as CampaignsResponse;
 
-  let saveIndex = new Map(
-    (await fetchSaveIndex(apiUrl)).map((save) => [
-      save.campaignId,
-      save.saveId,
-    ]),
-  );
+  let saveIndex = latestSaveIdByCampaign(await fetchSaveIndex(apiUrl));
 
   const remoteStore = createRemoteSessionStore(apiUrl, summaries);
   const store: SessionStore = {
     ...remoteStore,
     saveGame: async (sessionId) => {
       const handle = await remoteStore.saveGame(sessionId);
-      saveIndex = new Map(
-        (await fetchSaveIndex(apiUrl)).map((save) => [
-          save.campaignId,
-          save.saveId,
-        ]),
-      );
+      saveIndex = latestSaveIdByCampaign(await fetchSaveIndex(apiUrl));
       return handle;
     },
   };

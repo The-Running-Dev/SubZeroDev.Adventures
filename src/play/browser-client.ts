@@ -1,6 +1,6 @@
 import type {
   ActionParams,
-  CampaignSummary,
+  CampaignCatalog,
   PlayerView,
   SaveHandle,
   Scene,
@@ -38,7 +38,7 @@ export class BrowserClient {
     this.store = store;
   }
 
-  listCampaigns(): CampaignSummary[] {
+  listCampaigns(): Promise<CampaignCatalog> {
     return this.store.listCampaigns();
   }
 

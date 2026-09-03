@@ -27,7 +27,7 @@ import {
   removeContentSource,
   type ContentSourceRow,
 } from "../content-sources.js";
-import { requirePrincipal, resolvePrincipal } from "../principal.js";
+import { guardPrincipal, requirePrincipal } from "../principal.js";
 import { findPlayerByIdentity, isAdmin, setRole } from "../roles.js";
 
 /** A write -- refreshing content is a real action, so this mints a guest the same as any
@@ -50,18 +50,11 @@ function requireAdmin(pool: Pool) {
 /** Read-only admin guard: unlike `requireAdmin`, this never mints a guest account merely
  *  because somebody guessed an admin URL. */
 function resolveAdmin(pool: Pool) {
-  const resolve = resolvePrincipal(pool);
-  return async (
-    request: FastifyRequest,
-    reply: FastifyReply,
-  ): Promise<void> => {
-    await resolve(request);
-    const principal = request.principalOrNull;
-    if (!principal || !(await isAdmin(pool, principal.playerId))) {
-      reply.code(403);
-      await reply.send({ error: { operation: "admin", code: "forbidden" } });
-    }
-  };
+  return guardPrincipal(
+    pool,
+    (principal) => isAdmin(pool, principal.playerId),
+    { operation: "admin", code: "forbidden" },
+  );
 }
 
 interface SourceStatusEntry {

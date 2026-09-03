@@ -20,7 +20,9 @@ import { registerProfileRoutes } from "./routes/profile.js";
 import { registerRankingRoutes } from "./routes/ranking.js";
 import { registerAdminRoutes } from "./routes/admin.js";
 import { registerContentRoutes } from "./routes/content.js";
+import { registerDiscussionRoutes } from "./routes/discussions.js";
 import { loadIdentityProviders } from "./identity/registry.js";
+import type { DiscussionForum } from "./discussions/forum.js";
 
 /** The one place this server reads deployment configuration from -- `index.ts` is the only
  *  caller that reads `process.env` and passes the result in here (issue #12); everything
@@ -51,6 +53,11 @@ export interface AppConfig {
    *  there, a build that fails is the thing under test, not an operator locked out of
    *  their own server. */
   readonly bootstrapSource?: CampaignSource;
+  /** Undefined means the feature is not configured -- `routes/discussions.ts` answers
+   *  `503 not_configured` rather than 404, so the site can tell "off" from "broken", the
+   *  same posture identity's `oauth_not_configured` has. `index.ts` is the only caller
+   *  that passes one, built by `discussions/registry.ts` from the environment. */
+  readonly discussionForum?: DiscussionForum;
 }
 
 /** Builds the wired Fastify instance without binding a port -- shared by `index.ts`
@@ -63,6 +70,7 @@ export async function buildApp(
     previewOrigins = [],
     campaignSource = createDiskCampaignSource(),
     bootstrapSource,
+    discussionForum,
   }: AppConfig,
 ): Promise<FastifyInstance> {
   const app = Fastify({ logger: process.env.NODE_ENV !== "test" });
@@ -153,6 +161,7 @@ export async function buildApp(
   registerRankingRoutes(app, pool, cell);
   registerAdminRoutes(app, pool, cell, campaignSource);
   registerContentRoutes(app, pool, cell);
+  registerDiscussionRoutes(app, pool, discussionForum);
 
   return app;
 }

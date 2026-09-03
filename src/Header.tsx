@@ -7,9 +7,16 @@ interface HeaderProps {
    * Which top-level nav item the current page is: the disk shelf at `"/"`
    * (`"shelf"`), a story actually loaded and in progress there (`"playing"`), or one
    * of the standalone pages reached by a real navigation (`"standings"`, `"profile"`,
-   * `"content"`).
+   * `"content"`, `"start"`, `"discussions"`).
    */
-  current: "shelf" | "playing" | "standings" | "profile" | "content";
+  current:
+    | "shelf"
+    | "playing"
+    | "standings"
+    | "profile"
+    | "content"
+    | "start"
+    | "discussions";
   /** The loaded story's title -- required, and only ever shown, while `current` is
    *  `"playing"`. A third nav item next to "Standings", marking that specific story
    *  current instead of "Disk library" while it's the thing actually on screen. */
@@ -30,9 +37,10 @@ interface HeaderProps {
 
 /**
  * The global header, shared across every page this site has: the single-page app
- * (PlayApp.tsx), the standings page (src/ranking/Ranking.tsx), and a player's own
- * profile (src/profile/OwnProfile.tsx). "Disk library" and "Standings" are peer nav
- * items; the account menu (when present) and the display-mode select sit alongside them.
+ * (PlayApp.tsx), the standings page (src/ranking/Ranking.tsx), a player's own profile
+ * (src/profile/OwnProfile.tsx), and the operator channel (src/discussions/Discussions.tsx).
+ * "Disk library", "Standings", "My content", "Getting started", and "Discussions" are peer
+ * nav items; the account menu (when present) and the display-mode select sit alongside them.
  */
 export function Header({
   current,
@@ -71,6 +79,20 @@ export function Header({
           aria-current={current === "content" ? "page" : undefined}
         >
           My content
+        </a>
+        <a
+          className="system-bar-link"
+          href="/start"
+          aria-current={current === "start" ? "page" : undefined}
+        >
+          Getting started
+        </a>
+        <a
+          className="system-bar-link"
+          href="/discussions"
+          aria-current={current === "discussions" ? "page" : undefined}
+        >
+          Discussions
         </a>
         {current === "playing" && playingTitle && (
           <span

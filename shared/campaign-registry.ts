@@ -15,6 +15,8 @@ import {
   worldGraphKind,
   type ContentRegistry,
   type PortableCampaign,
+  type ValidationError,
+  type ValidationWarning,
 } from "@the-running-dev/game-engine";
 import {
   mergeExtensions,
@@ -145,16 +147,40 @@ export interface BuiltCatalog {
   readonly campaignStringKeys: ReadonlyMap<string, ReadonlySet<string>>;
 }
 
-type HydrateResult =
-  | { readonly ok: true; readonly value: BuiltCatalog }
-  | { readonly ok: false; readonly error: string };
+export type HydrateResult =
+  | {
+      readonly ok: true;
+      readonly value: BuiltCatalog;
+      /** Tier-2 findings — the campaign loaded, but the kind flagged something
+       *  (`unreachable_node`, `no_reachable_ending`, …). Every existing caller ignores these
+       *  by design: a warning must not stop a catalog from publishing. The authoring wizard
+       *  is the first caller that shows them, because they are exactly the mistakes a
+       *  first-time author makes and no error would catch. */
+      readonly warnings: readonly ValidationWarning[];
+    }
+  | {
+      readonly ok: false;
+      readonly error: string;
+      readonly warnings?: readonly ValidationWarning[];
+      /** The engine's own `ValidationError[]`, when the failure came from
+       *  `buildValidatedContentRegistry` rather than from `mergeExtensions` throwing. Carried
+       *  alongside `error` (which stays the flattened string every existing caller reads) so a
+       *  caller rendering failures to a person — `src/start/draft-validation.ts`, the authoring
+       *  wizard — can show one row per error instead of one JSON blob. */
+      readonly errors?: readonly ValidationError[];
+    };
 
 /** The non-throwing core of `buildCatalog` — merges extensions into their base campaigns,
  *  hydrates, and validates, but reports failure instead of throwing so a caller building a
  *  combined catalog from several independent sources (`buildTieredCatalog` below) can decide
  *  what to do about it, the same way `multi-source.ts`'s `loadAllSources` reports a source's
- *  own failure rather than throwing through it. */
-function hydrateCatalog(
+ *  own failure rather than throwing through it.
+ *
+ *  Exported for the authoring wizard (`src/start/draft-validation.ts`), which validates an
+ *  in-progress draft on every edit: a draft is invalid for most of its life, so it needs
+ *  exactly this reporting shape rather than `buildCatalog`'s throwing one — and it must reach
+ *  the engine's real validator, not a second one written to agree with it. */
+export function hydrateCatalog(
   portables: readonly PortableCampaign[],
   extensions: readonly PortableExtension[],
 ): HydrateResult {
@@ -177,6 +203,8 @@ function hydrateCatalog(
     return {
       ok: false,
       error: `The playable catalog could not be validated: ${JSON.stringify(registry.errors)}`,
+      errors: registry.errors,
+      warnings: registry.warnings,
     };
 
   const all = hydrated.map(({ built, catalog }) => ({
@@ -209,6 +237,7 @@ function hydrateCatalog(
       all: Object.freeze(all),
       campaignStringKeys,
     },
+    warnings: registry.warnings,
   };
 }
 

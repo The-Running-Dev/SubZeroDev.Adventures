@@ -558,9 +558,7 @@ describeIfDb("server API", () => {
     const afterDelete = await app
       .inject({ method: "GET", url: "/api/saves", headers: { cookie } })
       .then((r) => r.json() as { saves: { saveId: string }[] });
-    expect(afterDelete.saves.map((s) => s.saveId)).not.toContain(
-      saved.saveId,
-    );
+    expect(afterDelete.saves.map((s) => s.saveId)).not.toContain(saved.saveId);
   });
 
   // The internal `players.player_id` is what keeps the eventual Platform identity handover

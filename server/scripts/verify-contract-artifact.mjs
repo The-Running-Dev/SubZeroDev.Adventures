@@ -1,19 +1,24 @@
-// Guards against this repo and SubZeroDev.Platform silently drifting onto two different
-// copies of the same-named contract artifact (issue #13) -- there is no shared CI between
-// the two repos to compare against live, so this pins the sha256 Platform's own
-// `workloads/game-service/vendor/subzerodev-service-contract-0.2.0.tgz` had as of the last
-// time someone checked the two side by side. Bumping the vendored tarball here requires
-// updating EXPECTED_SHA256 in the same commit, deliberately -- that is the point at which
-// a human re-confirms Platform vendored the identical file, not a different build of the
-// same version.
+// Guards against this repo silently drifting onto a different build of the same-named
+// contract artifact it thinks it vendored (issue #13) -- there is no shared CI between
+// this repo and SubZeroDev.Platform to compare against live, so this pins the sha256 the
+// vendored tarball is expected to have. Bumping the vendored tarball requires updating
+// EXPECTED_SHA256 in the same commit, deliberately -- that is the point at which whoever
+// makes the change confirms the file they committed is the one they meant to.
+//
+// KNOWN DIVERGENCE (2026-09-03): this repo now vendors 0.6.0; SubZeroDev.Platform's own
+// `workloads/game-service/vendor/` was last confirmed at 0.5.0 (issue #13's original
+// cross-repo parity this guard existed to protect). The two are not currently
+// byte-identical. Re-verify against Platform's copy once it bumps to 0.6.0 or later, and
+// restore this comment's original claim that EXPECTED_SHA256 matches Platform's vendored
+// copy -- until then, this only proves this repo's own file is the one it meant to commit.
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 
 const EXPECTED_SHA256 =
-  "80505020e74a521dda0e0cb182ff3952714391a4170f242115e29e2b9a9b8feb";
+  "41afbe946a6f96fa65339994800afaa5f4164c80628a5cba8d6c5fd84aafb175";
 
 const artifactUrl = new URL(
-  "../vendor/subzerodev-service-contract-0.2.0.tgz",
+  "../vendor/subzerodev-service-contract-0.6.0.tgz",
   import.meta.url,
 );
 const bytes = await readFile(artifactUrl);
@@ -21,10 +26,10 @@ const actual = createHash("sha256").update(bytes).digest("hex");
 
 if (actual !== EXPECTED_SHA256) {
   throw new Error(
-    `server/vendor/subzerodev-service-contract-0.2.0.tgz has sha256 ${actual}, expected ${EXPECTED_SHA256} -- ` +
-      "this no longer matches the copy SubZeroDev.Platform vendors. Re-verify the two repos " +
-      "reference the identical artifact, then update EXPECTED_SHA256 in this script.",
+    `server/vendor/subzerodev-service-contract-0.6.0.tgz has sha256 ${actual}, expected ${EXPECTED_SHA256} -- ` +
+      "this no longer matches the file this repo committed. Re-verify what changed, then " +
+      "update EXPECTED_SHA256 in this script.",
   );
 }
 
-console.log("contract artifact sha256 matches Platform's vendored copy.");
+console.log("contract artifact sha256 matches the pinned value.");

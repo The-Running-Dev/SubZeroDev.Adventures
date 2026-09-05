@@ -4,10 +4,11 @@ argument-hint: [target repo path]
 ---
 
 <!-- companion:declared:start -->
+
 **Per-repo companion:** `.claude/commands/install-code-review-agent-local.md`. Read it now, if it exists — an absent,
 empty, or frontmatter-only file is no companion, and this file then stands alone.
 It may override: `extra-steps`, `tightened-authorization`. It may never override anything in
-[`.claude/COMPANIONS.md`](../COMPANIONS.md) § *Never*, which is also where these categories are defined.
+[`.claude/COMPANIONS.md`](../COMPANIONS.md) § _Never_, which is also where these categories are defined.
 <!-- companion:declared:end -->
 
 Install Anthropic's official `claude-code-action` into a GitHub repository, so pull requests get an automated Claude review. **$1** is the target repository path; default to the current repository if not given.
@@ -15,7 +16,7 @@ Install Anthropic's official `claude-code-action` into a GitHub repository, so p
 This installs three things, and only one of them is this command's to do:
 
 1. **The workflow file** — `.github/workflows/claude-code-review.yml`. This command writes it.
-2. **The GitHub App** (`https://github.com/apps/claude`) — grants Claude's GitHub identity access to the target repository. This is a browser consent flow on the user's GitHub account; it cannot be scripted or driven headlessly, and this command does not attempt it (`AGENTS.md`, top-level: *bypassing or completing CAPTCHAs or other bot-detection* and *granting OAuth/SSO permissions* are never automated).
+2. **The GitHub App** (`https://github.com/apps/claude`) — grants Claude's GitHub identity access to the target repository. This is a browser consent flow on the user's GitHub account; it cannot be scripted or driven headlessly, and this command does not attempt it (`AGENTS.md`, top-level: _bypassing or completing CAPTCHAs or other bot-detection_ and _granting OAuth/SSO permissions_ are never automated).
 3. **The `ANTHROPIC_API_KEY` repository secret** (or `CLAUDE_CODE_OAUTH_TOKEN` for a Claude Pro/Max/Team subscription, via `claude setup-token`) — this command never enters the value itself, under any circumstance, even if it is pasted into chat. Entering an API key into a field is a prohibited action at the top level of this session, and no per-repo authorization changes that.
 
 ## Resolve the target
@@ -36,7 +37,7 @@ Not authenticated, or `gh` missing entirely — stop and report. This command do
 Test-Path <target>/.github/workflows/claude-code-review.yml
 ```
 
-- **Absent** — proceed to *Choose a mode*.
+- **Absent** — proceed to _Choose a mode_.
 - **Present** — read it. If its `uses:` line already pins `anthropics/claude-code-action`, report **Identical** (or note a version difference) and stop; re-running this command is not how an existing installation is upgraded. If it is a different workflow that happens to occupy this filename, this is **Occupied** — stop and ask, the same as `INSTALL.md` phase 1 treats any other occupied artifact. Never overwrite a workflow file this command did not write.
 
 ## Choose a mode

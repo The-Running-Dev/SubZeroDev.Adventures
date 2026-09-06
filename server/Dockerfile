@@ -3,9 +3,19 @@
 # Build context is the repository root -- server/docker-compose.yml sets `context: ..` and
 # deploy-api.yml sets `context: .`. This image needs engine/, shared/, and server/: the same
 # three things server/src/composition.ts and shared/campaign-registry.ts reach across at
-# runtime. public/campaigns/ is not among them -- it is test-fixture content only
-# (server/src/index.ts's only content source is SubZeroDev.Adventures.Content), so it is
-# deliberately not copied into either target below.
+# runtime, plus public/campaigns/.
+#
+# public/campaigns/ is carried for exactly one job: it is the snapshot a deployment boots
+# from when the first build off the published source fails (deployment.ts's
+# `createBootstrapCampaignSource`, content-cell.ts's `ready`, issue #53). It is NOT a
+# content source -- the running server serves SubZeroDev.Adventures.Content and nothing
+# else, and a boot that fell back to this set says so through `bootstrapFallback`. It was
+# deliberately left out of the image before #53, on the reasoning that fixtures do not
+# belong in a production image; what changed that is that one unbuildable campaign in the
+# published content exited the process before it bound a port, with the admin API that
+# could have removed the offending source never coming up. Both targets set CAMPAIGNS_DIR
+# explicitly rather than leaning on createDiskCampaignSource's relative default, which
+# resolves differently from src/ than from dist/.
 #
 # Two targets the compose files pick between:
 #   dev      -- server/docker-compose.yml. TypeScript straight through tsx, full
@@ -88,6 +98,7 @@ RUN npm ci --prefix server
 COPY package.json package.json
 COPY shared shared
 COPY server server
+COPY public/campaigns public/campaigns
 # Node resolves a module's dependencies by walking node_modules up through its *ancestor*
 # directories. /app/shared and /app/server are siblings, so server/node_modules is never on
 # shared/campaign-registry.ts's path and its `@the-running-dev/game-engine` import would
@@ -97,6 +108,7 @@ COPY server server
 RUN ln -s server/node_modules node_modules
 WORKDIR /app/server
 ENV PATH=/app/server/node_modules/.bin:$PATH
+ENV CAMPAIGNS_DIR=/app/public/campaigns
 ENV ADVENTURES_SERVE_CMD="tsx src/index.ts"
 ENV ADVENTURES_MAINTAIN_CMD="tsx src/maintenance-cli.ts"
 COPY server/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
@@ -130,6 +142,9 @@ COPY --from=build /app/server/dist server/dist
 # "type": "module" is what makes Node treat the emitted tree as ESM rather than CommonJS.
 COPY server/package.json server/package.json
 COPY server/migrations server/migrations
+# The bootstrap snapshot -- see the header. Read-only, and read only when the first content
+# build fails.
+COPY public/campaigns public/campaigns
 
 COPY server/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
@@ -139,6 +154,7 @@ WORKDIR /app/server
 
 ENV NODE_ENV=production
 ENV PATH=/app/server/node_modules/.bin:$PATH
+ENV CAMPAIGNS_DIR=/app/public/campaigns
 # tsconfig.build.json's rootDir spans server/src and shared/, so index.js lands two levels
 # down inside dist/. Kept here rather than in a package.json script so the layout stays a
 # property of the image and never leaks into either compose file.

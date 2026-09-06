@@ -45,10 +45,11 @@ export interface AppConfig {
    *  multi-source `CampaignSource` (`campaigns/multi-source.ts`) built around the hardcoded
    *  default plus whatever an admin has added (issue #27). Injectable for the same reason
    *  `createServerDemo`'s own `campaignSource` parameter is (#12) -- so this file never
-   *  has to know which kind it got. */
+   *  has to know which kind it got. `deployment.ts` is where the deployed pair is assembled. */
   readonly campaignSource?: CampaignSource;
   /** Content to boot from when the *first* build off `campaignSource` fails -- see
-   *  `content-cell.ts`'s `ready`. `index.ts` passes the committed disk snapshot. Undefined
+   *  `content-cell.ts`'s `ready`. The deployed process passes the committed disk snapshot
+   *  the image carries (`deployment.ts`'s `createBootstrapCampaignSource`). Undefined
    *  keeps the strict posture (a failed first build throws), which is what a test wants:
    *  there, a build that fails is the thing under test, not an operator locked out of
    *  their own server. */

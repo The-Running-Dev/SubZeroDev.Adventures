@@ -5,6 +5,8 @@ const AUTH_ERROR_MESSAGES: Readonly<Record<string, string>> = {
   oauth_not_configured: "Sign-in isn't set up on this deployment yet.",
   invalid_oauth_state: "That sign-in link expired. Try again.",
   oauth_token_exchange_failed: "Sign-in failed. Try again.",
+  oauth_provider_unavailable:
+    "The sign-in provider isn't reachable right now. Everything else still works — try again shortly.",
 };
 
 interface AccountPanelProps {

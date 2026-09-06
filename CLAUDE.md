@@ -58,11 +58,20 @@ docker-compose.yml      the deployment stack — see "The Three Compose Files" b
 `public/campaigns/*.json` (9 campaigns + `manifest.json`) is **test-fixture content, not a
 runtime source.** The deployed server's only campaign source is
 [`The-Running-Dev/SubZeroDev.Adventures.Content`](https://github.com/The-Running-Dev/SubZeroDev.Adventures.Content)
-(hardcoded in `server/src/index.ts`, served over GitHub Pages), and the deployed site always
+(hardcoded in `server/src/deployment.ts`, served over GitHub Pages), and the deployed site always
 sets `VITE_API_URL` so the browser never falls back to local files either (`src/play/composition.ts`).
 What lives here backs `browser-client.test.ts`, `PlayApp.test.tsx` (both import these files as
 fetch-stub fixtures), the visual-regression baselines, and `buildApp`'s disk-backed default
 `campaignSource` (`server/src/app.ts`) that the rest of the server test suite runs against.
+
+It has **one runtime job**, added in 2026-09 (issue #53, decision log below): it is the
+snapshot a deployment boots from when the _first_ build off the published source fails, so
+unbuildable published content cannot exit the process before it binds a port. That is a
+fallback, never a source — the running server serves the published content and nothing else,
+and a boot that fell back says so through `ContentStatus.bootstrapFallback`/`lastError`. It
+does mean a drifted fixture set is what a broken deployment shows until a refresh succeeds,
+which is a reason to regenerate it when it drifts, not a reason to treat it as shipped
+content.
 Regenerate with:
 
 ```bash
@@ -122,9 +131,11 @@ than flattening it, for two reasons that are easy to break and hard to diagnose:
   same line for the same reason. The `runtime` target needs no symlink only because it puts
   `dist/` _under_ `server/`, making `server/node_modules` a genuine ancestor.
 
-`public/campaigns/` is not copied into either image target — the deployed server has no disk
-content source (see "Campaign Content"), so there is nothing there for `CAMPAIGNS_DIR` to
-point at.
+`public/campaigns/` **is** copied into both image targets, and both set `CAMPAIGNS_DIR` to
+where it lands (`/app/public/campaigns`) rather than leaning on `createDiskCampaignSource`'s
+relative default, which resolves differently from `src/` than from `dist/`. It is not a
+content source there — it is the bootstrap snapshot (see "Campaign Content" and the decision
+log). It was deliberately left out of the image before issue #53.
 
 ## Visual Baselines — The One Real Gotcha
 
@@ -400,6 +411,40 @@ Reversibility: cheap | expensive
   local reason is a rule nobody can evaluate.
 
 ### Why it is installed this way
+
+#### 2026-09-06 — The image ships `public/campaigns/` as a bootstrap snapshot, and the deployed wiring moved to `deployment.ts`
+
+Context: a string-key collision between two campaigns in `SubZeroDev.Adventures.Content`
+failed catalog validation, and the deployed API crash-looped at boot — `content-cell.ts`'s
+`ready` throws when it is handed no `fallbackBuild`, `app.ts` only builds one when
+`bootstrapSource` is set, and `index.ts` never set it, despite comments in both files saying
+it did. Under `restart: unless-stopped` that is the exact crash loop issue #22 was closed to
+prevent, with the admin API that could have removed the bad source never coming up. The
+protection had been designed, documented, and left unwired.
+
+Chosen: copy `public/campaigns/` into both image targets with `CAMPAIGNS_DIR` pointing at it,
+and pass it as `bootstrapSource`. The deployed content sources moved out of `index.ts` into
+`server/src/deployment.ts` so `deployment.test.ts` can assert the bootstrap source is passed
+_and_ that it loads into a valid catalog — a present-but-unloadable snapshot fails one line
+later than no snapshot at all. `index.ts` keeps its issue #12 role as the only reader of
+`process.env`; `deployment.ts` takes those values as parameters.
+
+Rejected: booting on an empty catalog (keeps the image content-free and keeps "what you see
+is what the sources say" honest, but turns a content outage into a site that looks empty
+rather than stale, and an empty catalog is a state no route was written against); keeping the
+fail-closed posture and deleting the two comments that promise otherwise (defensible for a
+server that genuinely cannot do its job, but the job it cannot do is _serving campaigns_ —
+the admin, identity, and health surfaces are fine, and one of them is the recovery path);
+leaving the fixture set out and shipping a separate purpose-built snapshot (a second content
+set to keep current, with the same drift problem and none of the existing test coverage).
+
+Known and retained: what boots is a fixture snapshot that nothing forces to stay in step with
+published content, so a fallback boot can serve stale campaigns. `bootstrapFallback` and
+`lastError` on the admin status page are what distinguish it, and `npm run sync:campaigns`
+is what refreshes it.
+
+Reversibility: cheap — three `COPY`/`ENV` lines in `server/Dockerfile` and one field in
+`deploymentConfig`.
 
 #### 2026-08-15 — `sync:campaigns` deep-imports the engine's unexported `digestManifestResolution`
 

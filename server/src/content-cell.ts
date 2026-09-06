@@ -59,9 +59,14 @@ export function createContentCell(build: () => Promise<ServerDemo>): {
    * `restart: unless-stopped` that is a crash loop with no way in but psql.
    *
    * So a failed first build now boots from `fallbackBuild` (the committed disk snapshot,
-   * `index.ts`) instead of throwing, keeping `lastError` and `bootstrapFallback` set so the
-   * admin page can say what happened and let an operator fix it the ordinary way. Only if
-   * the fallback fails too is there genuinely nothing to serve, and that throws.
+   * `deployment.ts`) instead of throwing, keeping `lastError` and `bootstrapFallback` set so
+   * the admin page can say what happened and let an operator fix it the ordinary way. Only
+   * if the fallback fails too is there genuinely nothing to serve, and that throws.
+   *
+   * That fallback then went a release without being wired at all: this comment and
+   * `app.ts`'s both said `index.ts` passed one, and `index.ts` did not, so a string-key
+   * collision in the published content crash-looped the deployment exactly as described
+   * above (issue #53). `deployment.test.ts` asserts the wiring now -- a comment cannot.
    */
   ready(fallbackBuild?: () => Promise<ServerDemo>): Promise<void>;
 } {

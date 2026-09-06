@@ -1,6 +1,6 @@
 import { Pool } from "pg";
 import { buildApp } from "./app.js";
-import { createMultiSourceCampaignSource } from "./campaigns/multi-source.js";
+import { deploymentConfig } from "./deployment.js";
 import { loadDiscussionForum } from "./discussions/registry.js";
 
 const port = Number(process.env.PORT ?? 8787);
@@ -20,37 +20,22 @@ if (!databaseUrl) throw new Error("DATABASE_URL is required");
 
 const pool = new Pool({ connectionString: databaseUrl });
 
-// The one hardcoded, unremovable content source (issue #27) -- always prepended ahead of
-// whatever an admin has added through `/api/admin/content/sources` (content-sources.ts).
-// It is not admin-editable and carries no `CAMPAIGNS_DIR`/env override: the way to point a
-// deployment somewhere else is to add another source, not to change this one.
-//
-// `The-Running-Dev/SubZeroDev.Adventures.Content` serves its manifest at the repo root, not
-// under a `v2/` path -- an earlier commit here guessed `v2/` before the site had actually
-// finished publishing and got it wrong; verified live against the deployed Pages site before
-// fixing this. It is the one source of truth for campaign content now -- no disk fallback
-// stands behind it. `public/campaigns/` still exists in this repository, but only as a
-// fixture set the test suite imports directly; it is not wired into any runtime path, so it
-// cannot drift from what actually ships without a test catching it, and it also cannot
-// silently paper over this source being unreachable.
-const campaignSource = createMultiSourceCampaignSource(pool, {
-  id: "builtin-default",
-  label: "SubZeroDev.Adventures.Content",
-  kind: "url",
-  url: "https://the-running-dev.github.io/SubZeroDev.Adventures.Content/",
-});
-
 // Reads DISCUSSIONS_REPO/DISCUSSIONS_TOKEN/DISCUSSIONS_CATEGORY -- unset (any of the
 // three) means the feature is off, not a startup failure (discussions/registry.ts).
 const discussionForum = loadDiscussionForum();
 
-const app = await buildApp(pool, {
-  siteUrl,
-  apiUrl,
-  previewOrigins,
-  campaignSource,
-  discussionForum,
-});
+// Which content sources a deployment runs on -- including the bootstrap snapshot that keeps
+// unbuildable content from bricking the boot -- lives in `deployment.ts`, where a test can
+// assert it. This file's job is the environment and the socket.
+const app = await buildApp(
+  pool,
+  deploymentConfig(pool, {
+    siteUrl,
+    apiUrl,
+    previewOrigins,
+    discussionForum,
+  }),
+);
 
 await app.listen({ port, host: "0.0.0.0" });
 

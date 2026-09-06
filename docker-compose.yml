@@ -41,6 +41,26 @@ x-adventures-api-common: &adventures-api-common
   # the host happens to hold and silently run the previous build.
   pull_policy: always
   restart: unless-stopped
+  # Explicit public resolvers, rather than inheriting the host's.
+  #
+  # Docker's embedded DNS (127.0.0.11) forwards external names to whatever nameservers the
+  # host's /etc/resolv.conf lists. That is fine until those nameservers stop being reachable
+  # *from a container network* -- a host switching to systemd-resolved's 127.0.0.53 stub, a
+  # firewall rule, a recreated network -- at which point every outbound name fails with
+  # ENOTFOUND while the host itself resolves perfectly. That is exactly what took this
+  # deployment down: `getaddrinfo ENOTFOUND` against the configured OIDC issuer, with
+  # nothing in this file's networking having changed. Naming resolvers here removes the
+  # dependency on the host's resolver being routable from `adventures-internal`/`proxy-net`.
+  #
+  # Container-to-container names (`db`) are unaffected: Docker's embedded DNS answers those
+  # itself and only forwards what it cannot answer.
+  #
+  # This does not help if the container has no egress at all -- if `proxy-net` were created
+  # `--internal`, these resolvers would be just as unreachable as the host's. Diagnose that
+  # case with `docker network inspect proxy-net | grep -i internal` before assuming DNS.
+  dns:
+    - 1.1.1.1
+    - 9.9.9.9
   # No `env_file:` here, deliberately -- see SubZeroDev.com/docker-compose.yml and
   # SubZeroDev.Blog/docker-compose.yml for the same pattern. `env_file:` requires an
   # actual file on disk, which a Portainer-deployed stack never has: Portainer's stack

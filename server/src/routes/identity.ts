@@ -46,7 +46,20 @@ export function registerIdentityRoutes(
       }
 
       const redirectUri = `${apiUrl}/api/auth/${providerName}/callback`;
-      const { url, state, stash } = await provider.start(redirectUri);
+      // `start` reaches the issuer on its first call (`identity/oidc.ts`'s lazy discovery),
+      // so an unreachable provider surfaces here rather than at boot. That is one refused
+      // sign-in, and the player is told so -- not a 500, and emphatically not a dead API.
+      let started;
+      try {
+        started = await provider.start(redirectUri);
+      } catch (error) {
+        request.log.error(error);
+        reply.redirect(
+          redirectWithError(siteUrl, "oauth_provider_unavailable"),
+        );
+        return;
+      }
+      const { url, state, stash } = started;
       const payload: StateCookiePayload = stash ? { state, stash } : { state };
       reply.setCookie(STATE_COOKIE, JSON.stringify(payload), {
         httpOnly: true,

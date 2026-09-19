@@ -8,6 +8,7 @@ import { Stat } from "../../components/Stat";
 import { CampaignCard } from "../../components/CampaignCard";
 import { ResourceState } from "../../components/ResourceState";
 import { BadgeGrid } from "../../play/BadgeGrid";
+import { playEarnedBadgeCount } from "../../play/badges";
 import "./library.css";
 
 export default function Library() {
@@ -28,18 +29,21 @@ export default function Library() {
     .sort((a, b) => b.savedAt.localeCompare(a.savedAt))
     .find((save) => campaigns.some((c) => c.campaignId === save.campaignId));
   const continuing = campaigns.find((c) => c.campaignId === latest?.campaignId);
+  const owned = Boolean(account.identity.playerId && account.apiUrl);
+  // `started` is only offered to a signed-in player, so a selection left over from before a
+  // sign-out has to fall back rather than survive as a blank control over an empty grid.
+  const activeFilter = filter === "started" && !owned ? "all" : filter;
   const visible = campaigns.filter(
     (c) =>
       (!search ||
         `${c.title} ${c.description}`
           .toLocaleLowerCase()
           .includes(search.toLocaleLowerCase())) &&
-      (filter === "all" ||
-        (filter === "featured" && c.featured) ||
-        (filter === "started" && progressById.has(c.campaignId))),
+      (activeFilter === "all" ||
+        (activeFilter === "featured" && c.featured) ||
+        (activeFilter === "started" && progressById.has(c.campaignId))),
   );
   const entries = progress.data?.progress ?? [];
-  const owned = Boolean(account.identity.playerId && account.apiUrl);
   const state = (query: {
     isPending: boolean;
     error: unknown;
@@ -102,7 +106,7 @@ export default function Library() {
             <label>
               {t("filter")}
               <select
-                value={filter}
+                value={activeFilter}
                 onChange={(e) => setFilter(e.target.value)}
               >
                 <option value="all">{t("all")}</option>
@@ -161,7 +165,9 @@ export default function Library() {
           ) : (
             <details className="library-badges">
               <summary>
-                {t("badges", { count: badges.data?.badges.length ?? 0 })}
+                {t("badges", {
+                  count: playEarnedBadgeCount(badges.data?.badges ?? []),
+                })}
               </summary>
               <BadgeGrid badges={badges.data?.badges ?? []} />
             </details>

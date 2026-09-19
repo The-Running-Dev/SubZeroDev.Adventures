@@ -151,6 +151,22 @@ describe("persistent application routing", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("keeps a first-ever visit on the getting-started wizard instead of the library", async () => {
+    // The library home is what a returning visitor sees; the wizard still owns the very first
+    // load, and `PlayApp` is the only thing that can auto-start it.
+    localStorage.removeItem("subzerodev.play.onboarding-seen.v1");
+    render(<App />);
+    await waitFor(() =>
+      expect(document.querySelector(".onboarding-active")).not.toBeNull(),
+    );
+    expect(localStorage.getItem("subzerodev.play.onboarding-seen.v1")).toBe(
+      "1",
+    );
+    expect(
+      screen.queryByRole("heading", { name: "Adventure library" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("keeps navigation available when the catalog fails", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("unavailable")));
     const user = userEvent.setup();

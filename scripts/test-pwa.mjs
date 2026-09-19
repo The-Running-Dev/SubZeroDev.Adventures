@@ -131,6 +131,12 @@ try {
     "/manifest.webmanifest",
   );
   await offline.goto(`${origin}/ranking`);
+  await network.send("Network.emulateNetworkConditions", {
+    offline: true,
+    latency: 0,
+    downloadThroughput: -1,
+    uploadThroughput: -1,
+  });
   await offline.getByText("Без интернет", { exact: true }).waitFor();
   await context.setOffline(false);
   await network.send("Network.overrideNetworkState", {

@@ -28,6 +28,7 @@ src/
   test/                  jsdom + real-browser test setup and shared assertion helpers
 shared/                 code both compositions import — environment-neutral, no DOM, no Node
 server/                 the hosted Node API: its own npm project, its own Dockerfile
+frontend/               production static frontend Dockerfile, Caddy config and HTTP tests
 preview/                the preview static host — see "The Three Compose Files" below
 docker-compose.yml      the deployment stack — see "The Three Compose Files" below
 ```
@@ -94,7 +95,8 @@ There are three, they are independent, and none is an override layer over anothe
 mirrors how `SubZeroDev.com` and `SubZeroDev.Blog/tools/blog-mcp` are laid out.
 
 - **`docker-compose.yml` (root) is the deployment stack.** It pulls
-  `ghcr.io/the-running-dev/adventures-api` and builds nothing. Requires a `.env` beside it
+  `ghcr.io/the-running-dev/adventures-api` and `adventures-web` and builds nothing.
+  Manual Compose usage requires a `.env` beside it
   (copy `.env.example`) and a pre-existing external `proxy-net` network — TLS and public
   routing belong to whatever reverse proxy already lives on that network, not to this repo.
 - **`server/docker-compose.yml` is the dev stack.** `build: context: ..` — the context is
@@ -414,20 +416,24 @@ Reversibility: cheap | expensive
 
 ### Why it is installed this way
 
-#### 2026-09-19 — Explicit Cloudflare navigation routing and staged cutover
+#### 2026-09-19 — Frontend container uses the existing API GitOps deployment
 
-Chosen: a dependency-free Pages advanced-mode Worker, a separate generated deployment
-artifact, and Cloudflare's Wrangler GitHub Action for upload. GitHub remains source/CI;
-`FRONTEND_HOST` selects the production deployer only after live verification. The
-[migration runbook](docs/cloudflare-migration.md) owns the cutover and rollback procedure.
+Context: the owner selected the existing VPS and Portainer deployment instead of the
+proposed Cloudflare Pages migration.
 
-Rejected: a wildcard SPA redirect or Pages' implicit fallback (both can answer missing
-resources with HTML); proxying the existing API (changes cookie/origin contracts for no
-frontend benefit); replacing the GitHub workflow immediately (removes the working host
-before account, DNS and authentication checks). No npm runtime dependency is added.
+Chosen: reuse the preview host's Caddy image family for a static frontend runtime;
+publish it through the API's existing GHCR workflow and redeploy the same root Compose
+stack with the existing webhook. Wait for both image builds and test the actual frontend
+container before publication. TLS remains at the existing proxy-net reverse proxy.
+The [hosting runbook](docs/frontend-hosting.md) owns cutover and rollback.
 
-Reversibility: the generated artifact is separate; the saved GitHub-compatible deployment
-and DNS record remain the rollback until the cutover has been verified.
+Rejected: Cloudflare Pages (unnecessary second hosting system), a separate frontend
+webhook (can redeploy before the other image exists), and a blanket index.html fallback
+(hides missing resources). No npm runtime dependency is added. Caddy is already used by
+the preview stack; nginx would introduce another server configuration without a benefit.
+
+Reversibility: cheap — pin the frontend image independently; GitHub Pages compatibility
+remains until the live host has passed verification.
 
 #### 2026-09-19 — Query and locale foundations before feature redesign
 

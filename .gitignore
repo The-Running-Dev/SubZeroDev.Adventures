@@ -4,7 +4,6 @@ node_modules/
 # Build output
 dist/
 dist-ssr/
-dist-cloudflare/
 *.tsbuildinfo
 
 # Written by a failing `toMatchScreenshot()` (actual/diff images for local

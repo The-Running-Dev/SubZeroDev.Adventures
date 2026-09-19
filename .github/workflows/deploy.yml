@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   deploy:
-    if: vars.FRONTEND_HOST != 'cloudflare'
+    if: vars.FRONTEND_HOST != 'vps'
     name: deploy
     runs-on: ubuntu-latest
     environment:

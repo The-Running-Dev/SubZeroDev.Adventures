@@ -1,96 +1,38 @@
-import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { setTimeout } from "node:timers/promises";
 
 const origin = new URL(process.argv[2] ?? process.env.HOSTING_URL);
-assert.equal(origin.protocol, "https:", "Hosting checks require HTTPS");
-assert.equal(origin.pathname, "/", "Supply the deployment origin, not a route");
-const navigation = {
-  accept: "text/html",
-  "sec-fetch-mode": "navigate",
-  "sec-fetch-dest": "document",
-};
-async function get(path, headers = navigation) {
-  const response = await fetch(new URL(path, origin), {
-    headers,
-    redirect: "manual",
-    signal: AbortSignal.timeout(20_000),
-  });
-  return { response, body: await response.text() };
-}
-let shell;
-for (const path of [
-  "/",
-  "/profile",
-  "/play/hosting-probe",
-  "/discussions/1",
-  "/u/hosting-probe",
-  "/oauth/consent?authorization_id=hosting-probe",
-  "/?campaign=hosting-probe",
-]) {
-  for (let refresh = 0; refresh < 2; refresh++) {
-    const { response, body } = await get(path);
-    assert.equal(response.status, 200, path);
-    assert.match(
-      response.headers.get("content-type") ?? "",
-      /text\/html/,
-      path,
-    );
-    assert.match(body, /id="root"/, path);
-    assert.equal(response.headers.get("cache-control"), "no-cache", path);
-    shell ??= body;
-    assert.equal(body, shell, `Different shell at ${path}`);
+if (origin.protocol !== "https:" || origin.pathname !== "/")
+  throw new Error("Supply the HTTPS deployment origin, not a route");
+// Portainer acknowledges its webhook before the new container is serving.
+if (process.env.EXPECTED_BUILD_REVISION) {
+  let ready = false;
+  for (let attempt = 0; attempt < 30; attempt++) {
+    try {
+      const response = await fetch(new URL("/__build-id", origin), {
+        cache: "no-store",
+        redirect: "error",
+        signal: AbortSignal.timeout(5000),
+      });
+      if (
+        response.ok &&
+        (await response.text()).trim() === process.env.EXPECTED_BUILD_REVISION
+      ) {
+        ready = true;
+        break;
+      }
+    } catch {
+      /* The reverse proxy may briefly have no healthy upstream. */
+    }
+    await setTimeout(2000);
   }
+  if (!ready)
+    throw new Error("Portainer did not serve the expected frontend revision");
 }
-const bundles = [
-  ...shell.matchAll(/(?:src|href)="(\/assets\/[^"]+\.(?:js|css))"/g),
-].map((match) => match[1]);
-assert.ok(bundles.length >= 2, "No bundled JS/CSS references");
-for (const path of bundles) {
-  const { response, body } = await get(path, { accept: "*/*" });
-  assert.equal(response.status, 200, path);
-  assert.match(
-    response.headers.get("content-type") ?? "",
-    path.endsWith(".css") ? /text\/css/ : /javascript/,
-    path,
-  );
-  assert.match(response.headers.get("cache-control") ?? "", /immutable/, path);
-  assert.doesNotMatch(body, /<!doctype html>/i, path);
-}
-for (const path of [
-  "/assets/hosting-missing.js",
-  "/assets/hosting-missing",
-  "/hosting-missing.css",
-  "/icons/hosting-missing.png",
-  "/hosting-missing.webmanifest",
-  "/hosting-missing-worker.js",
-  "/api/me",
-  "/api/campaigns",
-]) {
-  const { response, body } = await get(path);
-  assert.equal(response.status, 404, path);
-  assert.equal(response.headers.get("cache-control"), "no-store", path);
-  assert.doesNotMatch(body, /id="root"|spa_redirect|<!doctype html>/i, path);
-}
-for (const path of ["/sw.js", "/service-worker.js", "/manifest.webmanifest"]) {
-  const { response, body } = await get(path);
-  assert.ok(response.status === 404 || response.status === 200, path);
-  assert.doesNotMatch(body, /id="root"|<!doctype html>/i, path);
-  if (response.status === 200) {
-    assert.match(
-      response.headers.get("content-type") ?? "",
-      path.endsWith(".js") ? /javascript/ : /json/,
-      path,
-    );
-    assert.equal(response.headers.get("cache-control"), "no-cache", path);
-  }
-}
-const ordinaryFetch = await get("/profile", {
-  accept: "application/json",
-  "sec-fetch-mode": "cors",
+execFileSync(process.execPath, ["--test", "frontend/hosting.test.mjs"], {
+  stdio: "inherit",
+  env: { ...process.env, HOSTING_URL: origin.origin },
 });
-assert.equal(ordinaryFetch.response.status, 404);
 console.log(
-  `PASS: HTTPS, repeated direct routes, ${bundles.length} bundles, missing resources, MIME types and cache headers at ${origin.origin}`,
-);
-console.log(
-  "Browser identity/cookies/CORS/OAuth and DNS rollback still require the migration runbook checks.",
+  "Browser cookies/CORS/OAuth and proxy/DNS cutover still require docs/frontend-hosting.md checks.",
 );

@@ -1,6 +1,6 @@
-name: Deploy API
+name: Deploy containers
 
-# Builds and publishes the API container to GHCR on every push to main, then (if
+# Builds and publishes both API and frontend containers to GHCR on main, then (if
 # PORTAINER_REDEPLOY_WEBHOOK_URL is configured) triggers a Portainer stack webhook to
 # redeploy it -- the same mechanism SubZeroDev.com uses. The image build/push half always
 # runs; the deploy half is a no-op until DEPLOY_ENABLED is set, so this workflow is safe to
@@ -25,9 +25,15 @@ permissions:
   contents: read
   packages: write
 
+# A later run must not overwrite :latest while an earlier run triggers Portainer.
+concurrency:
+  group: adventures-container-deploy
+  cancel-in-progress: false
+
 jobs:
   build-and-push:
     name: build-and-push
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout (with submodules)
@@ -59,19 +65,68 @@ jobs:
           tags: |
             ghcr.io/the-running-dev/adventures-api:${{ github.sha }}
             ghcr.io/the-running-dev/adventures-api:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=adventures-api
+          cache-to: type=gha,scope=adventures-api,mode=max
+
+  build-frontend:
+    name: build-frontend
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (with submodules)
+        uses: actions/checkout@v5
+        with:
+          submodules: true
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build frontend candidate
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: frontend/Dockerfile
+          target: runtime
+          load: true
+          tags: ghcr.io/the-running-dev/adventures-web:${{ github.sha }}
+          build-args: |
+            ADVENTURES_BUILD_REVISION=${{ github.sha }}
+            VITE_API_URL=https://adventures-api.subzerodev.com
+            VITE_SUPABASE_URL=${{ vars.VITE_SUPABASE_URL }}
+            VITE_SUPABASE_ANON_KEY=${{ vars.VITE_SUPABASE_ANON_KEY }}
+          cache-from: type=gha,scope=adventures-web
+          cache-to: type=gha,scope=adventures-web,mode=max
+      - name: Test exact frontend image before publishing
+        env:
+          FRONTEND_TEST_IMAGE: ghcr.io/the-running-dev/adventures-web:${{ github.sha }}
+          EXPECTED_BUILD_REVISION: ${{ github.sha }}
+        run: node scripts/test-frontend-container.mjs
+      - name: Publish tested frontend image
+        env:
+          FRONTEND_IMAGE: ghcr.io/the-running-dev/adventures-web:${{ github.sha }}
+        run: |
+          docker push "$FRONTEND_IMAGE"
+          docker tag "$FRONTEND_IMAGE" ghcr.io/the-running-dev/adventures-web:latest
+          docker push ghcr.io/the-running-dev/adventures-web:latest
 
   deploy:
     name: deploy
-    needs: build-and-push
+    needs: [build-and-push, build-frontend]
     runs-on: ubuntu-latest
     # Skips cleanly, rather than failing, until the Portainer stack exists.
     if: vars.DEPLOY_ENABLED == 'true'
     steps:
       # The redeploy trigger carries no contract surface -- no signature, no error code --
       # beyond a successful HTTP response. Portainer re-pulls the stack's configured image
-      # (:latest) and restarts it; there is no read-back here of whether that succeeded.
+      # (:latest) and restarts it. After host cutover, verify the frontend revision below.
       - name: Trigger the Portainer stack redeploy
         env:
           REDEPLOY_WEBHOOK_URL: ${{ secrets.PORTAINER_REDEPLOY_WEBHOOK_URL }}
@@ -81,3 +136,16 @@ jobs:
             exit 1
           fi
           curl -sf -X POST "$REDEPLOY_WEBHOOK_URL"
+      - name: Checkout frontend verification
+        if: vars.FRONTEND_HOST == 'vps'
+        uses: actions/checkout@v5
+      - name: Setup Node for deployment verification
+        if: vars.FRONTEND_HOST == 'vps'
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - name: Verify deployed frontend revision and routing
+        if: vars.FRONTEND_HOST == 'vps'
+        env:
+          EXPECTED_BUILD_REVISION: ${{ github.sha }}
+        run: node scripts/verify-hosting.mjs https://adventures.subzerodev.com/

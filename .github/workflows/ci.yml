@@ -36,9 +36,6 @@ jobs:
       - name: Check (format, lint, typecheck, unit + browser tests, build)
         run: npm run check
 
-      - name: Verify Cloudflare routing and artifact
-        run: npm run test:hosting && node scripts/prepare-cloudflare.mjs
-
       - name: Upload visual-regression diffs on failure
         if: failure()
         uses: actions/upload-artifact@v4
@@ -46,6 +43,38 @@ jobs:
           name: vitest-attachments
           path: .vitest-attachments/
           if-no-files-found: ignore
+
+  frontend-container:
+    name: frontend-container
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: true
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - uses: docker/setup-buildx-action@v3
+      - name: Build the production frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: frontend/Dockerfile
+          target: runtime
+          load: true
+          tags: adventures-web:test
+          build-args: |
+            ADVENTURES_BUILD_REVISION=${{ github.sha }}
+          cache-from: type=gha,scope=adventures-web
+          cache-to: type=gha,scope=adventures-web,mode=max
+      - name: Verify real container routing, assets, health and revision
+        env:
+          EXPECTED_BUILD_REVISION: ${{ github.sha }}
+        run: node scripts/test-frontend-container.mjs
+      - name: Validate deployment Compose
+        env:
+          DB_PASSWORD: ci-placeholder
+        run: docker compose config --quiet
 
   # The Node API (server/) -- a separate npm project, not part of the `ci` job above,
   # which stays exactly as it was. Needs a real Postgres for the port-conformance and

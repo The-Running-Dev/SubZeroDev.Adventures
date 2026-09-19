@@ -1,3 +1,4 @@
+import { Link } from "react-router";
 /**
  * The campaign-authoring wizard.
  *
@@ -16,7 +17,7 @@
  *    JSON by hand on `/content`. No new server surface exists for authoring.
  */
 import { useEffect, useState } from "react";
-import { useIdentity } from "../play/identity";
+import { useAccount } from "../app/providers/AccountProvider";
 import {
   clearDraft,
   draftDigest,
@@ -944,7 +945,7 @@ function RewardsStep({
         Rewards are optional, and unlock when a player reaches a particular
         ending. Richer conditions exist in the format — they are not authored
         here; a campaign that needs them can be pasted as JSON on{" "}
-        <a href="/content">My content</a>.
+        <Link to="/content">My content</Link>.
       </p>
 
       {endingIds.length === 0 && (
@@ -1054,7 +1055,7 @@ function SubmitStep({
   readonly valid: boolean;
   readonly onSubmitted: () => void;
 }) {
-  const { identity, loading } = useIdentity(apiUrl, 0);
+  const { identity, loading } = useAccount();
   const [busy, setBusy] = useState(false);
   const [outcome, setOutcome] = useState<{
     readonly tone: "ok" | "error";
@@ -1118,7 +1119,7 @@ function SubmitStep({
         Submitting sends the campaign exactly as the playtest ran it. It is
         playable by you immediately and privately, and queued for review; nobody
         else sees it unless an admin approves it. Everything you submit stays
-        listed on <a href="/content">My content</a>.
+        listed on <Link to="/content">My content</Link>.
       </p>
 
       {!apiUrl && (

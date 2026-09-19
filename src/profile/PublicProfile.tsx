@@ -86,7 +86,7 @@ export function PublicProfile({
   }
 
   return (
-    <main className="play-main">
+    <>
       <section className="archive" aria-labelledby="profile-title">
         <div className="archive-heading">
           <p className="eyebrow">SUBZERO STORY SYSTEM // OPERATOR RECORD</p>
@@ -174,6 +174,6 @@ export function PublicProfile({
           </>
         )}
       </section>
-    </main>
+    </>
   );
 }

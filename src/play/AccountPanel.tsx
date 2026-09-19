@@ -1,3 +1,4 @@
+import { Link } from "react-router";
 import { useEffect, useRef, useState } from "react";
 import { signInUrl, signOut, type Identity } from "./identity";
 
@@ -136,9 +137,9 @@ export function AccountPanel({
   return (
     <>
       {isAdmin && (
-        <a className="system-bar-link" href="/?admin">
+        <Link className="system-bar-link" to="/?admin">
           Admin
-        </a>
+        </Link>
       )}
       <div className="account-menu" ref={menu}>
         <button
@@ -159,13 +160,13 @@ export function AccountPanel({
               </p>
             )}
             {profileAvailable && (
-              <a
+              <Link
                 className="cabinet-button"
-                href="/profile"
+                to="/profile"
                 onClick={() => setOpen(false)}
               >
                 Profile
-              </a>
+              </Link>
             )}
             {member ? (
               <button

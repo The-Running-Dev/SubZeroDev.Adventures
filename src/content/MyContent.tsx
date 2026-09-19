@@ -1,27 +1,12 @@
+import { useAccount } from "../app/providers/AccountProvider";
 /**
  * `/content` -- a signed-in (or guest) player's own submitted campaigns and extensions.
- * Standalone top-level page, same shape as `OwnProfile.tsx`/`Ranking.tsx`: `apiUrl` read
- * once by `main.tsx` and passed down as a prop, its own theme state for the shared
- * `Header`. The submit form is `AdminPanel.tsx`'s paste/upload/URL flow ported to one
+ * Routed under AppShell, which owns theme and account state. The submit form is `AdminPanel.tsx`'s paste/upload/URL flow ported to one
  * owner (CLAUDE.md's "Ingestion UI scope" decision) -- same fields, same "add, then the
  * server refreshes, then report this row's own outcome" shape, against `/api/content`
  * instead of `/api/admin/content/sources`.
  */
 import { useEffect, useRef, useState } from "react";
-import { Header } from "../Header";
-import { AccountPanel } from "../play/AccountPanel";
-import {
-  consumeAuthError,
-  useAdminAccess,
-  useIdentity,
-} from "../play/identity";
-import {
-  applyTheme,
-  DEFAULT_THEME,
-  readStoredTheme,
-  storeTheme,
-  type ThemeId,
-} from "../theme";
 
 type SubmissionStatus = "pending" | "approved" | "rejected";
 type SubmissionVisibility = "private" | "public";
@@ -104,23 +89,7 @@ function useMySubmissions(
 }
 
 export function MyContent({ apiUrl }: { apiUrl?: string }) {
-  const [theme, setTheme] = useState<ThemeId>(DEFAULT_THEME);
-  useEffect(() => {
-    setTheme(readStoredTheme());
-  }, []);
-  function changeTheme(id: ThemeId): void {
-    setTheme(id);
-    applyTheme(id);
-    storeTheme(id);
-  }
-
-  const [identityRefreshToken, setIdentityRefreshToken] = useState(0);
-  const { identity, loading: identityLoading } = useIdentity(
-    apiUrl,
-    identityRefreshToken,
-  );
-  const { isAdmin } = useAdminAccess(apiUrl, identity.playerId);
-  const [authError] = useState(() => consumeAuthError());
+  const { identity, loading: identityLoading } = useAccount();
 
   const [refreshToken, setRefreshToken] = useState(0);
   const { submissions, refetch } = useMySubmissions(
@@ -301,20 +270,7 @@ export function MyContent({ apiUrl }: { apiUrl?: string }) {
   }
 
   return (
-    <main className="play-main">
-      <Header current="content" theme={theme} onThemeChange={changeTheme}>
-        {apiUrl && (
-          <AccountPanel
-            apiUrl={apiUrl}
-            identity={identity}
-            loading={identityLoading}
-            authError={authError}
-            onChanged={() => setIdentityRefreshToken((token) => token + 1)}
-            isAdmin={isAdmin}
-            profileAvailable={true}
-          />
-        )}
-      </Header>
+    <>
       <section className="archive admin" aria-labelledby="content-title">
         <div className="archive-heading">
           <p className="eyebrow">SUBZERO STORY SYSTEM // AUTHOR SUBMISSIONS</p>
@@ -528,6 +484,6 @@ export function MyContent({ apiUrl }: { apiUrl?: string }) {
           </>
         )}
       </section>
-    </main>
+    </>
   );
 }

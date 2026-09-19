@@ -1,5 +1,7 @@
+import { Link } from "react-router";
 import {
   useEffect,
+  useCallback,
   useMemo,
   useRef,
   useState,
@@ -7,15 +9,11 @@ import {
   type CSSProperties,
   type RefObject,
 } from "react";
-import { Header } from "../Header";
-import {
-  applyTheme,
-  DEFAULT_THEME,
-  readStoredTheme,
-  storeTheme,
-} from "../theme";
+import { useLocation, useNavigate } from "react-router";
+import { useTheme } from "../app/providers/ThemeProvider";
+import { useAccount } from "../app/providers/AccountProvider";
+import { usePlayerShell } from "../app/playerShell";
 import type { ThemeId } from "../theme";
-import { AccountPanel } from "./AccountPanel";
 import { AdminPanel } from "./AdminPanel";
 import { BbsPrompt } from "./BbsPrompt";
 import { BrowserClient, type PlayState } from "./browser-client";
@@ -29,14 +27,10 @@ import {
   type StatBounds,
 } from "./composition";
 import {
-  consumeAuthError,
-  useAdminAccess,
-  useIdentity,
   usePlatformStats,
   useProgress,
   type CampaignProgress,
 } from "./identity";
-import { MatrixRain } from "./MatrixRain";
 import { PlatformStats } from "./PlatformStats";
 
 /**
@@ -496,23 +490,14 @@ function PlayAppReady({
   const [busy, setBusy] = useState(false);
   /** Bumped on every game load and every return to the shelf, so the BBS prompt can clear its stale response/input independently of ordinary in-game state changes (choosing an action, selecting a disk). */
   const [bbsResetToken, setBbsResetToken] = useState(0);
-  const [displayTheme, setDisplayTheme] = useState<ThemeId>(DEFAULT_THEME);
+  const { theme: displayTheme } = useTheme();
+  const navigate = useNavigate();
+  const { search } = useLocation();
 
-  // Account chip + progress panel (AccountPanel.tsx) -- only meaningful in remote mode,
-  // where `demo.apiUrl` is set (composition.ts). `identityRefreshToken` bumps after a
-  // sign-in/out/transfer round trip to re-fetch `/api/me` and `/api/progress`.
-  const [identityRefreshToken, setIdentityRefreshToken] = useState(0);
-  const { identity, loading: identityLoading } = useIdentity(
-    demo.apiUrl,
-    identityRefreshToken,
-  );
-  const { isAdmin, loading: adminAccessLoading } = useAdminAccess(
-    demo.apiUrl,
-    identity.playerId,
-  );
+  const { identity, isAdmin, adminAccessLoading, refreshIdentity } =
+    useAccount();
   const progress = useProgress(demo.apiUrl, identity.playerId);
   const platformStats = usePlatformStats(demo.apiUrl);
-  const [authError] = useState(() => consumeAuthError());
   /** The profile page needs a signed-in (or guest) player to have anything to show, and a
    *  backend to fetch it from -- local mode has neither. */
   const profileAvailable =
@@ -572,27 +557,13 @@ function PlayAppReady({
     if (campaignId) window.scrollTo({ top: 0, left: 0, behavior: "instant" });
   }, [campaignId]);
 
-  useEffect(() => {
-    const stored = readStoredTheme();
-    setDisplayTheme(stored);
-    applyTheme(stored);
-  }, []);
-
-  function changeTheme(id: ThemeId) {
-    setDisplayTheme(id);
-    applyTheme(id);
-    storeTheme(id);
-  }
-
   /**
    * A permanent `?campaign=` link loads the adventure directly -- no dossier click, no
    * briefing step. A hidden campaign has no dossier tile at all, so this is its only door in.
    */
   useEffect(() => {
     if (autoStarted.current) return;
-    const requested = new URLSearchParams(window.location.search).get(
-      "campaign",
-    );
+    const requested = new URLSearchParams(search).get("campaign");
     if (!requested || !demo.findCampaign(requested)) return;
     autoStarted.current = true;
     setSelectedId(requested);
@@ -615,7 +586,7 @@ function PlayAppReady({
    */
   useEffect(() => {
     if (autoStarted.current) return;
-    if (new URLSearchParams(window.location.search).has("admin")) return;
+    if (new URLSearchParams(search).has("admin")) return;
     if (hasSeenOnboarding()) return;
     if (!demo.findCampaign(GETTING_STARTED_CAMPAIGN_ID)) return;
     autoStarted.current = true;
@@ -632,6 +603,7 @@ function PlayAppReady({
     setSaveFailed(false);
     try {
       const next = await client.start(id);
+      if (identity.kind === "anonymous" && demo.apiUrl) refreshIdentity();
       if (runToken.current !== token) return;
       setState(next);
       setCampaignId(id);
@@ -715,7 +687,7 @@ function PlayAppReady({
     }
   }
 
-  function returnToShelf() {
+  const returnToShelf = useCallback(() => {
     runToken.current += 1;
     if (campaignId) setSelectedId(campaignId);
     setState(undefined);
@@ -726,7 +698,7 @@ function PlayAppReady({
     setJourney([]);
     setBusy(false);
     setBbsResetToken((token) => token + 1);
-  }
+  }, [campaignId]);
 
   /**
    * The BBS Terminal prompt's only route into the game -- everything it can
@@ -752,7 +724,7 @@ function PlayAppReady({
 
     if (!state) {
       if (upper === "PROFILE" && profileAvailable) {
-        window.location.assign("/profile");
+        navigate("/profile");
         return undefined;
       }
       if (index !== undefined) {
@@ -824,386 +796,362 @@ function PlayAppReady({
   const bbsFocusToken = `${selectedId ?? ""}|${campaignId ?? ""}|${sceneText ?? ""}|${ended}`;
   // Content administration keeps the same header and archive shell as the main surface;
   // it is an operator mode of the game, not a separate visual application.
-  const isAdminPage = new URLSearchParams(window.location.search).has("admin");
+  const isAdminPage = new URLSearchParams(search).has("admin");
+
+  usePlayerShell({
+    hidden: isOnboarding,
+    title: !isAdminPage && state ? selected?.title : undefined,
+    onSelectShelf: isAdminPage ? undefined : returnToShelf,
+  });
 
   return (
     <>
-      {displayTheme === "matrix" && <MatrixRain />}
-      <main
-        className={isOnboarding ? "play-main onboarding-active" : "play-main"}
-      >
-        <div className="boot-flash" key={displayTheme} aria-hidden="true" />
-        {!isOnboarding && (
-          <Header
-            current={isAdminPage ? "shelf" : state ? "playing" : "shelf"}
-            playingTitle={isAdminPage ? undefined : selected?.title}
-            onSelectShelf={isAdminPage ? undefined : returnToShelf}
-            theme={displayTheme}
-            onThemeChange={changeTheme}
+      <div className="boot-flash" key={displayTheme} aria-hidden="true" />
+      {isAdminPage ? (
+        adminAccessLoading ? (
+          <div className="play-loading" role="status">
+            Checking admin access…
+          </div>
+        ) : isAdmin ? (
+          <AdminPanel
+            demo={demo}
+            syncing={syncing}
+            syncError={syncError}
+            lastSyncedAt={lastSyncedAt}
+            onSync={onSync}
+          />
+        ) : (
+          <section
+            className="archive admin"
+            aria-labelledby="admin-denied-title"
           >
-            {demo.apiUrl && (
-              <AccountPanel
-                apiUrl={demo.apiUrl}
-                identity={identity}
-                loading={identityLoading}
-                authError={authError}
-                onChanged={() => setIdentityRefreshToken((token) => token + 1)}
-                isAdmin={isAdmin}
-                profileAvailable={profileAvailable}
+            <div className="archive-heading">
+              <p className="eyebrow">RESTRICTED SYSTEM // ACCESS DENIED</p>
+              <h1 id="admin-denied-title">Admin access required</h1>
+              <p>
+                This page is available only to an authorized signed-in account.
+              </p>
+              <Link className="cabinet-button" to="/">
+                Return to disk library
+              </Link>
+            </div>
+          </section>
+        )
+      ) : !state ? (
+        <section className="archive" aria-labelledby="shelf-title">
+          <div className="archive-heading">
+            {demo.apiUrl && platformStats && (
+              <PlatformStats
+                stats={platformStats}
+                catalogSize={demo.catalog.length}
               />
             )}
-          </Header>
-        )}
-        {isAdminPage ? (
-          adminAccessLoading ? (
-            <div className="play-loading" role="status">
-              Checking admin access…
-            </div>
-          ) : isAdmin ? (
-            <AdminPanel
-              demo={demo}
-              syncing={syncing}
-              syncError={syncError}
-              lastSyncedAt={lastSyncedAt}
-              onSync={onSync}
-            />
-          ) : (
-            <section
-              className="archive admin"
-              aria-labelledby="admin-denied-title"
-            >
-              <div className="archive-heading">
-                <p className="eyebrow">RESTRICTED SYSTEM // ACCESS DENIED</p>
-                <h1 id="admin-denied-title">Admin access required</h1>
-                <p>
-                  This page is available only to an authorized signed-in
-                  account.
-                </p>
-                <a className="cabinet-button" href="/">
-                  Return to disk library
-                </a>
-              </div>
-            </section>
-          )
-        ) : !state ? (
-          <section className="archive" aria-labelledby="shelf-title">
-            <div className="archive-heading">
-              {demo.apiUrl && platformStats && (
-                <PlatformStats
-                  stats={platformStats}
-                  catalogSize={demo.catalog.length}
-                />
-              )}
-              <p className="eyebrow">SUBZERO STORY SYSTEM // INSERT DISK</p>
-              <h1 id="shelf-title">Adventure disk library</h1>
-              <p>
-                Select a program. Your choices, bad luck, and improbable
-                consequences run entirely on this machine.
-              </p>
-            </div>
-            <div className="dossier-grid" aria-label="Story dossiers">
-              {demo.catalog.map((campaign, index) => {
-                const isSelected = selectedId === campaign.campaignId;
-                // An odd-numbered catalog's final tile has no partner column, so it
-                // spans both -- and drops the left/right column classing below, which
-                // exists only to alternate a border between adjacent tiles.
-                const isLastOdd =
-                  index === demo.catalog.length - 1 &&
-                  demo.catalog.length % 2 === 1;
-                return (
-                  <div
-                    key={campaign.campaignId}
+            <p className="eyebrow">SUBZERO STORY SYSTEM // INSERT DISK</p>
+            <h1 id="shelf-title">Adventure disk library</h1>
+            <p>
+              Select a program. Your choices, bad luck, and improbable
+              consequences run entirely on this machine.
+            </p>
+          </div>
+          <div className="dossier-grid" aria-label="Story dossiers">
+            {demo.catalog.map((campaign, index) => {
+              const isSelected = selectedId === campaign.campaignId;
+              // An odd-numbered catalog's final tile has no partner column, so it
+              // spans both -- and drops the left/right column classing below, which
+              // exists only to alternate a border between adjacent tiles.
+              const isLastOdd =
+                index === demo.catalog.length - 1 &&
+                demo.catalog.length % 2 === 1;
+              return (
+                <div
+                  key={campaign.campaignId}
+                  className={[
+                    "dossier-tile",
+                    isLastOdd
+                      ? "dossier-span-full"
+                      : index % 2 === 0
+                        ? "dossier-col-left"
+                        : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                >
+                  <button
                     className={[
-                      "dossier-tile",
-                      isLastOdd
-                        ? "dossier-span-full"
-                        : index % 2 === 0
-                          ? "dossier-col-left"
-                          : "",
+                      "dossier",
+                      campaign.featured ? "dossier-featured" : "",
+                      isSelected ? "is-selected" : "",
                     ]
                       .filter(Boolean)
                       .join(" ")}
+                    onClick={() => setSelectedId(campaign.campaignId)}
+                    aria-pressed={isSelected}
+                    aria-expanded={isSelected}
                   >
-                    <button
-                      className={[
-                        "dossier",
-                        campaign.featured ? "dossier-featured" : "",
-                        isSelected ? "is-selected" : "",
-                      ]
-                        .filter(Boolean)
-                        .join(" ")}
-                      onClick={() => setSelectedId(campaign.campaignId)}
-                      aria-pressed={isSelected}
-                      aria-expanded={isSelected}
-                    >
-                      <span className="dossier-number">
-                        DISK {String(index + 1).padStart(2, "0")} //{" "}
-                        {campaign.mine
-                          ? campaign.visibility === "public"
-                            ? "PUBLISHED BY YOU"
-                            : "PRIVATE"
-                          : campaign.featured
-                            ? "FEATURED"
-                            : "READY"}
+                    <span className="dossier-number">
+                      DISK {String(index + 1).padStart(2, "0")} //{" "}
+                      {campaign.mine
+                        ? campaign.visibility === "public"
+                          ? "PUBLISHED BY YOU"
+                          : "PRIVATE"
+                        : campaign.featured
+                          ? "FEATURED"
+                          : "READY"}
+                    </span>
+                    <strong>{campaign.title}</strong>
+                    <span>{campaign.duration}</span>
+                    {progress.get(campaign.campaignId) && (
+                      <span className="dossier-progress">
+                        {progressLabel(
+                          campaign,
+                          progress.get(campaign.campaignId)!,
+                        )}
                       </span>
-                      <strong>{campaign.title}</strong>
-                      <span>{campaign.duration}</span>
-                      {progress.get(campaign.campaignId) && (
-                        <span className="dossier-progress">
-                          {progressLabel(
-                            campaign,
-                            progress.get(campaign.campaignId)!,
-                          )}
-                        </span>
-                      )}
-                    </button>
-                    {isSelected && (
-                      <div className="dossier-brief">
-                        <p className="dossier-description">
-                          {campaign.description}
-                        </p>
-                        <div className="briefing-actions">
-                          <button
-                            className="cabinet-button primary"
-                            disabled={busy}
-                            onClick={() => void start(campaign.campaignId)}
-                          >
-                            Load
-                          </button>
-                          {demo.findLocalSave(campaign.campaignId) && (
-                            <button
-                              className="cabinet-button"
-                              disabled={busy}
-                              onClick={() =>
-                                void resume(
-                                  campaign.campaignId,
-                                  demo.findLocalSave(campaign.campaignId)!,
-                                )
-                              }
-                            >
-                              Resume
-                            </button>
-                          )}
-                        </div>
-                        <p className="briefing-permalink">
-                          <a href={permalinkFor(campaign.campaignId)}>
-                            {permalinkFor(campaign.campaignId)}
-                          </a>
-                        </p>
-                      </div>
                     )}
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        ) : (
-          <section
-            className={`cabinet accent-${cabinetTheme?.accent ?? "default"}${isOnboarding ? " onboarding" : ""}`}
-            aria-label={`${selected?.title ?? "Story"} adventure terminal`}
-          >
-            <header className="cabinet-marquee">
-              <div>
-                <p className="eyebrow">
-                  {cabinetTheme?.eyebrow ?? "STORY IN PROGRESS"}
-                </p>
-                <h1>{selected?.title}</h1>
-              </div>
-              <div className="marquee-controls">
-                {!isOnboarding && (
-                  <span
-                    className={saveFailed ? "save-lamp warning" : "save-lamp"}
-                  >
-                    <span aria-hidden="true" />{" "}
-                    {saveFailed ? "DISK WRITE ERROR" : "GAME SAVED"}
-                  </span>
-                )}
-                <button
-                  className="cabinet-button quiet"
-                  onClick={returnToShelf}
-                >
-                  {isOnboarding ? "Skip" : "Quit to library"}
-                </button>
-              </div>
-            </header>
-            <div className="cabinet-layout">
-              <article className="scene-viewport" aria-live="polite">
-                {ended ? (
-                  <>
-                    <p className="scene-kicker">SESSION COMPLETE</p>
-                    <SceneRegion
-                      key={sceneText}
-                      text={state.scene.body.text}
-                      regionRef={sceneRegion}
-                      theme={displayTheme}
-                    />
-                    <ArrivalReceipt arrivalChoice={arrivalChoice} />
-                    <div className="ending-controls">
-                      <p className="ending-placard">
-                        This matter has been concluded with excessive ceremony.
+                  </button>
+                  {isSelected && (
+                    <div className="dossier-brief">
+                      <p className="dossier-description">
+                        {campaign.description}
                       </p>
+                      <div className="briefing-actions">
+                        <button
+                          className="cabinet-button primary"
+                          disabled={busy}
+                          onClick={() => void start(campaign.campaignId)}
+                        >
+                          Load
+                        </button>
+                        {demo.findLocalSave(campaign.campaignId) && (
+                          <button
+                            className="cabinet-button"
+                            disabled={busy}
+                            onClick={() =>
+                              void resume(
+                                campaign.campaignId,
+                                demo.findLocalSave(campaign.campaignId)!,
+                              )
+                            }
+                          >
+                            Resume
+                          </button>
+                        )}
+                      </div>
+                      <p className="briefing-permalink">
+                        <Link to={permalinkFor(campaign.campaignId)}>
+                          {permalinkFor(campaign.campaignId)}
+                        </Link>
+                      </p>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      ) : (
+        <section
+          className={`cabinet accent-${cabinetTheme?.accent ?? "default"}${isOnboarding ? " onboarding" : ""}`}
+          aria-label={`${selected?.title ?? "Story"} adventure terminal`}
+        >
+          <header className="cabinet-marquee">
+            <div>
+              <p className="eyebrow">
+                {cabinetTheme?.eyebrow ?? "STORY IN PROGRESS"}
+              </p>
+              <h1>{selected?.title}</h1>
+            </div>
+            <div className="marquee-controls">
+              {!isOnboarding && (
+                <span
+                  className={saveFailed ? "save-lamp warning" : "save-lamp"}
+                >
+                  <span aria-hidden="true" />{" "}
+                  {saveFailed ? "DISK WRITE ERROR" : "GAME SAVED"}
+                </span>
+              )}
+              <button className="cabinet-button quiet" onClick={returnToShelf}>
+                {isOnboarding ? "Skip" : "Quit to library"}
+              </button>
+            </div>
+          </header>
+          <div className="cabinet-layout">
+            <article className="scene-viewport" aria-live="polite">
+              {ended ? (
+                <>
+                  <p className="scene-kicker">SESSION COMPLETE</p>
+                  <SceneRegion
+                    key={sceneText}
+                    text={state.scene.body.text}
+                    regionRef={sceneRegion}
+                    theme={displayTheme}
+                  />
+                  <ArrivalReceipt arrivalChoice={arrivalChoice} />
+                  <div className="ending-controls">
+                    <p className="ending-placard">
+                      This matter has been concluded with excessive ceremony.
+                    </p>
+                    <button
+                      className="cabinet-button primary"
+                      disabled={busy}
+                      onClick={() => void start(campaignId!)}
+                    >
+                      Start another run
+                    </button>
+                    {campaignId === demo.catalog[0]?.campaignId && (
                       <button
-                        className="cabinet-button primary"
+                        className="cabinet-button"
                         disabled={busy}
                         onClick={() => void start(campaignId!)}
                       >
-                        Start another run
+                        Play the other role
                       </button>
-                      {campaignId === demo.catalog[0]?.campaignId && (
-                        <button
-                          className="cabinet-button"
-                          disabled={busy}
-                          onClick={() => void start(campaignId!)}
-                        >
-                          Play the other role
-                        </button>
-                      )}
-                      <button
-                        className="cabinet-button quiet"
-                        onClick={returnToShelf}
-                      >
-                        Return to stories
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <p className="scene-kicker">ROOM DESCRIPTION</p>
-                    <SceneRegion
-                      key={sceneText}
-                      text={state.scene.body.text}
-                      regionRef={sceneRegion}
-                      theme={displayTheme}
-                    />
-                    <ArrivalReceipt arrivalChoice={arrivalChoice} />
-                    <div
-                      className="action-deck"
-                      aria-label="Available actions"
-                      aria-busy={busy}
+                    )}
+                    <button
+                      className="cabinet-button quiet"
+                      onClick={returnToShelf}
                     >
-                      <p className="deck-label">
-                        {displayTheme === "bbs" && `${bbsSigil} `}
-                        What will you do?
-                      </p>
-                      {state.actions.map((action, index) => (
-                        <div
-                          className={`action-card ${!action.available ? "unavailable" : ""}`}
-                          key={action.id}
-                        >
-                          <button
-                            disabled={busy || !action.available}
-                            onClick={() => choose(action.id)}
-                          >
-                            <span className="action-number" aria-hidden="true">
-                              {index + 1}
-                            </span>
-                            {action.label}
-                          </button>
-                          {!action.available && (
-                            <p className="play-reason">
-                              Unavailable: {action.reason}
-                            </p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                )}
-                {message && (
-                  <p className="play-message" role="status">
-                    {message}
-                  </p>
-                )}
-              </article>
-              <aside className="status-console" aria-labelledby="console-title">
-                <div className="console-heading">
-                  <p className="eyebrow">SIDE PANEL // MEMORY</p>
-                  <h2 id="console-title">Player status</h2>
-                  {viewOf(state).turn !== undefined && (
-                    <p className="turn-readout">Turn {viewOf(state).turn}</p>
-                  )}
-                </div>
-                {viewOf(state).stats.length ? (
-                  <StatReadouts
-                    stats={viewOf(state).stats}
-                    strings={state.strings}
-                    bounds={selected?.statBounds ?? {}}
+                      Return to stories
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="scene-kicker">ROOM DESCRIPTION</p>
+                  <SceneRegion
+                    key={sceneText}
+                    text={state.scene.body.text}
+                    regionRef={sceneRegion}
+                    theme={displayTheme}
                   />
-                ) : (
-                  <p className="console-empty">
-                    No visible statistics have been authorized for this case.
-                  </p>
-                )}
-                {viewOf(state).achievements.length > 0 && (
-                  <p className="achievement-note">
-                    <span aria-hidden="true">◆ </span>
-                    Achievement stamps: {viewOf(state).achievements.length}
-                  </p>
-                )}
-                {/*
-                 * Open by default: this is the run's own history, it fills the
-                 * console's otherwise-dead lower half on desktop, and behind a
-                 * collapsed `[+]` most players never find it. `open` is set
-                 * once, not controlled -- React only rewrites the attribute
-                 * when the prop value changes, so closing it stays closed.
-                 */}
-                <details className="journey-log" open>
-                  <summary>
-                    Travel log
-                    <span className="journey-count">
-                      {journey.length} {journey.length === 1 ? "page" : "pages"}
-                    </span>
-                  </summary>
-                  <ol>
-                    {journey.map((entry, index) => (
-                      <li
-                        key={`${index}-${entry.excerpt}`}
-                        aria-current={
-                          index === journey.length - 1 ? "step" : undefined
-                        }
-                      >
-                        {entry.choice && (
-                          <strong>You chose {entry.choice}. </strong>
-                        )}
-                        <span>{entry.excerpt}</span>
-                        {index === journey.length - 1 && <em> Current page</em>}
-                      </li>
-                    ))}
-                  </ol>
-                  {journey.length > 1 && (
-                    <p className="journey-origin">
-                      Where I came from: {journey[journey.length - 2]?.excerpt}
+                  <ArrivalReceipt arrivalChoice={arrivalChoice} />
+                  <div
+                    className="action-deck"
+                    aria-label="Available actions"
+                    aria-busy={busy}
+                  >
+                    <p className="deck-label">
+                      {displayTheme === "bbs" && `${bbsSigil} `}
+                      What will you do?
                     </p>
-                  )}
-                </details>
-                <p className="console-footnote">
-                  Player-visible memory only. No engine internals displayed.
-                </p>
-                {selected?.sources && (
-                  <div className="source-links">
-                    <h3>Sources / credits</h3>
-                    {selected.sources.map((source) => (
-                      <a key={source.href} href={source.href}>
-                        {source.label}
-                      </a>
+                    {state.actions.map((action, index) => (
+                      <div
+                        className={`action-card ${!action.available ? "unavailable" : ""}`}
+                        key={action.id}
+                      >
+                        <button
+                          disabled={busy || !action.available}
+                          onClick={() => choose(action.id)}
+                        >
+                          <span className="action-number" aria-hidden="true">
+                            {index + 1}
+                          </span>
+                          {action.label}
+                        </button>
+                        {!action.available && (
+                          <p className="play-reason">
+                            Unavailable: {action.reason}
+                          </p>
+                        )}
+                      </div>
                     ))}
                   </div>
+                </>
+              )}
+              {message && (
+                <p className="play-message" role="status">
+                  {message}
+                </p>
+              )}
+            </article>
+            <aside className="status-console" aria-labelledby="console-title">
+              <div className="console-heading">
+                <p className="eyebrow">SIDE PANEL // MEMORY</p>
+                <h2 id="console-title">Player status</h2>
+                {viewOf(state).turn !== undefined && (
+                  <p className="turn-readout">Turn {viewOf(state).turn}</p>
                 )}
-              </aside>
-            </div>
-          </section>
-        )}
-        {showBbsPrompt && (
-          <BbsPrompt
-            sigil={bbsSigil}
-            hint={bbsHint}
-            focusToken={bbsFocusToken}
-            resetToken={bbsResetToken}
-            busy={busy}
-            onCommand={runCommand}
-          />
-        )}
-      </main>
+              </div>
+              {viewOf(state).stats.length ? (
+                <StatReadouts
+                  stats={viewOf(state).stats}
+                  strings={state.strings}
+                  bounds={selected?.statBounds ?? {}}
+                />
+              ) : (
+                <p className="console-empty">
+                  No visible statistics have been authorized for this case.
+                </p>
+              )}
+              {viewOf(state).achievements.length > 0 && (
+                <p className="achievement-note">
+                  <span aria-hidden="true">◆ </span>
+                  Achievement stamps: {viewOf(state).achievements.length}
+                </p>
+              )}
+              {/*
+               * Open by default: this is the run's own history, it fills the
+               * console's otherwise-dead lower half on desktop, and behind a
+               * collapsed `[+]` most players never find it. `open` is set
+               * once, not controlled -- React only rewrites the attribute
+               * when the prop value changes, so closing it stays closed.
+               */}
+              <details className="journey-log" open>
+                <summary>
+                  Travel log
+                  <span className="journey-count">
+                    {journey.length} {journey.length === 1 ? "page" : "pages"}
+                  </span>
+                </summary>
+                <ol>
+                  {journey.map((entry, index) => (
+                    <li
+                      key={`${index}-${entry.excerpt}`}
+                      aria-current={
+                        index === journey.length - 1 ? "step" : undefined
+                      }
+                    >
+                      {entry.choice && (
+                        <strong>You chose {entry.choice}. </strong>
+                      )}
+                      <span>{entry.excerpt}</span>
+                      {index === journey.length - 1 && <em> Current page</em>}
+                    </li>
+                  ))}
+                </ol>
+                {journey.length > 1 && (
+                  <p className="journey-origin">
+                    Where I came from: {journey[journey.length - 2]?.excerpt}
+                  </p>
+                )}
+              </details>
+              <p className="console-footnote">
+                Player-visible memory only. No engine internals displayed.
+              </p>
+              {selected?.sources && (
+                <div className="source-links">
+                  <h3>Sources / credits</h3>
+                  {selected.sources.map((source) => (
+                    <a key={source.href} href={source.href}>
+                      {source.label}
+                    </a>
+                  ))}
+                </div>
+              )}
+            </aside>
+          </div>
+        </section>
+      )}
+      {showBbsPrompt && (
+        <BbsPrompt
+          sigil={bbsSigil}
+          hint={bbsHint}
+          focusToken={bbsFocusToken}
+          resetToken={bbsResetToken}
+          busy={busy}
+          onCommand={runCommand}
+        />
+      )}
     </>
   );
 }

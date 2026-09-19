@@ -1,3 +1,4 @@
+import { Link } from "react-router";
 import type { ReactNode } from "react";
 import { ThemeSelector } from "./ThemeSelector";
 import type { ThemeId } from "./theme";
@@ -6,7 +7,7 @@ interface HeaderProps {
   /**
    * Which top-level nav item the current page is: the disk shelf at `"/"`
    * (`"shelf"`), a story actually loaded and in progress there (`"playing"`), or one
-   * of the standalone pages reached by a real navigation (`"standings"`, `"profile"`,
+   * of the routed pages reached by client-side navigation (`"standings"`, `"profile"`,
    * `"content"`, `"start"`, `"discussions"`).
    */
   current:
@@ -22,17 +23,17 @@ interface HeaderProps {
    *  current instead of "Disk library" while it's the thing actually on screen. */
   playingTitle?: string;
   /**
-   * Only supplied by the single-page app (PlayApp.tsx): lets "Disk library" return to
-   * the shelf in place (abandoning an in-progress run first, if any) instead of a full
-   * navigation. Every other page has no such state -- "Disk library" there is a plain
+   * Supplied by the player through AppShell: lets "Disk library" return to
+   * the shelf in place (abandoning an in-progress run first, if any) without navigating away.
+   * Every other page has no such state -- "Disk library" there is a plain
    * link back to `/`.
    */
   onSelectShelf?: () => void;
   theme: ThemeId;
   onThemeChange: (id: ThemeId) => void;
-  /** The account menu -- PlayApp's and the profile page's, since both carry identity
-   *  state. Omitted entirely (not rendered empty) where it doesn't apply. */
+  /** The persistent account menu, supplied by AppShell when an API is configured. */
   children?: ReactNode;
+  hidden?: boolean;
 }
 
 /**
@@ -49,9 +50,14 @@ export function Header({
   theme,
   onThemeChange,
   children,
+  hidden,
 }: HeaderProps) {
   return (
-    <header className="system-bar">
+    <header
+      className="system-bar"
+      hidden={hidden}
+      style={hidden ? { display: "none" } : undefined}
+    >
       <nav className="system-bar-nav" aria-label="Primary">
         {onSelectShelf ? (
           <button
@@ -62,38 +68,38 @@ export function Header({
             Disk library
           </button>
         ) : (
-          <a className="system-bar-link" href="/">
+          <Link className="system-bar-link" to="/">
             Disk library
-          </a>
+          </Link>
         )}
-        <a
+        <Link
           className="system-bar-link"
-          href="/ranking"
+          to="/ranking"
           aria-current={current === "standings" ? "page" : undefined}
         >
           Standings
-        </a>
-        <a
+        </Link>
+        <Link
           className="system-bar-link"
-          href="/content"
+          to="/content"
           aria-current={current === "content" ? "page" : undefined}
         >
           My content
-        </a>
-        <a
+        </Link>
+        <Link
           className="system-bar-link"
-          href="/start"
+          to="/start"
           aria-current={current === "start" ? "page" : undefined}
         >
           Getting started
-        </a>
-        <a
+        </Link>
+        <Link
           className="system-bar-link"
-          href="/discussions"
+          to="/discussions"
           aria-current={current === "discussions" ? "page" : undefined}
         >
           Discussions
-        </a>
+        </Link>
         {current === "playing" && playingTitle && (
           <span
             className="system-bar-link system-bar-current-story"

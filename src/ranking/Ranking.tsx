@@ -6,7 +6,8 @@ import { Link } from "react-router";
  * `import.meta.env` here, for the same testability reason `PublicProfile.tsx` documents),
  * same bare unauthenticated `fetch`.
  */
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { getRanking } from "../api/ranking";
 import type { RankingData, RankingEntry } from "../play/identity";
 import { positionTitleFor } from "../play/ranking";
 
@@ -19,36 +20,18 @@ type Stage =
   | { readonly kind: "loaded"; readonly data: RankingData };
 
 export function Ranking({ apiUrl }: { apiUrl?: string }) {
-  const [stage, setStage] = useState<Stage>(
-    apiUrl ? { kind: "loading" } : { kind: "unavailable" },
-  );
-
-  useEffect(() => {
-    if (!apiUrl) {
-      setStage({ kind: "unavailable" });
-      return;
-    }
-    let cancelled = false;
-    setStage({ kind: "loading" });
-
-    fetch(`${apiUrl}/api/ranking`)
-      .then((response) =>
-        response.ok
-          ? response.json().then((data: RankingData) => {
-              if (!cancelled) setStage({ kind: "loaded", data });
-            })
-          : Promise.resolve().then(() => {
-              if (!cancelled) setStage({ kind: "failed" });
-            }),
-      )
-      .catch(() => {
-        if (!cancelled) setStage({ kind: "failed" });
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [apiUrl]);
+  const query = useQuery({
+    queryKey: ["public", apiUrl, "ranking"],
+    queryFn: ({ signal }) => getRanking(apiUrl, signal),
+    enabled: Boolean(apiUrl),
+  });
+  const stage: Stage = !apiUrl
+    ? { kind: "unavailable" }
+    : query.isPending
+      ? { kind: "loading" }
+      : query.isError
+        ? { kind: "failed" }
+        : { kind: "loaded", data: query.data };
 
   return (
     <>

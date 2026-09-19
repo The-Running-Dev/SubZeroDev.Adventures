@@ -1,41 +1,8 @@
 import { useAccount } from "../app/providers/AccountProvider";
 /** The player's record; chrome, theme and identity belong to AppShell. */
-import { useEffect, useState } from "react";
-import type { BrowserCampaign } from "../play/composition";
+import { useCampaigns } from "../api/queries";
 import { useBadges, useProfileSettings, useProgress } from "../play/identity";
 import { PlayerHome } from "../play/PlayerHome";
-
-interface CampaignsResponse {
-  campaigns: readonly BrowserCampaign[];
-}
-
-/** The same `!hidden` filter composition.ts's `demo.catalog` applies, kept in sync here
- *  so "Stories finished x/N" means the same N this player would see on the shelf. */
-function useCatalog(apiUrl: string | undefined): readonly BrowserCampaign[] {
-  const [catalog, setCatalog] = useState<readonly BrowserCampaign[]>([]);
-
-  useEffect(() => {
-    if (!apiUrl) {
-      setCatalog([]);
-      return;
-    }
-    let cancelled = false;
-    fetch(`${apiUrl}/api/campaigns`)
-      .then((response) => (response.ok ? response.json() : { campaigns: [] }))
-      .then((body: CampaignsResponse) => {
-        if (!cancelled)
-          setCatalog(body.campaigns.filter((campaign) => !campaign.hidden));
-      })
-      .catch(() => {
-        if (!cancelled) setCatalog([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [apiUrl]);
-
-  return catalog;
-}
 
 export function OwnProfile({ apiUrl }: { apiUrl?: string }) {
   const {
@@ -50,7 +17,9 @@ export function OwnProfile({ apiUrl }: { apiUrl?: string }) {
     identity.playerId,
     identityRefreshToken,
   );
-  const catalog = useCatalog(apiUrl);
+  const campaigns = useCampaigns(apiUrl);
+  const catalog =
+    campaigns.data?.campaigns.filter((campaign) => !campaign.hidden) ?? [];
 
   const ready =
     Boolean(apiUrl) && !identityLoading && identity.kind !== "anonymous";

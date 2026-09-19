@@ -414,6 +414,22 @@ Reversibility: cheap | expensive
 
 ### Why it is installed this way
 
+#### 2026-09-19 — Query and locale foundations before feature redesign
+
+Context: the approved frontend handoff requires shared ordinary server data and English/
+Bulgarian UI ownership before redesigned screens ship.
+
+Chosen: TanStack Query for server reads with account-scoped keys, cancellation and explicit
+invalidation; i18next/react-i18next for namespaced, interpolated/pluralized local catalogs.
+Both catalogs ship in the bundle. Existing gameplay/session execution remains independent.
+Feature copy and the visible shell switcher ship with their specified later feature PRs.
+
+Rejected: more per-component fetch effects (repeat cache/invalidation logic), hand-built
+bilingual branches (no reliable plural/fallback/parity mechanism), and remote-only catalog
+loading (would make language switching depend on networking).
+
+Reversibility: expensive — shared hooks and localized feature components depend on these APIs.
+
 #### 2026-09-19 — React Router library and a persistent application shell
 
 Context: internal anchors unloaded the document and each page reconstructed its theme,

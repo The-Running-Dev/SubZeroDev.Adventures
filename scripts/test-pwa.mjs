@@ -80,6 +80,16 @@ try {
   await context.setOffline(true);
   await page.close();
   const offline = await context.newPage();
+  // Chromium 151 blocks new-target requests via context.setOffline but leaves
+  // navigator.onLine true. Emulate the OS connectivity signal separately; keep
+  // the context-wide network block in place throughout this cold launch.
+  const network = await context.newCDPSession(offline);
+  await network.send("Network.overrideNetworkState", {
+    offline: true,
+    latency: 0,
+    downloadThroughput: -1,
+    uploadThroughput: -1,
+  });
   await offline.goto(`${origin}/profile`);
   try {
     await offline.getByText("Без интернет", { exact: true }).waitFor();
@@ -105,6 +115,12 @@ try {
   await offline.goto(`${origin}/ranking`);
   await offline.getByText("Без интернет", { exact: true }).waitFor();
   await context.setOffline(false);
+  await network.send("Network.overrideNetworkState", {
+    offline: false,
+    latency: 0,
+    downloadThroughput: -1,
+    uploadThroughput: -1,
+  });
   version = "B";
   await offline.evaluate(async () => {
     const r = await navigator.serviceWorker.getRegistration();

@@ -1,0 +1,25 @@
+.pwa-status {
+  border: 1px solid currentColor;
+  padding: 1rem;
+  margin-block: 1rem;
+  overflow-wrap: anywhere;
+}
+.pwa-status button,
+.pwa-install {
+  min-height: 44px;
+  margin-inline-end: 0.5rem;
+}
+.pwa-status button {
+  margin-block: 0.25rem;
+}
+.pwa-install summary {
+  cursor: pointer;
+}
+@media (display-mode: standalone) {
+  body {
+    padding-top: env(safe-area-inset-top);
+    padding-right: env(safe-area-inset-right);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+  }
+}

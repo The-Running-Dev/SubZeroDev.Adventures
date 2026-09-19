@@ -1,5 +1,31 @@
 export const resources = {
   en: {
+    pwa: {
+      offlineTitle: "Offline",
+      offlineBody:
+        "The app shell is available. Reconnect to load your library, play online, save to the server or change your account. Actions are not queued.",
+      install: "Install Adventures",
+      ios: "In Safari, open Share, then choose Add to Home Screen.",
+      updateTitle: "A new build has arrived",
+      updateBody: "Update when you are ready. Save any unfinished work first.",
+      updatePlaying:
+        "Your current run will not be interrupted. Save your run before updating.",
+      update: "Update now",
+      showUpdate: "Update available",
+      later: "Later",
+      confirm:
+        "This will reload Adventures. Have you saved your run and unfinished work?",
+      confirmUpdate: "Reload and update",
+      cancel: "Cancel",
+      errors: {
+        tabs: "Close other Adventures tabs, then try updating again. Their work has not been interrupted.",
+        registration:
+          "Offline setup could not finish. Check your connection and available browser storage, then reload when your work is saved.",
+        install:
+          "Installation could not start. Try your browser’s install menu.",
+      },
+    },
+
     common: {
       loading: "Loading…",
       empty: "Nothing here yet.",
@@ -36,6 +62,31 @@ export const resources = {
     },
   },
   bg: {
+    pwa: {
+      offlineTitle: "Без интернет",
+      offlineBody:
+        "Приложението е достъпно. Свържи се, за да заредиш библиотеката, да играеш онлайн, да запазиш на сървъра или да промениш профила си. Действията не се изпращат по-късно.",
+      install: "Инсталирай Adventures",
+      ios: "В Safari отвори „Сподели“, след което избери „Добави към началния екран“.",
+      updateTitle: "Има нова версия",
+      updateBody: "Обнови, когато си готов. Първо запази незавършената работа.",
+      updatePlaying:
+        "Текущата игра няма да бъде прекъсната. Запази я преди обновяване.",
+      update: "Обнови сега",
+      showUpdate: "Налична е нова версия",
+      later: "По-късно",
+      confirm:
+        "Adventures ще се презареди. Запази ли играта и незавършената работа?",
+      confirmUpdate: "Презареди и обнови",
+      cancel: "Отказ",
+      errors: {
+        tabs: "Затвори другите раздели с Adventures и опитай отново. Работата в тях не е прекъсната.",
+        registration:
+          "Подготовката за работа без интернет не завърши. Провери връзката и свободното място в браузъра. Презареди, след като запазиш работата си.",
+        install: "Инсталирането не започна. Опитай от менюто на браузъра.",
+      },
+    },
+
     common: {
       loading: "Зареждане…",
       empty: "Все още няма нищо тук.",

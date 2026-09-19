@@ -270,7 +270,9 @@ export function useProfileSettings(
   return {
     settings: query.data ?? { public: false, slug: null },
     error: query.error,
-    retry: () => { void query.refetch(); },
+    retry: () => {
+      void query.refetch();
+    },
     loading: Boolean(apiUrl && playerId) && query.isPending,
     setPublic,
   };

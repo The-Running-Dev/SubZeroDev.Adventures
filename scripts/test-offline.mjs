@@ -189,9 +189,15 @@ try {
     ]);
   });
   await page.waitForFunction(() => Boolean(navigator.serviceWorker.controller));
-  const title = JSON.parse(
-    await readFile("public/campaigns/getting-started.json", "utf8"),
-  ).catalog.title;
+  const title = (
+    await app.inject({
+      method: "GET",
+      url: "/api/campaigns",
+      headers: { cookie: `sza_session=${owner.token}` },
+    })
+  )
+    .json()
+    .campaigns.find((c) => c.campaignId === "getting-started").title;
   await page
     .locator(".offline-grid article")
     .filter({ has: page.getByRole("heading", { name: title, exact: true }) })

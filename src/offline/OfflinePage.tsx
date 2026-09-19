@@ -9,6 +9,7 @@ import { SceneRegion } from "../features/play/SceneRegion";
 import { ActionDeck } from "../features/play/ActionDeck";
 import { usePlayerShell } from "../app/playerShell";
 import { useTheme } from "../app/providers/ThemeProvider";
+import { useOfflineShellReady } from "./shell";
 import { useOfflineScope } from "./identity";
 import {
   records,
@@ -54,6 +55,7 @@ function OfflineContent({
 }: ReturnType<typeof useOfflineScope> & { scope: string }) {
   const { t } = useTranslation("offline");
   const { theme } = useTheme();
+  const shellReady = useOfflineShellReady();
   const { runId } = useParams();
   const [search] = useSearchParams();
   const navigate = useNavigate();
@@ -291,13 +293,14 @@ function OfflineContent({
       )}
       {!runId && (
         <>
+          {!shellReady && <p role="status">{t("needsSetup")}</p>}
           <h2>{t("downloads")}</h2>
           {!downloads.length && !loading && <p>{t("empty")}</p>}
           <div className="offline-grid">
             {downloads.map((download) => (
               <article key={download.key}>
                 <h3>{download.bundle.portable.catalog.title}</h3>
-                <p>{t("ready")}</p>
+                <p>{t(shellReady ? "ready" : "needsSetup")}</p>
                 <div className="offline-controls">
                   <button
                     className="app-button"
@@ -356,7 +359,7 @@ function OfflineContent({
                       {c.offline ? (
                         <button
                           className="app-button"
-                          disabled={Boolean(busy)}
+                          disabled={Boolean(busy) || !shellReady}
                           onClick={() =>
                             void perform(c.campaignId, () =>
                               downloadCampaign(

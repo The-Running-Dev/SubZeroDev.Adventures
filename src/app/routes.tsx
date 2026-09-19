@@ -1,6 +1,13 @@
 import { useTranslation } from "react-i18next";
 import { lazy } from "react";
-import { Link, Route, Routes, useLocation, useParams } from "react-router";
+import {
+  Link,
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+  useParams,
+} from "react-router";
 import { AppShell } from "./AppShell";
 import { useAccount } from "./providers/AccountProvider";
 
@@ -32,16 +39,21 @@ const OAuthConsent = lazy(() =>
   import("../oauth/OAuthConsent").then((m) => ({ default: m.OAuthConsent })),
 );
 
-function PlayRoute() {
+function LibraryRoute() {
   const { search } = useLocation();
-  const { sessionGeneration } = useAccount();
-  if (
-    !new URLSearchParams(search).has("campaign") &&
-    !new URLSearchParams(search).has("admin")
-  )
-    return <Library />;
-  // Until PR 7 moves gameplay to /play/:campaignId, query changes are real entries.
-  return <PlayApp key={`${search}:${sessionGeneration}`} />;
+  const query = new URLSearchParams(search);
+  const requested = query.get("campaign");
+  if (requested) {
+    query.delete("campaign");
+    const remainder = query.toString();
+    return (
+      <Navigate
+        replace
+        to={`/play/${encodeURIComponent(requested)}${remainder ? `?${remainder}` : ""}`}
+      />
+    );
+  }
+  return query.has("admin") ? <PlayApp /> : <Library />;
 }
 
 function ThreadRoute() {
@@ -75,7 +87,8 @@ export function AppRoutes() {
   return (
     <Routes>
       <Route element={<AppShell />}>
-        <Route index element={<PlayRoute />} />
+        <Route index element={<LibraryRoute />} />
+        <Route path="play/:campaignId" element={null} />
         <Route path="ranking" element={<Ranking apiUrl={apiUrl} />} />
         <Route path="profile" element={<OwnProfile apiUrl={apiUrl} />} />
         <Route path="content" element={<MyContent apiUrl={apiUrl} />} />

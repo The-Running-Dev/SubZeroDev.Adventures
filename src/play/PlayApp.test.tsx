@@ -143,10 +143,10 @@ describe("PlayApp cabinet presentation", () => {
 
     await user.click(screen.getByRole("button", { name: /The Bureaucracy/i }));
 
-    const link = screen.getByRole("link", { name: /\?campaign=/ });
+    const link = screen.getByRole("link", { name: /\/play\// });
     expect(link).toHaveAttribute(
       "href",
-      expect.stringContaining("?campaign=bulgaria-bureaucracy"),
+      expect.stringContaining("/play/bulgaria-bureaucracy"),
     );
   });
 

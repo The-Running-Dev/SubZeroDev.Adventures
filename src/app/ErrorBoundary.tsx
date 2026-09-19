@@ -17,7 +17,7 @@ function Failure({ retry }: { retry: () => void }) {
   );
 }
 export class ErrorBoundary extends Component<
-  { children: ReactNode },
+  { children: ReactNode; fallback?: (retry: () => void) => ReactNode },
   { failed: boolean }
 > {
   state = { failed: false };
@@ -25,10 +25,12 @@ export class ErrorBoundary extends Component<
     return { failed: true };
   }
   render() {
-    return this.state.failed ? (
-      <Failure retry={() => this.setState({ failed: false })} />
+    if (!this.state.failed) return this.props.children;
+    const retry = () => this.setState({ failed: false });
+    return this.props.fallback ? (
+      this.props.fallback(retry)
     ) : (
-      this.props.children
+      <Failure retry={retry} />
     );
   }
 }

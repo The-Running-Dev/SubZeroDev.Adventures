@@ -145,7 +145,8 @@ describe("persistent application routing", () => {
     await waitFor(() =>
       expect(document.querySelector(".onboarding-active")).not.toBeNull(),
     );
-    expect(window.location.search).toBe("?campaign=getting-started");
+    expect(window.location.pathname).toBe("/play/getting-started");
+    expect(window.location.search).toBe("");
     expect(
       screen.queryByRole("navigation", { name: "Primary" }),
     ).not.toBeInTheDocument();

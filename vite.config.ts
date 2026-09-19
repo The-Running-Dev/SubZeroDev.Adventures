@@ -3,6 +3,8 @@ import { defineConfig, type Plugin } from "vitest/config";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { pwaShell } from "./scripts/pwa.mts";
+
 const projectRoot = fileURLToPath(new URL(".", import.meta.url));
 
 // Polls the `__build-id` file `scripts/deploy-preview.mjs` writes beside the bundle and
@@ -58,7 +60,7 @@ function previewReload(): Plugin {
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), previewReload()],
+  plugins: [react(), previewReload(), pwaShell()],
   server: { fs: { allow: [projectRoot, resolve(projectRoot, "engine")] } },
   test: {
     environment: "jsdom",

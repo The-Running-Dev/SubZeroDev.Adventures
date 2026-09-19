@@ -17,6 +17,8 @@ COPY src src
 COPY shared shared
 COPY public public
 COPY scripts scripts
+ARG VITE_ENABLE_PWA=false
+ENV VITE_ENABLE_PWA=${VITE_ENABLE_PWA}
 ARG VITE_API_URL=https://adventures-api.subzerodev.com
 # Public browser configuration, matching the existing GitHub Pages build variables.
 ARG VITE_SUPABASE_URL

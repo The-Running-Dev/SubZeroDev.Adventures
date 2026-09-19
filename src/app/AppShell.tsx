@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { Suspense, useEffect, useState } from "react";
 import { Outlet, useLocation } from "react-router";
+import { PwaStatus } from "../pwa/PwaStatus";
 import { Header } from "../Header";
 import { AccountPanel } from "../play/AccountPanel";
 import { MatrixRain } from "../play/MatrixRain";
@@ -83,6 +84,7 @@ export function AppShell() {
             />
           )}
         </Header>
+        <PwaStatus playing={Boolean(player?.title)} />
         <ErrorBoundary key={location.pathname + location.search}>
           <Suspense
             fallback={

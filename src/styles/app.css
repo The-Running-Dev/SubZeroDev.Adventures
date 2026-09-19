@@ -135,6 +135,7 @@
   }
   .app-preferences .system-bar-group {
     flex: 1 1 8rem;
+    min-width: 0;
     gap: var(--space-1);
   }
   .app-preferences select {
@@ -146,7 +147,10 @@
     left: 0;
     right: 0;
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1.4fr) repeat(2, minmax(0, 1fr)) minmax(
+        0,
+        0.6fr
+      );
     gap: 0;
     background: var(--surface);
     border-top: 1px solid var(--rule);

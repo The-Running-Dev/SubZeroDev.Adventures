@@ -8,7 +8,6 @@
     "prepare": "node scripts/setup-engine.mjs",
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "test:hosting": "node --test frontend/hosting.test.mjs",
     "verify:hosting": "node scripts/verify-hosting.mjs",
     "check": "npm run format:check && npm run lint && npm run typecheck && npm run test && npm run test:browser && npm run test:build",
     "format": "prettier --write .",

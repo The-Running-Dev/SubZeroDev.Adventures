@@ -11,7 +11,7 @@
 import type { CSSProperties } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getProfile } from "../api/profile";
-import { useCampaigns } from "../api/queries";
+import { usePublicCampaigns } from "../api/queries";
 import type { PublicProfileData } from "../play/identity";
 import { playEarnedBadgeCount } from "../play/badges";
 import { ProfileRankBadge } from "../play/ProfileRankBadge";
@@ -42,7 +42,9 @@ export function PublicProfile({
     queryFn: ({ signal }) => getProfile(apiUrl, slug, signal),
     enabled: Boolean(apiUrl),
   });
-  const campaigns = useCampaigns(apiUrl);
+  // Anonymous, not the viewer's own catalog: this page is rendered for strangers, so the
+  // titles on it must not vary by who is looking (and must not wait on `/api/me`).
+  const campaigns = usePublicCampaigns(apiUrl);
   const stage: Stage = !apiUrl
     ? { kind: "unavailable" }
     : query.isPending

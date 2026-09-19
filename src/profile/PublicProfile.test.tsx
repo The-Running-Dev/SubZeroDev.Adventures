@@ -48,19 +48,25 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+const catalogRequests: RequestInit[] = [];
+
 function stubFetch(profileStatus: number, profileBody: unknown) {
-  globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
-    const url = typeof input === "string" ? input : input.toString();
-    if (url.includes("/api/campaigns")) {
-      return new Response(JSON.stringify({ campaigns: [] }), { status: 200 });
-    }
-    if (url.includes("/api/profile/")) {
-      return new Response(JSON.stringify(profileBody), {
-        status: profileStatus,
-      });
-    }
-    throw new Error(`Unstubbed fetch: ${url}`);
-  }) as typeof fetch;
+  catalogRequests.length = 0;
+  globalThis.fetch = vi.fn(
+    async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/campaigns")) {
+        catalogRequests.push(init ?? {});
+        return new Response(JSON.stringify({ campaigns: [] }), { status: 200 });
+      }
+      if (url.includes("/api/profile/")) {
+        return new Response(JSON.stringify(profileBody), {
+          status: profileStatus,
+        });
+      }
+      throw new Error(`Unstubbed fetch: ${url}`);
+    },
+  ) as typeof fetch;
 }
 
 describe("PublicProfile", () => {
@@ -77,6 +83,21 @@ describe("PublicProfile", () => {
 
     expect(screen.getByText("Loading operator record…")).toBeVisible();
     expect(await screen.findByText("Test Operator")).toBeVisible();
+  });
+
+  // A stranger's page must not be assembled from the viewer's own catalog: `/api/campaigns`
+  // is access-filtered per principal and answers `Vary: Cookie`, so a credentialed read here
+  // would make the campaign titles on someone else's profile depend on who is looking, and
+  // would serialize the lookup behind `/api/me`.
+  it("reads the campaign catalog anonymously", async () => {
+    stubFetch(200, sampleProfile);
+    render(<PublicProfile apiUrl="http://localhost:8787" slug="abc123" />);
+
+    await screen.findByText("Test Operator");
+    await waitFor(() => expect(catalogRequests.length).toBeGreaterThan(0));
+    for (const init of catalogRequests) {
+      expect(init.credentials).toBe("omit");
+    }
   });
 
   it("shows the not-found message on a 404", async () => {

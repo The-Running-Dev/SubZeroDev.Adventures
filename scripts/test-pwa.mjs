@@ -5,9 +5,12 @@ import { resolve, extname } from "node:path";
 import { spawnSync } from "node:child_process";
 import { chromium } from "playwright";
 
+// npm's Windows launcher is a .cmd, which Node refuses to spawn directly. Run npm's
+// own CLI under this Node rather than reaching for a shell.
+const npmCli = process.env.npm_execpath;
 const build = spawnSync(
-  process.platform === "win32" ? "npm.cmd" : "npm",
-  ["run", "build"],
+  npmCli ? process.execPath : "npm",
+  npmCli ? [npmCli, "run", "build"] : ["run", "build"],
   {
     stdio: "inherit",
     env: {
@@ -17,7 +20,11 @@ const build = spawnSync(
     },
   },
 );
-assert.equal(build.status, 0, "PWA test build must succeed");
+assert.equal(
+  build.status,
+  0,
+  `PWA test build must succeed: ${build.error?.message ?? build.status}`,
+);
 let version = "A";
 const mime = {
   ".html": "text/html",

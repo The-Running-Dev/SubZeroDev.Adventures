@@ -26,7 +26,7 @@ derives its numbers, and what each cross-device path preserves.
 | `npm run build`          | Production build to `dist/`                                                                       |
 | `npm run check`          | The full local gate: format, lint, typecheck, unit tests, real-browser tests, build               |
 | `npm run setup`          | Build the engine submodule (`engine/src/engine`) — needed after a fresh clone or a submodule bump |
-| `npm run sync:campaigns` | Regenerate `public/campaigns/` from the pinned engine submodule                                   |
+| `npm run sync:campaigns` | Regenerate the `public/campaigns/` test fixtures from the published content feed                  |
 
 ## Credit
 

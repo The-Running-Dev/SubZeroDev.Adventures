@@ -7,7 +7,9 @@ no Cloudflare Pages project, Wrangler dependency, new stack or new deploy secret
 ## Deployment contract
 
 - `frontend/Dockerfile` builds the engine and Vite application, then copies only
-  static output into Caddy. Node and API credentials are absent from the runtime.
+  static output into `nginx:alpine` -- the same release shape SubZeroDev.com uses,
+  rather than a second static server. Node and API credentials are absent from the
+  runtime.
 - `.github/workflows/deploy-api.yml` publishes `adventures-api` and
   `adventures-web` with immutable commit tags and `:latest`. It tests the exact
   frontend image before publishing and waits for both images before calling the
@@ -28,10 +30,15 @@ no Cloudflare Pages project, Wrangler dependency, new stack or new deploy secret
   Docker healthcheck and external deployment verification use this endpoint.
 
 The static server rewrites only HTML application navigations. Missing assets,
-SW files, manifests and API resources return errors. Existing hashed bundles
+SW files, manifests and API resources return errors. The site root is served as a
+file, so `/` answers every client -- uptime monitors, link-unfurl bots and `*/*`
+crawlers included -- without depending on navigation headers; a deeper route still
+requires an HTML navigation. A route segment containing a dot is read as a resource
+and returns 404, which is why `/u/<slug>` (base64url) and `/discussions/<id>`
+(`[A-Za-z0-9_-]`) are safe: a future `/play/<campaign-id>` must stay dot-free too. Existing hashed bundles
 cache immutably; HTML, service workers and manifests revalidate. The API is not
-proxied through this container. See [Caddy's SPA pattern](https://caddyserver.com/docs/caddyfile/patterns#single-page-apps-spas)
-and the stricter matchers in [frontend/Caddyfile](../frontend/Caddyfile).
+proxied through this container. The matchers that decide all of this are in
+[frontend/default.conf](../frontend/default.conf).
 
 ## First rollout
 
@@ -51,7 +58,7 @@ and the stricter matchers in [frontend/Caddyfile](../frontend/Caddyfile).
    EXPECTED_BUILD_REVISION=<full-source-sha> npm run verify:hosting -- https://adventures.subzerodev.com/
    ```
 
-   This repeats the same 35 HTTP checks used against the container in CI. It
+   This repeats the same 39 HTTP checks used against the container in CI. It
    requires HTTPS for a public host and rejects an old build or broken fallback.
 
 4. Verify browser refresh and query/hash preservation on `/profile`, nested
@@ -73,8 +80,9 @@ and the stricter matchers in [frontend/Caddyfile](../frontend/Caddyfile).
 ## Validation and rollback
 
 CI builds the actual image and starts it with the same read-only filesystem,
-non-root user and capability restrictions as Compose. It waits for its Docker
-healthcheck, then runs `frontend/hosting.test.mjs` against the live Caddy server.
+tmpfs mounts, non-root user and capability restrictions as Compose. It waits for
+its Docker healthcheck, then runs `frontend/hosting.test.mjs` against the live
+nginx server.
 The release workflow repeats that check before pushing the image.
 
 For a frontend-only rollback, set Portainer's `ADVENTURES_FRONTEND_IMAGE` to
@@ -112,3 +120,9 @@ no forced reload or automatic deletion of earlier runtimes.
 `npm run test:pwa` builds an enabled production bundle and checks offline cold navigation
 in Bulgarian, private-data cache exclusion, and update protection using real Chromium.
 The build is test-only; deploy the frontend through the normal GitOps image workflow.
+
+Known and retained: `index.html` links the manifest on every build, not only an enabled
+one. A browser can therefore still install a standalone window from GitHub Pages or the
+preview host, where no worker is registered and nothing is cached — that install is
+entirely network-dependent. Gating the link would mean generating `index.html` per host
+for the short remainder of the Pages window, so the flag stays on registration alone.

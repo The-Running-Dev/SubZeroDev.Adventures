@@ -80,6 +80,35 @@ describe("service worker privacy and lifecycle", () => {
     expect(await (await respondWith.mock.calls[0][0]).text()).toBe("shell");
     expect(cache.match).toHaveBeenCalledWith("/index.html");
   });
+  it("serves the shell for every navigation route the router declares", () => {
+    // The allowlist restates src/app/routes.tsx, and nothing in the build couples them.
+    // A route missing from ROUTES is not a visible failure anywhere: online, Caddy's
+    // navigation fallback still returns index.html. It only surfaces as a browser error
+    // page on an installed cold start, offline. Derive the table and check it here.
+    const paths = [
+      ...readFileSync("src/app/routes.tsx", "utf8").matchAll(
+        /<Route\s+(index|path="([^"]+)")/g,
+      ),
+    ]
+      .map((match) => (match[1] === "index" ? "" : match[2]))
+      .filter((path) => path !== "*")
+      .map((path) => `/${path.replaceAll(/:[^/]+/g, "sample")}`);
+    expect(paths).toContain("/");
+    expect(paths.length).toBeGreaterThan(5);
+    for (const path of paths) {
+      const { handlers } = worker();
+      const respondWith = vi.fn();
+      handlers.fetch({
+        request: {
+          method: "GET",
+          mode: "navigate",
+          url: new URL(path, "https://adventures.test").href,
+        },
+        respondWith,
+      });
+      expect(respondWith, `no cached shell for ${path}`).toHaveBeenCalled();
+    }
+  });
   it("does not activate during installation and fails incomplete precaching", async () => {
     const { handlers, cache, self } = worker();
     cache.addAll.mockRejectedValue(new Error("quota"));

@@ -1878,12 +1878,14 @@
  */
 @media (max-width: 767px) {
   /*
-   * The header's third nav item costs a whole extra row here (`.system-bar-nav` wraps),
-   * pushing the cabinet marquee -- and with it the phone reading model's "no scroll
-   * needed" scene+choices viewport (14 §8.2, `phone-layout.browser.test.tsx`) -- down by
-   * however tall that row is. The marquee's own `<h1>` already names the loaded story
-   * right below, so this is a repeat here, not new information -- unlike "Disk library"
-   * and "Standings", which are the only way to leave the cabinet at all on a phone.
+   * The story title costs a whole extra header row here -- it is the one item in the bar
+   * with no length bound, so it wraps where the fixed short labels beside it do not --
+   * pushing the cabinet marquee, and with it the phone reading model's "no scroll needed"
+   * scene+choices viewport (14 §8.2, `phone-layout.browser.test.tsx`), down by however
+   * tall that row is. The marquee's own `<h1>` already names the loaded story right
+   * below, so this is a repeat here, not new information -- unlike the primary nav, which
+   * is the only way to leave the cabinet at all on a phone and which `app.css` moves to a
+   * fixed bottom bar rather than hiding.
    */
   .system-bar-current-story {
     display: none;

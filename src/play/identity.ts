@@ -5,7 +5,13 @@
  * `usePlatformStats` are per-player and only ever used in remote mode (`BrowserDemo.apiUrl`
  * set); there is nothing for any of these to fetch against the local, in-browser store.
  */
-import { useEffect, useRef, useState } from "react";
+import { useMemo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAccount } from "../app/providers/AccountProvider";
+import { getIdentity, getAdminAccess } from "../api/identity";
+import { getProgress, getBadges } from "../api/progress";
+import { getPlatformStats } from "../api/stats";
+import { getProfileSettings, setProfileVisibility } from "../api/profile";
 
 export interface Identity {
   readonly playerId: string | null;
@@ -157,280 +163,115 @@ export interface DiscussionThreadData {
   readonly moreComments: boolean;
 }
 
-const anonymousIdentity: Identity = {
+export const anonymousIdentity: Identity = {
   playerId: null,
   kind: "anonymous",
   displayName: null,
   signInProvider: null,
 };
 
-/** Fetches `/api/me` once on mount. `refreshToken` bumps to re-fetch after a sign-in/out
- *  round trip changes the cookie. `apiUrl` is `undefined` in local mode -- called
- *  unconditionally either way (rules of hooks), it just never fetches. */
-export function useIdentity(
-  apiUrl: string | undefined,
-  refreshToken: number,
-): { identity: Identity; loading: boolean } {
-  const [identity, setIdentity] = useState<Identity>(anonymousIdentity);
-  const [loading, setLoading] = useState(apiUrl !== undefined);
-  const request = useRef<{
-    apiUrl: string;
-    token: number;
-    promise: Promise<Identity>;
-  } | null>(null);
-
-  useEffect(() => {
-    if (!apiUrl) {
-      setIdentity(anonymousIdentity);
-      setLoading(false);
-      return;
-    }
-    let cancelled = false;
-    setLoading(true);
-    // Share StrictMode's effect replay without a cross-root/account global cache.
-    if (
-      request.current?.apiUrl !== apiUrl ||
-      request.current.token !== refreshToken
-    ) {
-      request.current = {
-        apiUrl,
-        token: refreshToken,
-        promise: fetch(`${apiUrl}/api/me`, { credentials: "include" })
-          .then((response) =>
-            response.ok ? response.json() : anonymousIdentity,
-          )
-          .catch(() => anonymousIdentity),
-      };
-    }
-    request.current.promise
-      .then((body: Identity) => {
-        if (!cancelled) setIdentity(body);
-      })
-      .catch(() => {
-        if (!cancelled) setIdentity(anonymousIdentity);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [apiUrl, refreshToken]);
-
-  return { identity, loading };
+export function useIdentity(apiUrl: string | undefined, refreshToken: number) {
+  const query = useQuery({
+    queryKey: ["identity", apiUrl, refreshToken],
+    // Retain one in-flight bootstrap through StrictMode's effect replay.
+    queryFn: () => getIdentity(apiUrl),
+    enabled: Boolean(apiUrl),
+    staleTime: Infinity,
+  });
+  return {
+    identity: query.data ?? anonymousIdentity,
+    loading: Boolean(apiUrl) && query.isPending,
+    error: query.error,
+  };
 }
 
-/**
- * Answers the one authorization question the browser needs to expose the unlisted content
- * operator surface. It deliberately reuses the status endpoint instead of duplicating the
- * server's identity allowlist in browser code, and re-runs whenever the current player
- * changes after sign-in, sign-out, or a device transfer.
- */
 export function useAdminAccess(
   apiUrl: string | undefined,
   playerId: string | null,
-): { isAdmin: boolean; loading: boolean } {
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [loading, setLoading] = useState(apiUrl !== undefined);
-
-  useEffect(() => {
-    if (!apiUrl) {
-      setIsAdmin(false);
-      setLoading(false);
-      return;
-    }
-    let cancelled = false;
-    setIsAdmin(false);
-    setLoading(true);
-    fetch(`${apiUrl}/api/admin/content/status`, { credentials: "include" })
-      .then((response) =>
-        response.ok
-          ? (response.json() as Promise<{ isAdmin?: boolean }>)
-          : { isAdmin: false },
-      )
-      .then((body) => {
-        if (!cancelled) setIsAdmin(body.isAdmin === true);
-      })
-      .catch(() => {
-        if (!cancelled) setIsAdmin(false);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [apiUrl, playerId]);
-
-  return { isAdmin, loading };
+  refreshToken = 0,
+) {
+  const query = useQuery({
+    queryKey: ["private", apiUrl, playerId, refreshToken, "admin"],
+    queryFn: ({ signal }) => getAdminAccess(apiUrl, signal),
+    enabled: Boolean(apiUrl && playerId),
+  });
+  return {
+    isAdmin: query.data?.isAdmin === true,
+    loading: Boolean(apiUrl && playerId) && query.isPending,
+  };
 }
 
-/** Progress is keyed by campaignId; a campaign with no session yet simply has no entry.
- *  `apiUrl` is `undefined` in local mode -- called unconditionally either way, it just
- *  never fetches. */
 export function useProgress(
   apiUrl: string | undefined,
   playerId: string | null,
 ): ReadonlyMap<string, CampaignProgress> {
-  const [progress, setProgress] = useState<
-    ReadonlyMap<string, CampaignProgress>
-  >(new Map());
-
-  useEffect(() => {
-    if (!apiUrl || !playerId) {
-      setProgress(new Map());
-      return;
-    }
-    let cancelled = false;
-    fetch(`${apiUrl}/api/progress`, { credentials: "include" })
-      .then((response) => (response.ok ? response.json() : { progress: [] }))
-      .then((body: { progress: CampaignProgress[] }) => {
-        if (cancelled) return;
-        setProgress(new Map(body.progress.map((p) => [p.campaignId, p])));
-      })
-      .catch(() => {
-        if (!cancelled) setProgress(new Map());
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [apiUrl, playerId]);
-
-  return progress;
+  const { refreshToken, loading } = useAccount();
+  const query = useQuery({
+    queryKey: ["private", apiUrl, playerId, refreshToken, "progress"],
+    queryFn: ({ signal }) => getProgress(apiUrl, signal),
+    enabled: Boolean(apiUrl && playerId) && !loading,
+  });
+  return useMemo(
+    () => new Map(query.data?.progress.map((p) => [p.campaignId, p]) ?? []),
+    [query.data],
+  );
 }
 
-/** Mirrors `useProgress`'s shape exactly: keyed off `playerId` so it re-fetches after a
- *  sign-in or transfer merges in a new set, and a no-op returning `[]`/`null` in local
- *  mode where `apiUrl` is undefined -- there is no server to evaluate badges or compute
- *  records against. `records` is `null` before the fetch resolves and in local mode,
- *  same absent-state convention `usePlatformStats` already uses. */
 export function useBadges(
   apiUrl: string | undefined,
   playerId: string | null,
 ): { badges: readonly Badge[]; records: PersonnelRecords | null } {
-  const [badges, setBadges] = useState<readonly Badge[]>([]);
-  const [records, setRecords] = useState<PersonnelRecords | null>(null);
-
-  useEffect(() => {
-    if (!apiUrl || !playerId) {
-      setBadges([]);
-      setRecords(null);
-      return;
-    }
-    let cancelled = false;
-    fetch(`${apiUrl}/api/badges`, { credentials: "include" })
-      .then((response) =>
-        response.ok ? response.json() : { badges: [], records: null },
-      )
-      .then((body: { badges: Badge[]; records: PersonnelRecords | null }) => {
-        if (cancelled) return;
-        setBadges(body.badges);
-        setRecords(body.records);
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setBadges([]);
-          setRecords(null);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [apiUrl, playerId]);
-
-  return { badges, records };
+  const { refreshToken, loading } = useAccount();
+  const query = useQuery({
+    queryKey: ["private", apiUrl, playerId, refreshToken, "badges"],
+    queryFn: ({ signal }) => getBadges(apiUrl, signal),
+    enabled: Boolean(apiUrl && playerId) && !loading,
+  });
+  return {
+    badges: query.data?.badges ?? [],
+    records: query.data?.records ?? null,
+  };
 }
 
-/** The one public read in this module -- `/api/stats` needs no cookie and no player, so
- *  no `credentials: "include"` (there's nothing for the server to read off it). Still
- *  no-ops when `apiUrl` is undefined: local mode has no backend at all (composition.ts),
- *  so there is nothing to fetch and the caller renders nothing. */
 export function usePlatformStats(
   apiUrl: string | undefined,
 ): PlatformStats | null {
-  const [stats, setStats] = useState<PlatformStats | null>(null);
-
-  useEffect(() => {
-    if (!apiUrl) {
-      setStats(null);
-      return;
-    }
-    let cancelled = false;
-    fetch(`${apiUrl}/api/stats`)
-      .then((response) => (response.ok ? response.json() : null))
-      .then((body: PlatformStats | null) => {
-        if (!cancelled) setStats(body);
-      })
-      .catch(() => {
-        if (!cancelled) setStats(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [apiUrl]);
-
-  return stats;
+  const query = useQuery({
+    queryKey: ["public", apiUrl, "stats"],
+    queryFn: ({ signal }) => getPlatformStats(apiUrl, signal),
+    enabled: Boolean(apiUrl),
+  });
+  return query.data ?? null;
 }
 
-const anonymousProfileSettings: ProfileSettings = { public: false, slug: null };
-
-/** Mirrors `useIdentity`'s fetch-on-mount shape (GET `/api/profile/settings`, a no-op
- *  when `apiUrl`/`playerId` is absent), plus a `setPublic` action that POSTs
- *  `/api/profile/visibility` and updates local state from the response directly --
- *  no full-page refetch needed to see the new slug/flag. */
 export function useProfileSettings(
   apiUrl: string | undefined,
   playerId: string | null,
   refreshToken: number,
-): {
-  settings: ProfileSettings;
-  loading: boolean;
-  setPublic: (next: boolean) => Promise<void>;
-} {
-  const [settings, setSettings] = useState<ProfileSettings>(
-    anonymousProfileSettings,
-  );
-  const [loading, setLoading] = useState(Boolean(apiUrl && playerId));
-
-  useEffect(() => {
-    if (!apiUrl || !playerId) {
-      setSettings(anonymousProfileSettings);
-      return;
-    }
-    let cancelled = false;
-    setLoading(true);
-    fetch(`${apiUrl}/api/profile/settings`, { credentials: "include" })
-      .then((response) =>
-        response.ok ? response.json() : anonymousProfileSettings,
-      )
-      .then((body: ProfileSettings) => {
-        if (!cancelled) setSettings(body);
-      })
-      .catch(() => {
-        if (!cancelled) setSettings(anonymousProfileSettings);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [apiUrl, playerId, refreshToken]);
-
-  async function setPublic(next: boolean): Promise<void> {
-    if (!apiUrl) return;
-    const response = await fetch(`${apiUrl}/api/profile/visibility`, {
-      method: "POST",
-      credentials: "include",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ public: next }),
-    });
-    if (!response.ok) throw new Error("Couldn't update profile visibility.");
-    const body = (await response.json()) as ProfileSettings;
-    setSettings(body);
+) {
+  const client = useQueryClient();
+  const queryKey = [
+    "private",
+    apiUrl,
+    playerId,
+    refreshToken,
+    "profile-settings",
+  ];
+  const query = useQuery({
+    queryKey,
+    queryFn: ({ signal }) => getProfileSettings(apiUrl, signal),
+    enabled: Boolean(apiUrl && playerId),
+  });
+  async function setPublic(next: boolean) {
+    const settings = await setProfileVisibility(apiUrl, next);
+    // An account transition removes the old query; a late mutation cannot restore it.
+    if (client.getQueryState(queryKey)) client.setQueryData(queryKey, settings);
   }
-
-  return { settings, loading, setPublic };
+  return {
+    settings: query.data ?? { public: false, slug: null },
+    loading: Boolean(apiUrl && playerId) && query.isPending,
+    setPublic,
+  };
 }
 
 /** Builds the sign-in link for whichever provider `/api/me` reported as configured
@@ -455,6 +296,6 @@ export function consumeAuthError(): string | null {
   const code = url.searchParams.get("auth_error");
   if (!code) return null;
   url.searchParams.delete("auth_error");
-  window.history.replaceState({}, "", url.toString());
+  window.history.replaceState(window.history.state, "", url.toString());
   return code;
 }

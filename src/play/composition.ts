@@ -281,7 +281,6 @@ async function createRemoteBrowserDemo(apiUrl: string): Promise<BrowserDemo> {
   };
 }
 
-export async function createBrowserDemo(): Promise<BrowserDemo> {
-  const apiUrl = import.meta.env.VITE_API_URL as string | undefined;
+export async function createBrowserDemo(apiUrl?: string): Promise<BrowserDemo> {
   return apiUrl ? createRemoteBrowserDemo(apiUrl) : createLocalBrowserDemo();
 }

@@ -32,21 +32,39 @@ beforeEach(() => {
         return new Response(
           JSON.stringify(fixtures[`../../public/campaigns/${fixture}`]),
         );
-      const body = url.endsWith("/api/me")
-        ? member
-        : url.endsWith("/api/ranking")
-          ? { entries: [], totalRanked: 0 }
-          : url.endsWith("/api/progress")
-            ? { progress: [] }
-            : url.endsWith("/api/campaigns")
-              ? { campaigns: [] }
-              : url.endsWith("/api/badges")
-                ? { badges: [], records: null }
-                : url.endsWith("/api/profile/settings")
-                  ? { public: false, slug: null }
-                  : url.endsWith("/api/discussions/thread_1")
-                    ? { configured: false }
-                    : { isAdmin: false };
+      const body = url.endsWith("/api/saves")
+        ? { saves: [] }
+        : url.endsWith("/api/me")
+          ? member
+          : url.endsWith("/api/ranking")
+            ? { entries: [], totalRanked: 0 }
+            : url.endsWith("/api/progress")
+              ? { progress: [] }
+              : url.endsWith("/api/campaigns")
+                ? {
+                    campaigns: [
+                      {
+                        campaignId: "bulgaria-bureaucracy",
+                        kindId: "story-graph",
+                        version: "2.0.0",
+                        title: "The Bureaucracy",
+                        description: "Fixture",
+                        duration: "~5 min",
+                        contentNotice: "",
+                        featured: false,
+                        statBounds: {},
+                        endingCount: 1,
+                      },
+                    ],
+                    summaries: [],
+                  }
+                : url.endsWith("/api/badges")
+                  ? { badges: [], records: null }
+                  : url.endsWith("/api/profile/settings")
+                    ? { public: false, slug: null }
+                    : url.endsWith("/api/discussions/thread_1")
+                      ? { configured: false }
+                      : { isAdmin: false };
       return Response.json(body);
     }),
   );

@@ -1,4 +1,5 @@
-import { Suspense, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { Suspense, useEffect, useState } from "react";
 import { Outlet, useLocation } from "react-router";
 import { Header } from "../Header";
 import { AccountPanel } from "../play/AccountPanel";
@@ -10,6 +11,31 @@ import { ErrorBoundary } from "./ErrorBoundary";
 
 export function AppShell() {
   const location = useLocation();
+  const { t } = useTranslation("titles");
+  useEffect(() => {
+    const path = location.pathname;
+    const key =
+      path === "/"
+        ? "library"
+        : path === "/ranking"
+          ? "ranking"
+          : path === "/profile"
+            ? "profile"
+            : path === "/content"
+              ? "content"
+              : path === "/start"
+                ? "start"
+                : path === "/discussions"
+                  ? "discussions"
+                  : path.startsWith("/discussions/")
+                    ? "thread"
+                    : path.startsWith("/u/")
+                      ? "publicProfile"
+                      : path === "/oauth/consent"
+                        ? "consent"
+                        : "missing";
+    document.title = `${t(key)} · SubZeroDev Adventures`;
+  }, [location.pathname, t]);
   const { theme, changeTheme } = useTheme();
   const account = useAccount();
   const [player, setPlayer] = useState<PlayerShellState | null>(null);

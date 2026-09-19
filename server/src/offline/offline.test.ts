@@ -188,6 +188,38 @@ const campaign = "what-would-lucifer-do";
     expect(guest.owner).toBeNull();
     expect((await sync(body(guest), other.cookie)).statusCode).toBe(403);
   });
+  it("synchronizes a checkpoint with a one-connection pool", async () => {
+    const created = (
+      await app.inject({
+        method: "POST",
+        url: "/api/sessions",
+        headers: { cookie },
+        payload: { campaignId: campaign, seed: "single-connection" },
+      })
+    ).json();
+    const r = body(await download(created.sessionId));
+    const narrowPool = new Pool({
+      connectionString: databaseUrl,
+      max: 1,
+      connectionTimeoutMillis: 500,
+    });
+    const narrowApp = await buildApp(narrowPool, {
+      siteUrl: "http://localhost:5173",
+      apiUrl: "http://localhost:8787",
+    });
+    try {
+      const response = await narrowApp.inject({
+        method: "POST",
+        url: "/api/offline/sync",
+        headers: { cookie },
+        payload: r,
+      });
+      expect(response.statusCode, response.body).toBe(200);
+    } finally {
+      await narrowApp.close();
+      await narrowPool.end();
+    }
+  });
   it("protects checkpoint ownership at the store boundary", async () => {
     const created = (
       await app.inject({

@@ -63,5 +63,6 @@ export function useOfflineScope() {
     apiUrl: account.apiUrl,
     refreshToken: account.refreshToken,
     identityError: account.error,
+    retryIdentity: () => account.refreshIdentity(true),
   };
 }

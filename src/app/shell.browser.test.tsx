@@ -49,13 +49,13 @@ describe("persistent responsive shell", () => {
     await page.viewport(320, 800);
     const { user, container } = await reachPlaying();
     const scene = container.querySelector(".scene-region");
-    const prose = scene?.textContent;
+    const prose = scene?.querySelector(".scene-body")?.textContent;
     await user.selectOptions(
       screen.getByRole("combobox", { name: "Language" }),
       "bg",
     );
     expect(container.querySelector(".scene-region")).toBe(scene);
-    expect(scene?.textContent).toBe(prose);
+    expect(scene?.querySelector(".scene-body")?.textContent).toBe(prose);
     expect(screen.getByRole("combobox", { name: "Език" })).toHaveValue("bg");
     assertNoHorizontalOverflow();
     expect(

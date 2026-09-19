@@ -1,3 +1,14 @@
+import { SceneRegion } from "../features/play/SceneRegion";
+import { ArrivalReceipt } from "../features/play/ArrivalReceipt";
+import { ActionDeck } from "../features/play/ActionDeck";
+import {
+  StatusConsole,
+  type JourneyEntry,
+} from "../features/play/StatusConsole";
+import { useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
+import { ResourceState } from "../components/ResourceState";
+import { ApiError } from "../api/client";
 import { Link } from "react-router";
 import {
   useEffect,
@@ -6,14 +17,11 @@ import {
   useRef,
   useState,
   useSyncExternalStore,
-  type CSSProperties,
-  type RefObject,
 } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { useTheme } from "../app/providers/ThemeProvider";
 import { useAccount } from "../app/providers/AccountProvider";
 import { usePlayerShell } from "../app/playerShell";
-import type { ThemeId } from "../theme";
 import { AdminPanel } from "./AdminPanel";
 import { BbsPrompt } from "./BbsPrompt";
 import { BrowserClient, type PlayState } from "./browser-client";
@@ -24,7 +32,6 @@ import {
   markOnboardingSeen,
   type BrowserCampaign,
   type BrowserDemo,
-  type StatBounds,
 } from "./composition";
 import {
   usePlatformStats,
@@ -65,36 +72,9 @@ const cabinetThemes: Readonly<
   [GETTING_STARTED_CAMPAIGN_ID]: { accent: "green", eyebrow: "SYSTEM FILE" },
 };
 
-interface Stat {
-  readonly var: string;
-  readonly labelKey: string;
-  readonly value: string | number | boolean;
-}
-
-function viewOf(state: PlayState) {
-  const view = state.view.kindView as {
-    stats?: Stat[];
-    unlockedAchievements?: string[];
-    turn?: number;
-  };
-  return {
-    stats: view.stats ?? [],
-    achievements: view.unlockedAchievements ?? [],
-    turn: view.turn,
-  };
-}
-
-interface JourneyEntry {
-  readonly excerpt: string;
-  readonly choice?: string;
-}
-
-const saveWarning =
-  "Progress could not be saved locally; this run remains available in this tab.";
-
 /** A permanent, shareable link that loads a campaign directly -- no click-through required. */
 function permalinkFor(campaignId: string): string {
-  return `${window.location.origin}${window.location.pathname}?campaign=${encodeURIComponent(campaignId)}`;
+  return `${window.location.origin}/play/${encodeURIComponent(campaignId)}`;
 }
 
 function excerpt(text: string): string {
@@ -128,207 +108,6 @@ function dosName(title: string): string {
     .replace(/^(THE|A|AN)\s+/, "")
     .replace(/[^A-Z0-9]/g, "");
   return cleaned.slice(0, 8) || "STORY";
-}
-
-/** A brisk reveal, not a literal words-per-minute simulation -- floors and caps keep very short or very long excerpts from feeling instant or endless. */
-const REVEAL_CHARS_PER_SECOND = 55;
-const REVEAL_MIN_MS = 400;
-const REVEAL_MAX_MS = 900;
-/** Matrix reads slightly slower than the other skins -- part of its distinct pacing. */
-const MATRIX_REVEAL_MULTIPLIER = 1.25;
-
-function revealDuration(text: string, theme: ThemeId): number {
-  const raw = (text.length / REVEAL_CHARS_PER_SECOND) * 1000;
-  const clamped = Math.min(REVEAL_MAX_MS, Math.max(REVEAL_MIN_MS, raw));
-  return theme === "matrix" ? clamped * MATRIX_REVEAL_MULTIPLIER : clamped;
-}
-
-/**
- * A labelled region with a short real heading, not the authored prose
- * itself -- a paragraph marked up as a heading makes the phone
- * screen-reader's heading rotor return a wall of story instead of a
- * landmark (14 §8.5).
- *
- * The story text is split into per-character spans, each with its own
- * `animation-delay`, so it visibly prints one character at a time rather
- * than as a single block-wide wipe. Every character is present in the DOM
- * from the first render -- only its `opacity` is staggered -- so
- * `textContent` is complete immediately: no test or screen reader has to
- * wait out the reveal to see the full scene.
- */
-function SceneRegion({
-  text,
-  regionRef,
-  theme,
-}: {
-  text: string;
-  regionRef: RefObject<HTMLElement | null>;
-  theme: ThemeId;
-}) {
-  const chars = useMemo(() => Array.from(text), [text]);
-  const total = revealDuration(text, theme);
-  const perChar = chars.length ? total / chars.length : 0;
-  return (
-    <section
-      ref={regionRef}
-      tabIndex={-1}
-      aria-labelledby="scene-heading"
-      className="scene-region"
-    >
-      <h2 id="scene-heading" className="sr-only">
-        Scene
-      </h2>
-      <p
-        className="scene-body"
-        style={{ "--reveal-total": `${total}ms` } as CSSProperties}
-      >
-        {chars.map((char, index) => (
-          <span key={index} style={{ animationDelay: `${index * perChar}ms` }}>
-            {char}
-          </span>
-        ))}
-      </p>
-    </section>
-  );
-}
-
-const NO_STATS: ReadonlySet<string> = new Set();
-/**
- * Long enough to notice on a glance back at the panel, short enough that a stat
- * which moved two turns ago is not still lit. Kept in step with the
- * `.stat-changed` animation duration in play.css.
- */
-const STAT_HIGHLIGHT_MS = 1100;
-
-/**
- * Which stats changed on the turn just committed.
- *
- * A stat moving is this game's main feedback signal, and the projection reports
- * only the *new* value -- after a turn, "3" is indistinguishable from "3 again"
- * without remembering what the previous turn showed. Comparing against the
- * previously rendered values is what makes the change visible at all.
- *
- * Nothing is highlighted on a run's first render (every stat is new, not
- * changed), which is what keeps a freshly loaded story from flashing all eight
- * readouts at once. State lives in a signature string rather than the `stats`
- * array because `viewOf` builds a fresh array every render -- depending on the
- * array itself would re-run this on every render, not on every actual change.
- */
-function useChangedStats(stats: readonly Stat[]): ReadonlySet<string> {
-  /*
-   * JSON rather than a delimiter-joined string: an `enum` stat's value is
-   * authored content, so there is no separator this could assume it is free of.
-   */
-  const signature = JSON.stringify(
-    Object.fromEntries(stats.map((stat) => [stat.var, String(stat.value)])),
-  );
-  const previous = useRef<string | undefined>(undefined);
-  const [changed, setChanged] = useState<ReadonlySet<string>>(NO_STATS);
-
-  useEffect(() => {
-    const before = previous.current;
-    previous.current = signature;
-    if (before === undefined || before === signature) return;
-
-    const past = JSON.parse(before) as Record<string, string>;
-    const now = JSON.parse(signature) as Record<string, string>;
-    const moved = new Set(
-      Object.keys(now).filter(
-        (name) => past[name] !== undefined && past[name] !== now[name],
-      ),
-    );
-    if (moved.size === 0) return;
-
-    setChanged(moved);
-    const timer = setTimeout(() => setChanged(NO_STATS), STAT_HIGHLIGHT_MS);
-    return () => clearTimeout(timer);
-  }, [signature]);
-
-  return changed;
-}
-
-/**
- * The player-visible stats.
- *
- * A bounded int renders as `value / max` over a meter rather than a bare
- * number: the campaign declares the range (`predictions_correct` is 0-26, i.e.
- * a score out of 26), and without the denominator the panel shows a count with
- * nothing to read it against. Bounds come from the campaign this client already
- * fetched, since the projection deliberately carries the value alone.
- *
- * A stat still sitting at its floor is dimmed rather than hidden -- the set of
- * stats is itself a hint about what the story measures, so dropping the
- * untouched ones would hide the shape of the run, but leaving them at full
- * strength is what makes an all-zero panel read as noise.
- */
-function StatReadouts({
-  stats,
-  strings,
-  bounds,
-}: {
-  stats: readonly Stat[];
-  strings: PlayState["strings"];
-  bounds: Readonly<Record<string, StatBounds>>;
-}) {
-  const changed = useChangedStats(stats);
-  return (
-    <dl className="stat-readouts">
-      {stats.map((stat) => {
-        const range = bounds[stat.var];
-        const floor = range?.min ?? 0;
-        const ceiling = range?.max;
-        const numeric = typeof stat.value === "number";
-        const metered = numeric && ceiling !== undefined && ceiling > floor;
-        const className = [
-          numeric && stat.value === floor ? "stat-idle" : "",
-          metered ? "stat-metered" : "",
-          changed.has(stat.var) ? "stat-changed" : "",
-        ]
-          .filter(Boolean)
-          .join(" ");
-        return (
-          <div
-            key={stat.var}
-            {...(className ? { className } : {})}
-            {...(metered
-              ? {
-                  style: {
-                    "--stat-fill": `${Math.round(
-                      (((stat.value as number) - floor) / (ceiling! - floor)) *
-                        100,
-                    )}%`,
-                  } as CSSProperties,
-                }
-              : {})}
-          >
-            <dt>{strings[stat.labelKey]}</dt>
-            <dd>
-              {String(stat.value)}
-              {ceiling !== undefined && (
-                <span className="stat-ceiling"> / {ceiling}</span>
-              )}
-            </dd>
-          </div>
-        );
-      })}
-    </dl>
-  );
-}
-
-function ArrivalReceipt({ arrivalChoice }: { arrivalChoice?: string }) {
-  return (
-    <div className="arrival-receipt" role="status">
-      {arrivalChoice ? (
-        <>
-          <span>Last command</span>
-          <strong>{arrivalChoice}</strong>
-          <span className="arrival-link">// accepted</span>
-        </>
-      ) : (
-        <strong>PROGRAM LOADED. YOUR STORY BEGINS HERE.</strong>
-      )}
-    </div>
-  );
 }
 
 /** The same 768px boundary the stylesheet's phone rules use. */
@@ -365,7 +144,14 @@ function useIsPhone(): boolean {
 // (a fetch, not a synchronous compiled-in build). This gate loads it once and hands the
 // resolved `BrowserDemo` down as a prop, so `PlayAppReady` below is unchanged from the
 // synchronous version other than reading `demo` from props. See plans/spike-notes.md.
-export default function PlayApp() {
+interface PlayerRouteProps {
+  initialCampaignId?: string;
+  active?: boolean;
+  onClose?: () => void;
+  onNavigateLibrary?: () => void;
+}
+export default function PlayApp(props: PlayerRouteProps = {}) {
+  const { t } = useTranslation("play");
   const { apiUrl: configuredApiUrl } = useAccount();
   const [demo, setDemo] = useState<BrowserDemo>();
   const [loadError, setLoadError] = useState<string>();
@@ -431,7 +217,7 @@ export default function PlayApp() {
         setSyncing(false);
         // A failed *re-sync* keeps the catalog already on screen and reports itself on
         // the admin page; only a failed first load has nothing to fall back to.
-        if (syncToken > 0) setSyncError(refreshError ?? message);
+        if (demoRef.current) setSyncError(refreshError ?? message);
         else setLoadError(message);
       }
     }
@@ -442,22 +228,25 @@ export default function PlayApp() {
     };
   }, [syncToken, configuredApiUrl]);
 
-  if (loadError) {
+  if (loadError)
     return (
-      <div className="play-load-error" role="alert">
-        The playable catalog could not be loaded: {loadError}
-      </div>
+      <section className="play-load-error" role="alert">
+        <h1>{t("catalogError")}</h1>
+        <button
+          className="app-button"
+          onClick={() => {
+            setLoadError(undefined);
+            setSyncToken((token) => token + 1);
+          }}
+        >
+          {t("retry")}
+        </button>
+      </section>
     );
-  }
-  if (!demo) {
-    return (
-      <div className="play-loading" role="status">
-        Loading catalog…
-      </div>
-    );
-  }
+  if (!demo) return <ResourceState state="loading" />;
   return (
     <PlayAppReady
+      {...props}
       demo={demo}
       syncing={syncing}
       syncError={syncError}
@@ -468,6 +257,10 @@ export default function PlayApp() {
 }
 
 function PlayAppReady({
+  initialCampaignId,
+  active = true,
+  onClose,
+  onNavigateLibrary,
   demo,
   syncing,
   syncError,
@@ -479,7 +272,18 @@ function PlayAppReady({
   readonly syncError: string | undefined;
   readonly lastSyncedAt: string;
   readonly onSync: () => void;
-}) {
+} & PlayerRouteProps) {
+  const { t } = useTranslation("play");
+  const queries = useQueryClient();
+  const refreshRecords = () => {
+    if (demo.apiUrl)
+      void queries.invalidateQueries({
+        predicate: (query) =>
+          query.queryKey[0] === "private" &&
+          query.queryKey[1] === demo.apiUrl &&
+          ["progress", "saves", "badges"].includes(String(query.queryKey[4])),
+      });
+  };
   const client = useMemo(() => new BrowserClient(demo.store), [demo.store]);
   const [state, setState] = useState<PlayState>();
   const [campaignId, setCampaignId] = useState<string>();
@@ -540,9 +344,9 @@ function PlayAppReady({
    * few pixels regardless, which is a scroll this handoff never intended.
    */
   useEffect(() => {
-    if (sceneText && !showBbsPrompt)
+    if (active && sceneText && !showBbsPrompt)
       sceneRegion.current?.focus({ preventScroll: true });
-  }, [sceneText, showBbsPrompt]);
+  }, [active, sceneText, showBbsPrompt]);
 
   /**
    * Starting or resuming a run replaces the whole shelf with the cabinet, but leaves
@@ -555,8 +359,9 @@ function PlayAppReady({
    * Keyed on `campaignId`, which is set once per run, not once per turn.
    */
   useEffect(() => {
-    if (campaignId) window.scrollTo({ top: 0, left: 0, behavior: "instant" });
-  }, [campaignId]);
+    if (active && campaignId)
+      window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  }, [active, campaignId]);
 
   /**
    * A permanent `?campaign=` link loads the adventure directly -- no dossier click, no
@@ -564,7 +369,8 @@ function PlayAppReady({
    */
   useEffect(() => {
     if (autoStarted.current) return;
-    const requested = new URLSearchParams(search).get("campaign");
+    const requested =
+      initialCampaignId ?? new URLSearchParams(search).get("campaign");
     if (!requested || !demo.findCampaign(requested)) return;
     autoStarted.current = true;
     setSelectedId(requested);
@@ -588,7 +394,7 @@ function PlayAppReady({
   useEffect(() => {
     if (autoStarted.current) return;
     if (new URLSearchParams(search).has("admin")) return;
-    if (hasSeenOnboarding()) return;
+    if (initialCampaignId || hasSeenOnboarding()) return;
     if (!demo.findCampaign(GETTING_STARTED_CAMPAIGN_ID)) return;
     autoStarted.current = true;
     markOnboardingSeen();
@@ -613,13 +419,14 @@ function PlayAppReady({
       setBbsResetToken((resetToken) => resetToken + 1);
       try {
         await client.save(next.sessionId);
+        refreshRecords();
       } catch {
         if (runToken.current !== token) return;
         setSaveFailed(true);
-        setMessage(saveWarning);
+        setMessage(demo.apiUrl ? "remoteSaveWarning" : "localSaveWarning");
       }
     } catch {
-      if (runToken.current === token) setMessage("This story could not start.");
+      if (runToken.current === token) setMessage("startError");
     } finally {
       if (runToken.current === token) setBusy(false);
     }
@@ -639,8 +446,7 @@ function PlayAppReady({
       setJourney([{ excerpt: excerpt(next.scene.body.text) }]);
       setBbsResetToken((resetToken) => resetToken + 1);
     } catch {
-      if (runToken.current === token)
-        setMessage("This saved run could not be loaded.");
+      if (runToken.current === token) setMessage("resumeError");
     } finally {
       if (runToken.current === token) setBusy(false);
     }
@@ -659,8 +465,7 @@ function PlayAppReady({
       const next = await client.submit(state, id);
       if (runToken.current !== token) return;
       setState(next.state);
-      if (!next.result.ok)
-        setMessage("That action was rejected. The scene has not changed.");
+      if (!next.result.ok) setMessage("rejected");
       else {
         if (resolvedLabel) {
           setArrivalChoice(resolvedLabel);
@@ -674,15 +479,15 @@ function PlayAppReady({
         }
         try {
           await client.save(next.state.sessionId);
+          refreshRecords();
         } catch {
           if (runToken.current !== token) return;
           setSaveFailed(true);
-          setMessage(saveWarning);
+          setMessage(demo.apiUrl ? "remoteSaveWarning" : "localSaveWarning");
         }
       }
     } catch {
-      if (runToken.current === token)
-        setMessage("That action could not be completed.");
+      if (runToken.current === token) setMessage("actionError");
     } finally {
       if (runToken.current === token) setBusy(false);
     }
@@ -699,7 +504,8 @@ function PlayAppReady({
     setJourney([]);
     setBusy(false);
     setBbsResetToken((token) => token + 1);
-  }, [campaignId]);
+    onClose?.();
+  }, [campaignId, onClose]);
 
   /**
    * The BBS Terminal prompt's only route into the game -- everything it can
@@ -800,10 +606,46 @@ function PlayAppReady({
   const isAdminPage = new URLSearchParams(search).has("admin");
 
   usePlayerShell({
+    active,
     hidden: isOnboarding,
     title: !isAdminPage && state ? selected?.title : undefined,
-    onSelectShelf: isAdminPage ? undefined : returnToShelf,
+    onSelectShelf: isAdminPage
+      ? undefined
+      : (onNavigateLibrary ?? returnToShelf),
   });
+
+  if (initialCampaignId && !demo.findCampaign(initialCampaignId))
+    return (
+      <section>
+        <h1>{t("missingCampaign")}</h1>
+        <ResourceState
+          state="error"
+          error={new ApiError(404, "not_found", "Unknown campaign")}
+        />
+        <Link to="/">{t("library")}</Link>
+      </section>
+    );
+
+  if (initialCampaignId && !state)
+    return message ? (
+      <section className="play-load-error" role="alert">
+        <p>{t(message)}</p>
+        <button
+          className="app-button"
+          disabled={busy}
+          onClick={() => {
+            const saveId = demo.findLocalSave(initialCampaignId);
+            if (saveId) void resume(initialCampaignId, saveId);
+            else void start(initialCampaignId);
+          }}
+        >
+          {t("retry")}
+        </button>
+        <Link to="/">{t("library")}</Link>
+      </section>
+    ) : (
+      <ResourceState state="loading" />
+    );
 
   return (
     <>
@@ -968,11 +810,11 @@ function PlayAppReady({
                   className={saveFailed ? "save-lamp warning" : "save-lamp"}
                 >
                   <span aria-hidden="true" />{" "}
-                  {saveFailed ? "DISK WRITE ERROR" : "GAME SAVED"}
+                  {t(busy ? "saving" : saveFailed ? "saveError" : "saved")}
                 </span>
               )}
               <button className="cabinet-button quiet" onClick={returnToShelf}>
-                {isOnboarding ? "Skip" : "Quit to library"}
+                {t(isOnboarding ? "skip" : "quit")}
               </button>
             </div>
           </header>
@@ -980,7 +822,7 @@ function PlayAppReady({
             <article className="scene-viewport" aria-live="polite">
               {ended ? (
                 <>
-                  <p className="scene-kicker">SESSION COMPLETE</p>
+                  <p className="scene-kicker">{t("complete")}</p>
                   <SceneRegion
                     key={sceneText}
                     text={state.scene.body.text}
@@ -1005,20 +847,20 @@ function PlayAppReady({
                         disabled={busy}
                         onClick={() => void start(campaignId!)}
                       >
-                        Play the other role
+                        {t("otherRole")}
                       </button>
                     )}
                     <button
                       className="cabinet-button quiet"
                       onClick={returnToShelf}
                     >
-                      Return to stories
+                      {t("returnStories")}
                     </button>
                   </div>
                 </>
               ) : (
                 <>
-                  <p className="scene-kicker">ROOM DESCRIPTION</p>
+                  <p className="scene-kicker">{t("room")}</p>
                   <SceneRegion
                     key={sceneText}
                     text={state.scene.body.text}
@@ -1026,120 +868,26 @@ function PlayAppReady({
                     theme={displayTheme}
                   />
                   <ArrivalReceipt arrivalChoice={arrivalChoice} />
-                  <div
-                    className="action-deck"
-                    aria-label="Available actions"
-                    aria-busy={busy}
-                  >
-                    <p className="deck-label">
-                      {displayTheme === "bbs" && `${bbsSigil} `}
-                      What will you do?
-                    </p>
-                    {state.actions.map((action, index) => (
-                      <div
-                        className={`action-card ${!action.available ? "unavailable" : ""}`}
-                        key={action.id}
-                      >
-                        <button
-                          disabled={busy || !action.available}
-                          onClick={() => choose(action.id)}
-                        >
-                          <span className="action-number" aria-hidden="true">
-                            {index + 1}
-                          </span>
-                          {action.label}
-                        </button>
-                        {!action.available && (
-                          <p className="play-reason">
-                            Unavailable: {action.reason}
-                          </p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+                  <ActionDeck
+                    actions={state.actions}
+                    busy={busy}
+                    terminal={displayTheme === "bbs"}
+                    bbsSigil={bbsSigil}
+                    onChoose={(id) => void choose(id)}
+                  />
                 </>
               )}
               {message && (
                 <p className="play-message" role="status">
-                  {message}
+                  {t(message)}
                 </p>
               )}
             </article>
-            <aside className="status-console" aria-labelledby="console-title">
-              <div className="console-heading">
-                <p className="eyebrow">SIDE PANEL // MEMORY</p>
-                <h2 id="console-title">Player status</h2>
-                {viewOf(state).turn !== undefined && (
-                  <p className="turn-readout">Turn {viewOf(state).turn}</p>
-                )}
-              </div>
-              {viewOf(state).stats.length ? (
-                <StatReadouts
-                  stats={viewOf(state).stats}
-                  strings={state.strings}
-                  bounds={selected?.statBounds ?? {}}
-                />
-              ) : (
-                <p className="console-empty">
-                  No visible statistics have been authorized for this case.
-                </p>
-              )}
-              {viewOf(state).achievements.length > 0 && (
-                <p className="achievement-note">
-                  <span aria-hidden="true">◆ </span>
-                  Achievement stamps: {viewOf(state).achievements.length}
-                </p>
-              )}
-              {/*
-               * Open by default: this is the run's own history, it fills the
-               * console's otherwise-dead lower half on desktop, and behind a
-               * collapsed `[+]` most players never find it. `open` is set
-               * once, not controlled -- React only rewrites the attribute
-               * when the prop value changes, so closing it stays closed.
-               */}
-              <details className="journey-log" open>
-                <summary>
-                  Travel log
-                  <span className="journey-count">
-                    {journey.length} {journey.length === 1 ? "page" : "pages"}
-                  </span>
-                </summary>
-                <ol>
-                  {journey.map((entry, index) => (
-                    <li
-                      key={`${index}-${entry.excerpt}`}
-                      aria-current={
-                        index === journey.length - 1 ? "step" : undefined
-                      }
-                    >
-                      {entry.choice && (
-                        <strong>You chose {entry.choice}. </strong>
-                      )}
-                      <span>{entry.excerpt}</span>
-                      {index === journey.length - 1 && <em> Current page</em>}
-                    </li>
-                  ))}
-                </ol>
-                {journey.length > 1 && (
-                  <p className="journey-origin">
-                    Where I came from: {journey[journey.length - 2]?.excerpt}
-                  </p>
-                )}
-              </details>
-              <p className="console-footnote">
-                Player-visible memory only. No engine internals displayed.
-              </p>
-              {selected?.sources && (
-                <div className="source-links">
-                  <h3>Sources / credits</h3>
-                  {selected.sources.map((source) => (
-                    <a key={source.href} href={source.href}>
-                      {source.label}
-                    </a>
-                  ))}
-                </div>
-              )}
-            </aside>
+            <StatusConsole
+              state={state}
+              selected={selected}
+              journey={journey}
+            />
           </div>
         </section>
       )}

@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { Suspense, useEffect, useState } from "react";
 import { Outlet, useLocation } from "react-router";
+import { PlayerHost } from "../features/play/PlayerHost";
 import { ResourceState } from "../components/ResourceState";
 import { PwaStatus } from "../pwa/PwaStatus";
 import { Header } from "../Header";
@@ -16,8 +17,9 @@ export function AppShell() {
   const { t } = useTranslation("titles");
   useEffect(() => {
     const path = location.pathname;
-    const key =
-      path === "/"
+    const key = path.startsWith("/play/")
+      ? "play"
+      : path === "/"
         ? "library"
         : path === "/ranking"
           ? "ranking"
@@ -90,6 +92,7 @@ export function AppShell() {
         </Header>
         <PwaStatus playing={Boolean(player?.title)} />
         <div id="route-content" tabIndex={-1}>
+          <PlayerHost key={account.sessionGeneration} />
           <ErrorBoundary key={location.pathname + location.search}>
             <Suspense fallback={<ResourceState state="loading" />}>
               <Outlet />

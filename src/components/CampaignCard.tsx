@@ -68,7 +68,7 @@ export function CampaignCard({
         ) : (
           <Link
             className="app-button app-button--primary"
-            to={`/?campaign=${encodeURIComponent(campaign.campaignId)}`}
+            to={`/play/${encodeURIComponent(campaign.campaignId)}`}
           >
             {t(resumable ? "continue" : "play")}
             <span className="visually-hidden">: {campaign.title}</span>

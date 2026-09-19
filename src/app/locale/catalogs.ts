@@ -1,7 +1,13 @@
+import { onboardingEn, onboardingBg } from "./onboarding";
+import { contentEn, contentBg } from "./content";
+import { communityEn, communityBg } from "./community";
 import { BADGE_DEFINITIONS } from "../../play/badges";
 import { badgesBg } from "./badges.bg";
 export const resources = {
   en: {
+    onboarding: onboardingEn,
+    content: contentEn,
+    community: communityEn,
     play: {
       renderError: "Something broke while rendering this adventure.",
       scene: "Scene",
@@ -190,6 +196,9 @@ export const resources = {
     },
   },
   bg: {
+    onboarding: onboardingBg,
+    content: contentBg,
+    community: communityBg,
     play: {
       renderError: "Възникна грешка при показването на приключението.",
       scene: "Сцена",

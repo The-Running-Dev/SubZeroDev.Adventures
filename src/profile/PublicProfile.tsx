@@ -8,7 +8,10 @@
  * ever exercise its local-mode branch under this repo's test suite, which pins
  * `VITE_API_URL: ""` for the whole run (vite.config.ts, issue #18).
  */
-import { useEffect, useState, type CSSProperties } from "react";
+import type { CSSProperties } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { getProfile } from "../api/profile";
+import { usePublicCampaigns } from "../api/queries";
 import type { PublicProfileData } from "../play/identity";
 import { playEarnedBadgeCount } from "../play/badges";
 import { ProfileRankBadge } from "../play/ProfileRankBadge";
@@ -27,11 +30,6 @@ type Stage =
   | { readonly kind: "not-found" }
   | { readonly kind: "loaded"; readonly data: PublicProfileData };
 
-interface CampaignSummary {
-  readonly campaignId: string;
-  readonly title: string;
-}
-
 export function PublicProfile({
   apiUrl,
   slug,
@@ -39,50 +37,27 @@ export function PublicProfile({
   apiUrl?: string;
   slug: string;
 }) {
-  const [stage, setStage] = useState<Stage>(
-    apiUrl ? { kind: "loading" } : { kind: "unavailable" },
-  );
-  const [titles, setTitles] = useState<ReadonlyMap<string, string>>(new Map());
-
-  useEffect(() => {
-    if (!apiUrl) {
-      setStage({ kind: "unavailable" });
-      return;
-    }
-    let cancelled = false;
-    setStage({ kind: "loading" });
-
-    fetch(`${apiUrl}/api/profile/${encodeURIComponent(slug)}`)
-      .then((response) =>
-        response.ok
-          ? response.json().then((data: PublicProfileData) => {
-              if (!cancelled) setStage({ kind: "loaded", data });
-            })
-          : Promise.resolve().then(() => {
-              if (!cancelled) setStage({ kind: "not-found" });
-            }),
-      )
-      .catch(() => {
-        if (!cancelled) setStage({ kind: "not-found" });
-      });
-
-    fetch(`${apiUrl}/api/campaigns`)
-      .then((response) => (response.ok ? response.json() : null))
-      .then((body: { campaigns: CampaignSummary[] } | null) => {
-        if (cancelled || !body) return;
-        setTitles(new Map(body.campaigns.map((c) => [c.campaignId, c.title])));
-      })
-      .catch(() => {
-        /* Title resolution is a nicety -- PersonnelFile falls back to the raw id. */
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [apiUrl, slug]);
+  const query = useQuery({
+    queryKey: ["public", apiUrl, "profile", slug],
+    queryFn: ({ signal }) => getProfile(apiUrl, slug, signal),
+    enabled: Boolean(apiUrl),
+  });
+  // Anonymous, not the viewer's own catalog: this page is rendered for strangers, so the
+  // titles on it must not vary by who is looking (and must not wait on `/api/me`).
+  const campaigns = usePublicCampaigns(apiUrl);
+  const stage: Stage = !apiUrl
+    ? { kind: "unavailable" }
+    : query.isPending
+      ? { kind: "loading" }
+      : query.isError
+        ? { kind: "not-found" }
+        : { kind: "loaded", data: query.data };
 
   function findCampaignTitle(campaignId: string): string {
-    return titles.get(campaignId) ?? campaignId;
+    return (
+      campaigns.data?.campaigns.find((c) => c.campaignId === campaignId)
+        ?.title ?? campaignId
+    );
   }
 
   return (

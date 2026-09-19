@@ -1,3 +1,10 @@
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { ApiError } from "../api/client";
+import {
+  getDiscussion,
+  getDiscussions,
+  postDiscussion,
+} from "../api/discussions";
 import { Link } from "react-router";
 import { useAccount } from "../app/providers/AccountProvider";
 /**
@@ -14,7 +21,7 @@ import { useAccount } from "../app/providers/AccountProvider";
  * anywhere in this codebase, and the server's own seam (`discussions/forum.ts`) declares
  * the same property on its side, so nothing crossing either boundary is ever markup.
  */
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   type DiscussionListData,
   type DiscussionThreadData,
@@ -45,67 +52,39 @@ export function Discussions({
   readonly apiUrl?: string;
   readonly threadId?: string;
 }) {
-  const { identity, loading: identityLoading } = useAccount();
+  const { identity, loading: identityLoading, refreshToken } = useAccount();
 
-  const [refreshToken, setRefreshToken] = useState(0);
-  const [stage, setStage] = useState<Stage>(
-    apiUrl ? { kind: "loading" } : { kind: "unavailable" },
-  );
-
-  useEffect(() => {
-    if (!apiUrl) {
-      setStage({ kind: "unavailable" });
-      return;
-    }
-    let cancelled = false;
-    setStage({ kind: "loading" });
-
-    const url = threadId
-      ? `${apiUrl}/api/discussions/${encodeURIComponent(threadId)}`
-      : `${apiUrl}/api/discussions`;
-
-    fetch(url, { credentials: "include" })
-      .then(async (response) => {
-        if (response.status === 404) {
-          if (!cancelled) setStage({ kind: "not-found" });
-          return;
-        }
-        if (response.status === 503) {
-          const body = (await response.json().catch(() => undefined)) as
-            { error?: { code?: string } } | undefined;
-          if (!cancelled) {
-            setStage(
-              body?.error?.code === "not_configured"
-                ? { kind: "not-configured" }
-                : { kind: "failed" },
-            );
-          }
-          return;
-        }
-        if (!response.ok) {
-          if (!cancelled) setStage({ kind: "failed" });
-          return;
-        }
-        const body = await response.json();
-        if (cancelled) return;
-        setStage(
-          threadId
-            ? { kind: "thread", data: body as DiscussionThreadData }
-            : { kind: "list", data: body as DiscussionListData },
-        );
-      })
-      .catch(() => {
-        if (!cancelled) setStage({ kind: "failed" });
-      });
-
-    return () => {
-      cancelled = true;
-    };
-    // `refreshToken` bumps after a successful post, so the list picks up the new thread
-    // without a full page reload. The compose form's own gate is `identity.kind`, read
-    // directly (below), not the response's `canPost` field, so a sign-in/out round trip
-    // does not need to be in this dependency list.
-  }, [apiUrl, threadId, refreshToken]);
+  const client = useQueryClient();
+  const queryKey = [
+    "private",
+    apiUrl,
+    identity.playerId,
+    refreshToken,
+    "discussions",
+    threadId ?? "list",
+  ];
+  const query = useQuery<DiscussionListData | DiscussionThreadData>({
+    queryKey,
+    queryFn: ({ signal }) =>
+      threadId
+        ? getDiscussion(apiUrl, threadId, signal)
+        : getDiscussions(apiUrl, undefined, signal),
+    enabled: Boolean(apiUrl) && !identityLoading,
+  });
+  const error = query.error;
+  const stage: Stage = !apiUrl
+    ? { kind: "unavailable" }
+    : query.isPending
+      ? { kind: "loading" }
+      : error instanceof ApiError && error.status === 404
+        ? { kind: "not-found" }
+        : error instanceof ApiError && error.code === "not_configured"
+          ? { kind: "not-configured" }
+          : query.isError
+            ? { kind: "failed" }
+            : threadId
+              ? { kind: "thread", data: query.data as DiscussionThreadData }
+              : { kind: "list", data: query.data as DiscussionListData };
 
   const [loadingMore, setLoadingMore] = useState(false);
 
@@ -113,21 +92,16 @@ export function Discussions({
     if (stage.kind !== "list" || !stage.data.nextCursor || !apiUrl) return;
     setLoadingMore(true);
     try {
-      const url = `${apiUrl}/api/discussions?cursor=${encodeURIComponent(stage.data.nextCursor)}`;
-      const response = await fetch(url, { credentials: "include" });
-      if (!response.ok) return;
-      const body = (await response.json()) as DiscussionListData;
-      setStage((current) =>
-        current.kind === "list"
-          ? {
-              kind: "list",
-              data: {
-                ...body,
-                threads: [...current.data.threads, ...body.threads],
-              },
-            }
-          : current,
-      );
+      const body = await getDiscussions(apiUrl, stage.data.nextCursor);
+      // Cancelled/removed account queries must not be recreated by late pagination.
+      if (client.getQueryState(queryKey))
+        client.setQueryData<DiscussionListData>(queryKey, (current) =>
+          current
+            ? { ...body, threads: [...current.threads, ...body.threads] }
+            : current,
+        );
+    } catch {
+      // The existing list remains usable and its load-more action remains retryable.
     } finally {
       setLoadingMore(false);
     }
@@ -142,25 +116,11 @@ export function Discussions({
     setPosting(true);
     setComposeOutcome(undefined);
     try {
-      const response = await fetch(`${apiUrl}/api/discussions`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ title, body }),
-      });
-      const json = (await response.json().catch(() => undefined)) as
-        { error?: { code?: string } } | undefined;
-      if (!response.ok) {
-        throw new Error(
-          json?.error?.code
-            ? `${response.status} (${json.error.code})`
-            : `${response.status}`,
-        );
-      }
+      await postDiscussion(apiUrl, title, body);
       setTitle("");
       setBody("");
       setComposeOutcome({ tone: "ok", text: "Posted." });
-      setRefreshToken((t) => t + 1);
+      await client.invalidateQueries({ queryKey });
     } catch (error) {
       setComposeOutcome({
         tone: "error",

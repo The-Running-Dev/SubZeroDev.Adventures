@@ -32,8 +32,9 @@ const OAuthConsent = lazy(() =>
 
 function PlayRoute() {
   const { search } = useLocation();
+  const { sessionGeneration } = useAccount();
   // Until PR 7 moves gameplay to /play/:campaignId, query changes are real entries.
-  return <PlayApp key={search} />;
+  return <PlayApp key={`${search}:${sessionGeneration}`} />;
 }
 
 function ThreadRoute() {

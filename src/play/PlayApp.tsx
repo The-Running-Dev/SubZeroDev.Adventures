@@ -366,6 +366,7 @@ function useIsPhone(): boolean {
 // resolved `BrowserDemo` down as a prop, so `PlayAppReady` below is unchanged from the
 // synchronous version other than reading `demo` from props. See plans/spike-notes.md.
 export default function PlayApp() {
+  const { apiUrl: configuredApiUrl } = useAccount();
   const [demo, setDemo] = useState<BrowserDemo>();
   const [loadError, setLoadError] = useState<string>();
   // Bumped by the admin page's "Sync" to re-run the loader below. `demo` is deliberately
@@ -418,7 +419,7 @@ export default function PlayApp() {
       }
 
       try {
-        const loaded = await createBrowserDemo();
+        const loaded = await createBrowserDemo(configuredApiUrl);
         if (cancelled) return;
         setDemo(loaded);
         setSyncedAt(new Date().toLocaleTimeString());
@@ -439,7 +440,7 @@ export default function PlayApp() {
     return () => {
       cancelled = true;
     };
-  }, [syncToken]);
+  }, [syncToken, configuredApiUrl]);
 
   if (loadError) {
     return (
@@ -603,7 +604,7 @@ function PlayAppReady({
     setSaveFailed(false);
     try {
       const next = await client.start(id);
-      if (identity.kind === "anonymous" && demo.apiUrl) refreshIdentity();
+      if (identity.kind === "anonymous" && demo.apiUrl) refreshIdentity(true);
       if (runToken.current !== token) return;
       setState(next);
       setCampaignId(id);

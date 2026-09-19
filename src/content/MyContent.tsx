@@ -1,3 +1,11 @@
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  getMyContent,
+  submitContent,
+  requestPublication,
+  deleteContent,
+  type Submission,
+} from "../api/content";
 import { useAccount } from "../app/providers/AccountProvider";
 /**
  * `/content` -- a signed-in (or guest) player's own submitted campaigns and extensions.
@@ -6,25 +14,7 @@ import { useAccount } from "../app/providers/AccountProvider";
  * server refreshes, then report this row's own outcome" shape, against `/api/content`
  * instead of `/api/admin/content/sources`.
  */
-import { useEffect, useRef, useState } from "react";
-
-type SubmissionStatus = "pending" | "approved" | "rejected";
-type SubmissionVisibility = "private" | "public";
-
-interface Submission {
-  readonly id: string;
-  readonly kind: "url" | "pasted";
-  readonly label: string;
-  readonly url?: string;
-  readonly lastSyncedAt?: string;
-  readonly lastError?: string;
-  readonly campaignCount?: number;
-  readonly extensionCount?: number;
-  readonly status: SubmissionStatus;
-  readonly visibility: SubmissionVisibility;
-  readonly reviewNote?: string;
-  readonly quarantineReason?: string;
-}
+import { useRef, useState } from "react";
 
 interface Outcome {
   readonly tone: "ok" | "warn" | "error";
@@ -55,47 +45,38 @@ function statusLabel(submission: Submission): string {
   return "Private";
 }
 
-function useMySubmissions(
-  apiUrl: string | undefined,
-  refetchKey: string,
-): { submissions: readonly Submission[]; refetch: () => void } {
-  const [submissions, setSubmissions] = useState<readonly Submission[]>([]);
-  const [token, setToken] = useState(0);
-
-  useEffect(() => {
-    if (!apiUrl) return;
-    let cancelled = false;
-    fetch(`${apiUrl}/api/content/mine`, { credentials: "include" })
-      .then((response) =>
-        response.ok
-          ? (response.json() as Promise<{ submissions: Submission[] }>)
-          : { submissions: [] },
-      )
-      .then((body) => {
-        if (!cancelled)
-          setSubmissions(
-            Array.isArray(body.submissions) ? body.submissions : [],
-          );
-      })
-      .catch(() => {
-        if (!cancelled) setSubmissions([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [apiUrl, refetchKey, token]);
-
-  return { submissions, refetch: () => setToken((t) => t + 1) };
-}
-
 export function MyContent({ apiUrl }: { apiUrl?: string }) {
-  const { identity, loading: identityLoading } = useAccount();
-
-  const [refreshToken, setRefreshToken] = useState(0);
-  const { submissions, refetch } = useMySubmissions(
+  const { identity, loading: identityLoading, refreshToken } = useAccount();
+  const queryClient = useQueryClient();
+  const queryKey = [
+    "private",
     apiUrl,
-    `${identity.playerId ?? ""}:${refreshToken}`,
-  );
+    identity.playerId,
+    refreshToken,
+    "content",
+  ];
+  const query = useQuery({
+    queryKey,
+    queryFn: ({ signal }) => getMyContent(apiUrl, signal),
+    enabled: Boolean(apiUrl && identity.playerId) && !identityLoading,
+  });
+  // Shape-guarded, not just null-guarded: `request` hands back whatever parsed, so a
+  // malformed `submissions` would otherwise reach `.map` below and take the page down.
+  // Annotated rather than inferred -- `Array.isArray` narrows a `readonly T[]` to `any[]`,
+  // which would quietly make every `submission` below untyped. The guard is arrayness only;
+  // element shape is trusted here exactly as it was before it.
+  const submissions: readonly Submission[] = Array.isArray(
+    query.data?.submissions,
+  )
+    ? query.data.submissions
+    : [];
+  const refetch = () => {
+    void queryClient.invalidateQueries({ queryKey });
+    void queryClient.invalidateQueries({
+      predicate: (q) =>
+        q.queryKey[0] === "private" && q.queryKey[4] === "campaigns",
+    });
+  };
 
   const [urlLabel, setUrlLabel] = useState("");
   const [urlValue, setUrlValue] = useState("");
@@ -120,27 +101,8 @@ export function MyContent({ apiUrl }: { apiUrl?: string }) {
   /** Mirrors `AdminPanel.tsx`'s `postSource` -- a 201 always means the row exists, so
    *  everything from here on is a report about a source that is already saved. */
   async function postSubmission(body: unknown): Promise<Outcome> {
-    const response = await fetch(`${apiUrl}/api/content`, {
-      method: "POST",
-      credentials: "include",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const json = (await response.json().catch(() => undefined)) as
-      | {
-          error?: { code?: string };
-          refresh?: { ok: boolean; error?: string };
-          source?: { label?: string; lastError?: string };
-        }
-      | undefined;
-    if (!response.ok) {
-      throw new Error(
-        json?.error?.code
-          ? `${response.status} (${json.error.code})`
-          : `${response.status}`,
-      );
-    }
-    setRefreshToken((t) => t + 1);
+    const json = await submitContent(apiUrl, body);
+    refetch();
     if (!json?.refresh || json.refresh.ok) {
       return {
         tone: "ok",
@@ -233,11 +195,7 @@ export function MyContent({ apiUrl }: { apiUrl?: string }) {
     setBusyId(id);
     setRowError(undefined);
     try {
-      const response = await fetch(`${apiUrl}/api/content/${id}/publish`, {
-        method: "POST",
-        credentials: "include",
-      });
-      if (!response.ok) throw new Error(`request failed: ${response.status}`);
+      await requestPublication(apiUrl, id);
       refetch();
     } catch (error) {
       setRowError({
@@ -253,11 +211,7 @@ export function MyContent({ apiUrl }: { apiUrl?: string }) {
     setBusyId(id);
     setRowError(undefined);
     try {
-      const response = await fetch(`${apiUrl}/api/content/${id}`, {
-        method: "DELETE",
-        credentials: "include",
-      });
-      if (!response.ok) throw new Error(`request failed: ${response.status}`);
+      await deleteContent(apiUrl, id);
       refetch();
     } catch (error) {
       setRowError({

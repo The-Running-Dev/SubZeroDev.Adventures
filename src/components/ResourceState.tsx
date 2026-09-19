@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next";
+import { Button } from "./Button";
 import { ApiError } from "../api/client";
 
 /** Common states for the feature-screen migrations in PRs 5–9. */
@@ -28,16 +29,9 @@ export function ResourceState({
       ? `errors.${i18n.exists(`errors.${code}`) ? code : "request_failed"}`
       : state;
   return (
-    <div
-      className="profile-unavailable"
-      role={state === "error" ? "alert" : "status"}
-    >
+    <div className="app-state" role={state === "error" ? "alert" : "status"}>
       <p>{t(key)}</p>
-      {onRetry && (
-        <button className="cabinet-button" onClick={onRetry}>
-          {t("retry")}
-        </button>
-      )}
+      {onRetry && <Button onClick={onRetry}>{t("retry")}</Button>}
     </div>
   );
 }

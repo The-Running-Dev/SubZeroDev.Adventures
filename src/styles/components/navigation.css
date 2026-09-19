@@ -1,0 +1,105 @@
+/*
+ * The global header: standings, the account menu, and the display-mode select.
+ * `position: relative` + `z-index` makes this its own stacking context, which is load-
+ * bearing: `.archive > *`/`.cabinet > *` below stack their own children at `z-index: 2`
+ * (to clear each panel's scanline overlay), and a child's `z-index` only ever competes
+ * within its parent's stacking context -- so without a context of its own, this bar's
+ * `z-index: 6` account dropdown (below) would still lose to that `2` outside it. `4` sits
+ * above that `2` and below `.boot-flash`'s `5`, matching where this bar already painted
+ * before the account dropdown existed.
+ */
+.system-bar {
+  align-items: center;
+  display: flex;
+  gap: 0.6rem;
+  justify-content: flex-end;
+  margin-bottom: 1rem;
+  position: relative;
+  z-index: 4;
+}
+
+.system-bar-group {
+  align-items: center;
+  display: flex;
+  gap: 0.6rem;
+}
+
+/* "Disk library", the loaded story's title while playing, "Standings", "My content",
+   "Getting started", and "Discussions" -- pushed to the far left of the bar, opposite the
+   account menu and display-mode select. Wraps: a long story title is the one item here
+   without a fixed short label. */
+.system-bar-nav {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-right: auto;
+}
+
+/* Styled as a button, matching the account sigil and theme select they sit beside,
+   rather than as inline body text. Shared by both an `<a>` (a real page, /ranking or /)
+   and a `<button>` (a same-page view switch) -- `border: 0` and `cursor: pointer` here
+   only matter for the button, undoing the browser's own button chrome. */
+.system-bar-link {
+  align-items: center;
+  background: var(--surface-sunken);
+  border: 2px solid var(--cyan);
+  color: var(--cyan);
+  cursor: pointer;
+  display: flex;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  min-height: 44px;
+  padding: 0.5rem 0.75rem;
+  text-transform: uppercase;
+}
+
+.system-bar-link:hover,
+.system-bar-link:focus-visible {
+  background: var(--cyan);
+  color: var(--screen);
+}
+
+.system-bar-link:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+/* The current page/view -- filled, like the account sigil while its menu is open. */
+.system-bar-link[aria-current="page"] {
+  background: var(--cyan);
+  color: var(--screen);
+}
+
+/* The loaded story's own nav item (Header.tsx, while playing) is a `<span>`, not a
+   real control -- nothing to click there, since it already is the current page. */
+.system-bar-link:not(a, button) {
+  cursor: default;
+}
+
+.system-bar-label {
+  color: var(--muted);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.theme-select {
+  background: var(--surface-sunken);
+  border: 2px solid var(--cyan);
+  color: var(--cyan);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  max-width: 100%;
+  min-height: 44px;
+  padding: 0.5rem 0.75rem;
+  text-transform: uppercase;
+}
+
+.theme-select:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}

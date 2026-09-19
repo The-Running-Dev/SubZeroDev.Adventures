@@ -1,4 +1,8 @@
-import { Link } from "react-router";
+import { useTranslation } from "react-i18next";
+import { useEffect, useRef } from "react";
+import { LanguageSelector } from "./components/LanguageSelector";
+import "./styles/app.css";
+import { Link, useLocation } from "react-router";
 import type { ReactNode } from "react";
 import { ThemeSelector } from "./ThemeSelector";
 import type { ThemeId } from "./theme";
@@ -52,24 +56,42 @@ export function Header({
   children,
   hidden,
 }: HeaderProps) {
+  const { t } = useTranslation("shell");
+  const { pathname } = useLocation();
+  const more = useRef<HTMLDetailsElement>(null);
+  useEffect(() => {
+    if (more.current) more.current.open = false;
+  }, [pathname]);
+  if (hidden)
+    return (
+      <div className="onboarding-language">
+        <LanguageSelector />
+      </div>
+    );
+  const playing = current === "playing";
   return (
     <header
-      className="system-bar"
-      hidden={hidden}
-      style={hidden ? { display: "none" } : undefined}
+      className={`system-bar app-header${playing ? " app-header--playing" : ""}`}
     >
-      <nav className="system-bar-nav" aria-label="Primary">
+      <Link className="app-brand" to="/" aria-label={t("home")}>
+        S0<span>ADVENTURES</span>
+      </Link>
+      <nav className="system-bar-nav" aria-label={t("primary")}>
         {onSelectShelf ? (
           <button
             className="system-bar-link"
             aria-current={current === "shelf" ? "page" : undefined}
             onClick={onSelectShelf}
           >
-            Disk library
+            {t("library")}
           </button>
         ) : (
-          <Link className="system-bar-link" to="/">
-            Disk library
+          <Link
+            className="system-bar-link"
+            to="/"
+            aria-current={current === "shelf" ? "page" : undefined}
+          >
+            {t("library")}
           </Link>
         )}
         <Link
@@ -77,40 +99,62 @@ export function Header({
           to="/ranking"
           aria-current={current === "standings" ? "page" : undefined}
         >
-          Standings
-        </Link>
-        <Link
-          className="system-bar-link"
-          to="/content"
-          aria-current={current === "content" ? "page" : undefined}
-        >
-          My content
-        </Link>
-        <Link
-          className="system-bar-link"
-          to="/start"
-          aria-current={current === "start" ? "page" : undefined}
-        >
-          Getting started
+          {t("standings")}
         </Link>
         <Link
           className="system-bar-link"
           to="/discussions"
           aria-current={current === "discussions" ? "page" : undefined}
         >
-          Discussions
+          {t("community")}
         </Link>
-        {current === "playing" && playingTitle && (
-          <span
-            className="system-bar-link system-bar-current-story"
-            aria-current="page"
-          >
-            {playingTitle}
-          </span>
-        )}
+        <details
+          className="nav-more"
+          ref={more}
+          onKeyDown={(event) => {
+            if (event.key === "Escape" && more.current) {
+              more.current.open = false;
+              more.current.querySelector("summary")?.focus();
+            }
+          }}
+        >
+          <summary className="system-bar-link">{t("more")}</summary>
+          <div className="nav-more-panel">
+            <Link
+              className="system-bar-link"
+              to="/profile"
+              aria-current={current === "profile" ? "page" : undefined}
+            >
+              {t("me")}
+            </Link>
+
+            <Link
+              className="system-bar-link"
+              to="/content"
+              aria-current={current === "content" ? "page" : undefined}
+            >
+              {t("content")}
+            </Link>
+            <Link
+              className="system-bar-link"
+              to="/start"
+              aria-current={current === "start" ? "page" : undefined}
+            >
+              {t("start")}
+            </Link>
+          </div>
+        </details>
       </nav>
-      {children}
-      <ThemeSelector theme={theme} onChange={onThemeChange} />
+      {playing && playingTitle && (
+        <span className="system-bar-current-story" aria-current="page">
+          {playingTitle}
+        </span>
+      )}
+      <div className="app-preferences">
+        {children}
+        <ThemeSelector theme={theme} onChange={onThemeChange} />
+        <LanguageSelector />
+      </div>
     </header>
   );
 }

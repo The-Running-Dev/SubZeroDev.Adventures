@@ -1,0 +1,193 @@
+@import "./tokens.css";
+@import "./components/navigation.css";
+
+.app-header {
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+.app-brand {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  color: var(--cyan);
+  font-weight: 800;
+  text-decoration: none;
+  min-height: var(--control-height);
+}
+.app-brand span {
+  color: var(--ink);
+  letter-spacing: 0.1em;
+}
+.app-header .system-bar-nav {
+  margin: 0;
+  gap: var(--space-2);
+}
+.app-header .system-bar-link {
+  text-decoration: none;
+  letter-spacing: 0;
+  border-width: 1px;
+}
+.app-preferences {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  align-items: center;
+  width: 100%;
+  justify-content: flex-end;
+}
+.app-preferences .system-bar-group {
+  flex-wrap: wrap;
+}
+.nav-more {
+  position: relative;
+}
+.nav-more-panel {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  z-index: 7;
+  background: var(--surface-raised);
+  border: 1px solid var(--rule);
+  padding: var(--space-2);
+  min-width: 12rem;
+  display: grid;
+  gap: var(--space-2);
+}
+.system-bar-current-story {
+  color: var(--text-quiet);
+  overflow-wrap: anywhere;
+}
+.skip-link {
+  position: fixed;
+  top: 0;
+  left: var(--space-4);
+  transform: translateY(-150%);
+  z-index: 20;
+  padding: var(--space-4);
+  background: var(--surface);
+  color: var(--cyan);
+}
+.skip-link:focus {
+  transform: none;
+}
+.onboarding-language {
+  display: flex;
+  justify-content: flex-end;
+  padding: var(--space-2);
+}
+.app-button {
+  font: inherit;
+  color: var(--cyan);
+  border: 1px solid var(--cyan);
+  background: var(--surface-sunken);
+  padding: var(--space-2) var(--space-4);
+  min-height: var(--control-height);
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.app-button--primary {
+  background: var(--cyan);
+  color: var(--on-cyan);
+}
+.app-button--danger {
+  border-color: var(--danger);
+  color: var(--danger-text);
+  background: var(--danger-bg);
+}
+.app-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.app-button:hover:not(:disabled) {
+  background: var(--cyan);
+  color: var(--on-cyan);
+}
+.app-panel,
+.app-state {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  padding: clamp(1rem, 3vw, 2rem);
+  color: var(--text-body);
+  overflow-wrap: anywhere;
+}
+.app-panel h1,
+.app-panel h2 {
+  color: var(--ink);
+}
+:where(button, select, input, textarea, summary):focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+@media (max-width: 767px) {
+  .app-header {
+    padding-inline: var(--page-inline);
+  }
+  .app-brand {
+    font-size: 0.875rem;
+  }
+  .app-preferences {
+    justify-content: space-between;
+    gap: var(--space-2);
+  }
+  .app-preferences .system-bar-label {
+    font-size: 0.75rem;
+  }
+  .app-preferences .system-bar-group {
+    flex: 1 1 8rem;
+    gap: var(--space-1);
+  }
+  .app-preferences select {
+    width: 100%;
+  }
+  .app-header .system-bar-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0;
+    background: var(--surface);
+    border-top: 1px solid var(--rule);
+    padding-bottom: env(safe-area-inset-bottom);
+    z-index: 8;
+  }
+  .app-header .system-bar-nav > .system-bar-link,
+  .nav-more > summary {
+    padding: var(--space-2) var(--space-1);
+    border: 0;
+    justify-content: center;
+    text-align: center;
+    font-size: 0.75rem;
+    min-height: 56px;
+    overflow-wrap: anywhere;
+    height: 100%;
+  }
+  .nav-more-panel {
+    top: auto;
+    bottom: 100%;
+    max-width: calc(100vw - 2rem);
+  }
+  .play-main:has(.app-header:not(.app-header--playing)) {
+    padding-bottom: calc(5rem + env(safe-area-inset-bottom));
+  }
+  .app-header--playing .system-bar-nav {
+    position: static;
+    display: flex;
+    width: 100%;
+    border: 0;
+    padding: 0;
+  }
+  .app-header--playing .system-bar-nav > :not(:first-child) {
+    display: none;
+  }
+  .app-header--playing .app-brand {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}

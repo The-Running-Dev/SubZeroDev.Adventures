@@ -1,5 +1,21 @@
 import { Component, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
+import { Button } from "../components/Button";
+import { Panel } from "../components/Panel";
 
+function Failure({ retry }: { retry: () => void }) {
+  const { t } = useTranslation("shell");
+  return (
+    <Panel role="alert">
+      <h1>
+        {t("screenError", {
+          defaultValue: "This screen could not be displayed.",
+        })}
+      </h1>
+      <Button onClick={retry}>{t("retry", { defaultValue: "Retry" })}</Button>
+    </Panel>
+  );
+}
 export class ErrorBoundary extends Component<
   { children: ReactNode },
   { failed: boolean }
@@ -9,17 +25,10 @@ export class ErrorBoundary extends Component<
     return { failed: true };
   }
   render() {
-    if (!this.state.failed) return this.props.children;
-    return (
-      <section className="play-load-error" role="alert">
-        <h1>This screen could not be displayed.</h1>
-        <button
-          className="cabinet-button"
-          onClick={() => this.setState({ failed: false })}
-        >
-          Retry
-        </button>
-      </section>
+    return this.state.failed ? (
+      <Failure retry={() => this.setState({ failed: false })} />
+    ) : (
+      this.props.children
     );
   }
 }

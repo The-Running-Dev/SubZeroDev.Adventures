@@ -1,5 +1,29 @@
 export const resources = {
   en: {
+    shell: {
+      primary: "Primary",
+      library: "Disk library",
+      standings: "Standings",
+      community: "Community",
+      me: "Me",
+      more: "More",
+      content: "My content",
+      start: "Getting started",
+      home: "Adventures home",
+      display: "DISPLAY MODE",
+      skip: "Skip to content",
+      themes: {
+        dos: "DOS Blue",
+        matrix: "Matrix",
+        amber: "Amber CRT",
+        bbs: "Terminal",
+      },
+      screenError: "This screen could not be displayed.",
+      retry: "Retry",
+      returnLibrary: "Return to disk library",
+      missing: "Page not found",
+    },
+
     pwa: {
       offlineTitle: "Offline",
       offlineBody:
@@ -62,6 +86,30 @@ export const resources = {
     },
   },
   bg: {
+    shell: {
+      primary: "Основна навигация",
+      library: "Библиотека",
+      standings: "Класация",
+      community: "Общност",
+      me: "Профил",
+      more: "Още",
+      content: "Моето съдържание",
+      start: "Първи стъпки",
+      home: "Начало на Adventures",
+      display: "ИЗГЛЕД",
+      skip: "Към съдържанието",
+      themes: {
+        dos: "Син DOS",
+        matrix: "Матрица",
+        amber: "Кехлибарен CRT",
+        bbs: "Терминал",
+      },
+      screenError: "Този екран не може да бъде показан.",
+      retry: "Опитай отново",
+      returnLibrary: "Към библиотеката",
+      missing: "Страницата не е намерена",
+    },
+
     pwa: {
       offlineTitle: "Без интернет",
       offlineBody:

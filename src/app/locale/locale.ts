@@ -25,7 +25,7 @@ export function createLocaleInstance() {
     lng: readLocale(),
     fallbackLng: "en",
     supportedLngs: ["en", "bg"],
-    ns: ["common", "titles", "pwa"],
+    ns: ["common", "titles", "pwa", "shell"],
     defaultNS: "common",
     initAsync: false,
     interpolation: { escapeValue: false },

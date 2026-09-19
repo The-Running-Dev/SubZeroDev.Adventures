@@ -837,6 +837,17 @@ function PlayAppReady({
                   {t(busy ? "saving" : saveFailed ? "saveError" : "saved")}
                 </span>
               )}
+              {demo.apiUrl &&
+                identity.kind === "member" &&
+                selected?.offline &&
+                !busy && (
+                  <Link
+                    className="cabinet-button quiet"
+                    to={`/offline?campaign=${encodeURIComponent(campaignId!)}&session=${encodeURIComponent(state.sessionId)}`}
+                  >
+                    {t("offline:checkpoint")}
+                  </Link>
+                )}
               <button className="cabinet-button quiet" onClick={returnToShelf}>
                 {t(isOnboarding ? "skip" : "quit")}
               </button>

@@ -1,3 +1,4 @@
+import { bundleFor } from "../../shared/offline/runtime.js";
 /**
  * Server-side composition root — the same shape as `src/play/composition.ts`'s
  * `createBrowserDemo`, but reading campaign JSON off disk instead of over `fetch`, and
@@ -34,6 +35,10 @@ export interface CampaignProvenance {
 }
 
 export interface ServerDemo {
+  readonly offlineBundles: ReadonlyMap<
+    string,
+    import("../../shared/offline/protocol.js").Bundle
+  >;
   /** Every registered campaign, core and submission alike, listed and hidden -- access is a
    *  separate question `accessibleCampaignIds` answers, same as `hidden` always has been:
    *  registered but not access-checked is not the same as visible to a given request. */
@@ -133,7 +138,7 @@ export async function createServerDemo(
   const { campaigns: trustedPortables, extensions: trustedExtensions } =
     await campaignSource.load();
   const { candidates, rowsById } = await loadSubmissionCandidates(pool);
-  const { registry, all, campaignStringKeys, quarantined, trusted } =
+  const { registry, all, campaignStringKeys, quarantined, trusted, portables } =
     buildTieredCatalog(trustedPortables, trustedExtensions, candidates);
 
   // Bookkeeping for the submission tier's own outcome -- a candidate is either quarantined
@@ -189,7 +194,20 @@ export async function createServerDemo(
   const engine = createEngine({ kinds: KINDS, registry });
   const recordIds = defaultRecordIdSource;
 
+  const offlineBundles = new Map<
+    string,
+    import("../../shared/offline/protocol.js").Bundle
+  >();
+  for (const portable of portables) {
+    try {
+      offlineBundles.set(portable.campaign.id, bundleFor(portable));
+    } catch {
+      /* Unsupported requirements stay online-only. */
+    }
+  }
+
   return {
+    offlineBundles,
     all,
     core: trusted.all,
     catalog: trusted.all.filter((campaign) => !campaign.hidden),

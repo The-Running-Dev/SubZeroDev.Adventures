@@ -118,9 +118,11 @@ export function registerSessionRoutes(
         .filter((campaign) => accessible.has(campaign.campaignId))
         .map((campaign) => {
           const entry = demo.provenance.get(campaign.campaignId);
-          if (!entry) return campaign;
+          const offline = demo.offlineBundles.has(campaign.campaignId);
+          if (!entry) return { ...campaign, offline };
           return {
             ...campaign,
+            offline,
             mine: entry.ownerPlayerId === playerId,
             visibility: entry.visibility,
           };

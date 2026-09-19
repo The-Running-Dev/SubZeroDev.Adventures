@@ -67,6 +67,9 @@ export default function Library() {
         <p className="eyebrow">SUBZERO / ADVENTURES</p>
         <h1 id="library-title">{t("title")}</h1>
         <p>{t("intro")}</p>
+        <Link className="app-button" to="/offline">
+          {t("offline:title")}
+        </Link>
         {!owned && !account.loading && (
           <p className="library-welcome">{t("welcomeBody")}</p>
         )}

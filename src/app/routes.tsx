@@ -12,6 +12,7 @@ import { AppShell } from "./AppShell";
 import { hasSeenOnboarding } from "../play/onboarding";
 import { useAccount } from "./providers/AccountProvider";
 
+const OfflinePage = lazy(() => import("../offline/OfflinePage"));
 const Library = lazy(() => import("../features/library/Library"));
 const PlayApp = lazy(() => import("../play/PlayApp"));
 const Ranking = lazy(() =>
@@ -99,6 +100,8 @@ export function AppRoutes() {
       <Route element={<AppShell />}>
         <Route index element={<LibraryRoute />} />
         <Route path="play/:campaignId" element={null} />
+        <Route path="offline" element={<OfflinePage />} />
+        <Route path="offline/:runId" element={<OfflinePage />} />
         <Route path="ranking" element={<Ranking apiUrl={apiUrl} />} />
         <Route path="profile" element={<OwnProfile apiUrl={apiUrl} />} />
         <Route path="content" element={<MyContent apiUrl={apiUrl} />} />

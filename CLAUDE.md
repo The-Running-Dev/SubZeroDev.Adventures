@@ -414,6 +414,20 @@ Reversibility: cheap | expensive
 
 ### Why it is installed this way
 
+#### 2026-09-19 — React Router library and a persistent application shell
+
+Context: internal anchors unloaded the document and each page reconstructed its theme,
+header and identity. The approved frontend/PWA handoff requires routing first.
+
+Chosen: `react-router` in declarative library mode, with lazy routes beneath one shell;
+shared theme and account providers outlive route transitions. GitHub Pages URL repair
+remains until the hosting migration is verified.
+
+Rejected: hand-written history dispatch (duplicates routing and link semantics), hash URLs
+(changes existing links), and a framework/SSR conversion (outside the approved scope).
+
+Reversibility: expensive — pages now consume the shared shell and router context.
+
 #### 2026-09-06 — The image ships `public/campaigns/` as a bootstrap snapshot, and the deployed wiring moved to `deployment.ts`
 
 Context: a string-key collision between two campaigns in `SubZeroDev.Adventures.Content`

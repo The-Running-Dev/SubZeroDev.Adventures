@@ -1,35 +1,9 @@
-/**
- * The signed-in (or guest) player's own profile, reached via `/profile` (main.tsx's
- * routing) -- a standalone top-level view, same shape as `src/ranking/Ranking.tsx` and
- * `PublicProfile.tsx`: `apiUrl` read once by `main.tsx` and passed down as a prop, its
- * own theme state for the shared `Header`. Previously this was a shelf face inside
- * PlayApp.tsx's single-page app; it moved out so "Profile" could be a real, linkable,
- * bookmarkable page like the other two.
- *
- * The identity/progress/badges/settings fetches are the same hooks PlayApp.tsx used when
- * this lived there (identity.ts) -- nothing about *what* is fetched changed, only that
- * this page now fetches it for itself instead of receiving it as props.
- */
+import { useAccount } from "../app/providers/AccountProvider";
+/** The player's record; chrome, theme and identity belong to AppShell. */
 import { useEffect, useState } from "react";
-import { Header } from "../Header";
-import { AccountPanel } from "../play/AccountPanel";
 import type { BrowserCampaign } from "../play/composition";
-import {
-  consumeAuthError,
-  useAdminAccess,
-  useBadges,
-  useIdentity,
-  useProfileSettings,
-  useProgress,
-} from "../play/identity";
+import { useBadges, useProfileSettings, useProgress } from "../play/identity";
 import { PlayerHome } from "../play/PlayerHome";
-import {
-  applyTheme,
-  DEFAULT_THEME,
-  readStoredTheme,
-  storeTheme,
-  type ThemeId,
-} from "../theme";
 
 interface CampaignsResponse {
   campaigns: readonly BrowserCampaign[];
@@ -64,22 +38,11 @@ function useCatalog(apiUrl: string | undefined): readonly BrowserCampaign[] {
 }
 
 export function OwnProfile({ apiUrl }: { apiUrl?: string }) {
-  const [theme, setTheme] = useState<ThemeId>(DEFAULT_THEME);
-  useEffect(() => {
-    setTheme(readStoredTheme());
-  }, []);
-  function changeTheme(id: ThemeId): void {
-    setTheme(id);
-    applyTheme(id);
-    storeTheme(id);
-  }
-
-  const [identityRefreshToken, setIdentityRefreshToken] = useState(0);
-  const { identity, loading: identityLoading } = useIdentity(
-    apiUrl,
-    identityRefreshToken,
-  );
-  const { isAdmin } = useAdminAccess(apiUrl, identity.playerId);
+  const {
+    identity,
+    loading: identityLoading,
+    refreshToken: identityRefreshToken,
+  } = useAccount();
   const progress = useProgress(apiUrl, identity.playerId);
   const { badges, records } = useBadges(apiUrl, identity.playerId);
   const { settings, setPublic } = useProfileSettings(
@@ -88,28 +51,12 @@ export function OwnProfile({ apiUrl }: { apiUrl?: string }) {
     identityRefreshToken,
   );
   const catalog = useCatalog(apiUrl);
-  const [authError] = useState(() => consumeAuthError());
 
   const ready =
     Boolean(apiUrl) && !identityLoading && identity.kind !== "anonymous";
 
   return (
-    <main className="play-main">
-      <Header current="profile" theme={theme} onThemeChange={changeTheme}>
-        {apiUrl && (
-          <AccountPanel
-            apiUrl={apiUrl}
-            identity={identity}
-            loading={identityLoading}
-            authError={authError}
-            onChanged={() => setIdentityRefreshToken((token) => token + 1)}
-            isAdmin={isAdmin}
-            // Already on the profile page -- the account menu's own link to it would be
-            // redundant.
-            profileAvailable={false}
-          />
-        )}
-      </Header>
+    <>
       <section className="archive" aria-labelledby="profile-title">
         <div className="archive-heading">
           <p className="eyebrow">SUBZERO STORY SYSTEM // OPERATOR RECORD</p>
@@ -144,6 +91,6 @@ export function OwnProfile({ apiUrl }: { apiUrl?: string }) {
           />
         )}
       </section>
-    </main>
+    </>
   );
 }

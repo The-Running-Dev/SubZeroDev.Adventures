@@ -9,6 +9,7 @@ import { afterEach, beforeEach } from "vitest";
 import "../themes.css";
 import "../index.css";
 import "../play/play.css";
+import "../start/start.css";
 
 // None of these specs are about the landing wizard (PlayApp.tsx's `isOnboarding`) -- they
 // mount `<PlayApp />` expecting the ordinary disk shelf or a specific story, same as

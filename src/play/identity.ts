@@ -1,3 +1,7 @@
+import {
+  rememberOfflineIdentity,
+  clearOfflineIdentity,
+} from "../offline/identity";
 import { request } from "../api/client";
 /**
  * The account chip's data: `/api/me`, sign-in/out, `/api/progress`, `/api/badges`, and the
@@ -175,7 +179,11 @@ export function useIdentity(apiUrl: string | undefined, refreshToken: number) {
   const query = useQuery({
     queryKey: ["identity", apiUrl, refreshToken],
     // Retain one in-flight bootstrap through StrictMode's effect replay.
-    queryFn: () => getIdentity(apiUrl),
+    queryFn: async () => {
+      const identity = await getIdentity(apiUrl);
+      rememberOfflineIdentity(apiUrl, identity);
+      return identity;
+    },
     enabled: Boolean(apiUrl),
     staleTime: Infinity,
   });
@@ -288,6 +296,7 @@ export function signInUrl(apiUrl: string, provider: string): string {
 
 export async function signOut(apiUrl: string): Promise<void> {
   await request(apiUrl, "/api/auth/logout", { method: "POST" });
+  clearOfflineIdentity(apiUrl);
 }
 
 /** Reads and strips `?auth_error=` left by a failed OAuth round trip

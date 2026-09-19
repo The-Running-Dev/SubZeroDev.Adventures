@@ -17,27 +17,29 @@ export function AppShell() {
   const { t } = useTranslation("titles");
   useEffect(() => {
     const path = location.pathname;
-    const key = path.startsWith("/play/")
-      ? "play"
-      : path === "/"
-        ? "library"
-        : path === "/ranking"
-          ? "ranking"
-          : path === "/profile"
-            ? "profile"
-            : path === "/content"
-              ? "content"
-              : path === "/start"
-                ? "start"
-                : path === "/discussions"
-                  ? "discussions"
-                  : path.startsWith("/discussions/")
-                    ? "thread"
-                    : path.startsWith("/u/")
-                      ? "publicProfile"
-                      : path === "/oauth/consent"
-                        ? "consent"
-                        : "missing";
+    const key = path.startsWith("/offline")
+      ? "offline"
+      : path.startsWith("/play/")
+        ? "play"
+        : path === "/"
+          ? "library"
+          : path === "/ranking"
+            ? "ranking"
+            : path === "/profile"
+              ? "profile"
+              : path === "/content"
+                ? "content"
+                : path === "/start"
+                  ? "start"
+                  : path === "/discussions"
+                    ? "discussions"
+                    : path.startsWith("/discussions/")
+                      ? "thread"
+                      : path.startsWith("/u/")
+                        ? "publicProfile"
+                        : path === "/oauth/consent"
+                          ? "consent"
+                          : "missing";
     document.title = `${t(key)} · SubZeroDev Adventures`;
   }, [location.pathname, t]);
   const { theme, changeTheme } = useTheme();

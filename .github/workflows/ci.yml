@@ -146,3 +146,37 @@ jobs:
       # verification: true
       - name: Test
         run: npm test --prefix server
+
+  offline-e2e:
+    name: offline-e2e
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: adventures
+          POSTGRES_PASSWORD: adventures
+          POSTGRES_DB: adventures
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U adventures"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgres://adventures:adventures@localhost:5432/adventures
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: true
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - run: npm run setup
+      - run: npm ci
+      - run: npm ci --prefix server
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build --prefix server
+      - run: npm run migrate --prefix server up
+      - name: Verify durable offline play and authoritative synchronization
+        run: npm run test:offline

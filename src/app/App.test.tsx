@@ -84,8 +84,8 @@ describe("persistent application routing", () => {
       </StrictMode>,
     );
     await screen.findByRole(
-      "button",
-      { name: /The Bureaucracy/i },
+      "link",
+      { name: /Play: The Bureaucracy/i },
       { timeout: 5000 },
     );
     await screen.findByRole("button", { name: /Signed in as Operator/i });

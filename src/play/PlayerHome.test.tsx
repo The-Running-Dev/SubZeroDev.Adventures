@@ -1,4 +1,5 @@
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
+import { render } from "../test/render";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { PlayerHome } from "./PlayerHome";
@@ -85,7 +86,9 @@ describe("PlayerHome", () => {
       el.textContent?.includes("First Steps"),
     )!;
     expect(earned).not.toHaveClass("badge-locked");
-    expect(earned.textContent).toContain("UNLOCKED 2026-01-15");
+    expect(earned.textContent).toContain(
+      `UNLOCKED ${new Intl.DateTimeFormat("en", { year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date("2026-01-15"))}`,
+    );
 
     expect(document.querySelectorAll(".badge-locked").length).toBe(
       BADGE_ORDER.length - 1,

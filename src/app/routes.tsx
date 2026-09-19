@@ -4,6 +4,7 @@ import { Link, Route, Routes, useLocation, useParams } from "react-router";
 import { AppShell } from "./AppShell";
 import { useAccount } from "./providers/AccountProvider";
 
+const Library = lazy(() => import("../features/library/Library"));
 const PlayApp = lazy(() => import("../play/PlayApp"));
 const Ranking = lazy(() =>
   import("../ranking/Ranking").then((m) => ({ default: m.Ranking })),
@@ -34,6 +35,11 @@ const OAuthConsent = lazy(() =>
 function PlayRoute() {
   const { search } = useLocation();
   const { sessionGeneration } = useAccount();
+  if (
+    !new URLSearchParams(search).has("campaign") &&
+    !new URLSearchParams(search).has("admin")
+  )
+    return <Library />;
   // Until PR 7 moves gameplay to /play/:campaignId, query changes are real entries.
   return <PlayApp key={`${search}:${sessionGeneration}`} />;
 }

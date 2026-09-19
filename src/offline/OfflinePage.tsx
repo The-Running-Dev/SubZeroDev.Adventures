@@ -40,6 +40,7 @@ export default function OfflinePage() {
               : "offline"
         }
         error={identity.identityError}
+        onRetry={identity.identityError ? identity.retryIdentity : undefined}
       />
     );
   return (

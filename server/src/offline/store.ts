@@ -181,12 +181,9 @@ export function ownedOfflineStore(
         }
         const checkpoint = grant.checkpoint as Checkpoint | null;
         if (checkpoint) {
-          await assertSessionOwned(
-            pool,
-            checkpoint.sessionId,
-            owner,
-            "offline_sync",
-          );
+          // The owned grant and locked profile_id predicate authorize this checkpoint
+          // on the transaction connection. Borrowing another pool client here can
+          // deadlock when concurrent syncs occupy the rest of the pool.
           const source = (
             await db.query(
               "select offline_revision from sessions where session_id=$1 and profile_id=$2 for update",

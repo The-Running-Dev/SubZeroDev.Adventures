@@ -55,7 +55,7 @@ const origin = `http://127.0.0.1:${server.address().port}`;
 const app = await buildApp(pool, { siteUrl: origin, apiUrl: origin });
 const api = await app.listen({ port: 0, host: "127.0.0.1" });
 const profile = await mkdtemp(resolve(tmpdir(), "adventures-offline-"));
-let context, page;
+let context, page, network;
 const watchdog = setTimeout(async () => {
   console.error(
     "Offline E2E exceeded its deadline",
@@ -91,6 +91,7 @@ async function launch() {
   });
   page = context.pages()[0] ?? (await context.newPage());
   page.setDefaultTimeout(15000);
+  network = await context.newCDPSession(page);
 }
 async function signIn(identity) {
   await context.addCookies([
@@ -100,13 +101,13 @@ async function signIn(identity) {
       url: api,
       httpOnly: true,
       sameSite: "Lax",
+      expires: Math.floor(Date.now() / 1000) + 86400,
     },
   ]);
 }
 async function connectivity(offline) {
   await context.setOffline(offline);
-  const cdp = await context.newCDPSession(page);
-  await cdp.send("Network.emulateNetworkConditions", {
+  await network.send("Network.overrideNetworkState", {
     offline,
     latency: 0,
     downloadThroughput: -1,
@@ -255,9 +256,32 @@ try {
   assert.equal(JSON.parse(completed.blob).gameId, saved.inputs.gameId);
   console.log("Full offline campaign completed after browser restart.");
   await connectivity(false);
-  await page
-    .getByRole("button", { name: "Synchronize", exact: true })
-    .waitFor();
+  const reconnected = await page.evaluate(async (api) => {
+    const response = await fetch(`${api}/api/me`, { credentials: "include" });
+    return { status: response.status, identity: await response.json() };
+  }, api);
+  assert.equal(
+    reconnected.status,
+    200,
+    "API must be reachable after reconnect",
+  );
+  assert.equal(
+    reconnected.identity.playerId,
+    owner.id,
+    "Persistent sign-in must survive browser closure",
+  );
+  // A connectivity event may race the actual connection. Its visible retry is explicit.
+  const retryIdentity = page.getByRole("button", {
+    name: "Try again",
+    exact: true,
+  });
+  const syncButton = page.getByRole("button", {
+    name: "Synchronize",
+    exact: true,
+  });
+  await Promise.race([syncButton.waitFor(), retryIdentity.waitFor()]);
+  if (await retryIdentity.isVisible()) await retryIdentity.click();
+  await syncButton.waitFor();
   // An application update remains prompted and retains the older build's exact runtime bytes.
   version = "B";
   await page.evaluate(async () => {
@@ -266,10 +290,12 @@ try {
   await page.getByRole("button", { name: "Update now", exact: true }).waitFor();
   assert.equal((await runRecord()).blob, completed.blob);
   await page.getByRole("button", { name: "Update now", exact: true }).click();
-  await page
-    .getByRole("button", { name: "Reload and update", exact: true })
-    .click();
-  await page.waitForEvent("load");
+  await Promise.all([
+    page.waitForEvent("load"),
+    page
+      .getByRole("button", { name: "Reload and update", exact: true })
+      .click(),
+  ]);
   await page.locator(".offline-player .scene-region").waitFor();
   assert.equal(
     (await runRecord()).download.runtimeCode,

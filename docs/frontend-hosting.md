@@ -112,3 +112,9 @@ no forced reload or automatic deletion of earlier runtimes.
 `npm run test:pwa` builds an enabled production bundle and checks offline cold navigation
 in Bulgarian, private-data cache exclusion, and update protection using real Chromium.
 The build is test-only; deploy the frontend through the normal GitOps image workflow.
+
+Known and retained: `index.html` links the manifest on every build, not only an enabled
+one. A browser can therefore still install a standalone window from GitHub Pages or the
+preview host, where no worker is registered and nothing is cached — that install is
+entirely network-dependent. Gating the link would mean generating `index.html` per host
+for the short remainder of the Pages window, so the flag stays on registration alone.

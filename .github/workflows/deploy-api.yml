@@ -99,6 +99,7 @@ jobs:
           tags: ghcr.io/the-running-dev/adventures-web:${{ github.sha }}
           build-args: |
             ADVENTURES_BUILD_REVISION=${{ github.sha }}
+            VITE_ENABLE_PWA=${{ vars.FRONTEND_HOST == 'vps' }}
             VITE_API_URL=https://adventures-api.subzerodev.com
             VITE_SUPABASE_URL=${{ vars.VITE_SUPABASE_URL }}
             VITE_SUPABASE_ANON_KEY=${{ vars.VITE_SUPABASE_ANON_KEY }}

@@ -421,6 +421,16 @@ Reversibility: cheap | expensive
 
 ### Why it is installed this way
 
+#### 2026-09-19 — PWA caches build assets and waits for explicit updates
+
+Context: remote sessions and the campaign catalog are principal-dependent; installing
+an application must not imply offline gameplay or interrupt a running session.
+Chosen: build-generated static allowlist, bundled EN/BG catalogs, confirmation before
+activation, and no activation with multiple tabs. Registration follows the verified VPS
+cutover flag. Retain older shell caches until runtime references can be tracked.
+Rejected: generic API caching, background mutation replay and automatic skipWaiting.
+Reversibility: cheap
+
 #### 2026-09-19 — Frontend container uses the existing API GitOps deployment
 
 Context: the owner selected the existing VPS and Portainer deployment instead of the

@@ -21,7 +21,8 @@
     "deploy:preview": "node scripts/deploy-preview.mjs",
     "test:build": "npm run build && node scripts/verify-build.mjs",
     "typecheck": "tsc -b",
-    "sync:campaigns": "node scripts/sync-campaigns.mjs"
+    "sync:campaigns": "node scripts/sync-campaigns.mjs",
+    "test:pwa": "node scripts/test-pwa.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.2",

@@ -98,3 +98,31 @@ redirect cleanup has already merged. Never guess the former DNS target.
 
 Live VPS rollout, reverse-proxy/DNS cutover and browser identity checks are not
 claimed by passing container CI. Record them against the actual deployed SHA.
+
+## PWA activation after cutover
+
+The frontend image enables service-worker registration only when the deployment
+workflow sees `FRONTEND_HOST=vps`. This keeps installation behind the verified VPS
+cutover above. Local production testing can set `VITE_ENABLE_PWA=true`; manual image
+builds use the `VITE_ENABLE_PWA=true` build argument. GitHub Pages does not enable it.
+
+The generated worker precaches the complete application shell and both UI languages,
+using a build-derived cache version. It never intercepts API requests, fixture
+campaigns or identity callbacks. Network-required actions are never queued. Downloaded
+gameplay is a separate protocol, not a side effect of installing the application.
+
+A waiting update needs an explicit confirmation. Other open Adventures tabs block
+activation; save their work and close them first. Choosing Later leaves the current
+worker active and exposes an Update available action. Existing shell caches are retained
+because another tab or a future pinned local run can still need that runtime. There is
+no forced reload or automatic deletion of earlier runtimes.
+
+`npm run test:pwa` builds an enabled production bundle and checks offline cold navigation
+in Bulgarian, private-data cache exclusion, and update protection using real Chromium.
+The build is test-only; deploy the frontend through the normal GitOps image workflow.
+
+Known and retained: `index.html` links the manifest on every build, not only an enabled
+one. A browser can therefore still install a standalone window from GitHub Pages or the
+preview host, where no worker is registered and nothing is cached — that install is
+entirely network-dependent. Gating the link would mean generating `index.html` per host
+for the short remainder of the Pages window, so the flag stays on registration alone.

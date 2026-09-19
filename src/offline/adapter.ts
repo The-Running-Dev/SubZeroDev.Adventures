@@ -1,5 +1,5 @@
 import { request } from "../api/client";
-import { RUNTIME_ID, RUNTIME_SHA256 } from "../../shared/offline/runtime-id";
+import { knownRuntimeHashes } from "../../shared/offline/known-runtimes";
 import type * as Runtime from "../../shared/offline/runtime-source";
 import type {
   Bundle,
@@ -14,9 +14,6 @@ import {
   type LocalRun,
   type SavedDownload,
 } from "./database";
-const knownRuntimeHashes: Readonly<Record<string, string>> = {
-  [RUNTIME_ID]: RUNTIME_SHA256,
-};
 const modules = new Map<string, typeof Runtime>();
 const sha256 = async (text: string) =>
   Array.from(

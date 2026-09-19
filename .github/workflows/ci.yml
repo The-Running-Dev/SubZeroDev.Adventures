@@ -149,6 +149,7 @@ jobs:
 
   offline-e2e:
     name: offline-e2e
+    timeout-minutes: 8
     runs-on: ubuntu-latest
     services:
       postgres:

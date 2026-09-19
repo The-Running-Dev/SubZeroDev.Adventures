@@ -56,6 +56,17 @@ const app = await buildApp(pool, { siteUrl: origin, apiUrl: origin });
 const api = await app.listen({ port: 0, host: "127.0.0.1" });
 const profile = await mkdtemp(resolve(tmpdir(), "adventures-offline-"));
 let context, page;
+const watchdog = setTimeout(async () => {
+  console.error(
+    "Offline E2E exceeded its deadline",
+    await page
+      ?.locator("body")
+      .innerText({ timeout: 2000 })
+      .catch(() => "unavailable"),
+  );
+  process.exit(1);
+}, 180000);
+watchdog.unref();
 const owners = [];
 async function member() {
   const id = randomUUID(),
@@ -156,11 +167,21 @@ try {
   const statsBefore = (
     await app.inject({ method: "GET", url: "/api/stats" })
   ).json();
+  console.log("API built; launching persistent browser");
   await launch();
   await signIn(owner);
   await page.goto(`${origin}/offline?campaign=getting-started`);
+  console.log("Offline management loaded; waiting for service worker");
   await page.evaluate(async () => {
-    await navigator.serviceWorker.ready;
+    await Promise.race([
+      navigator.serviceWorker.ready,
+      new Promise((_, reject) =>
+        setTimeout(
+          () => reject(Error("service worker readiness timeout")),
+          15000,
+        ),
+      ),
+    ]);
   });
   await page.waitForFunction(() => Boolean(navigator.serviceWorker.controller));
   const title = JSON.parse(
@@ -370,6 +391,7 @@ try {
   );
   throw error;
 } finally {
+  console.log("Closing offline browser and API");
   await context?.close();
   for (const id of owners)
     await pool.query("delete from players where player_id=$1", [id]);
@@ -377,4 +399,5 @@ try {
   await pool.end();
   await new Promise((done) => server.close(done));
   await rm(profile, { recursive: true, force: true });
+  clearTimeout(watchdog);
 }

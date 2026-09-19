@@ -18,6 +18,7 @@ COPY shared shared
 COPY public public
 COPY scripts scripts
 ARG VITE_API_URL=https://adventures-api.subzerodev.com
+# Public browser configuration, matching the existing GitHub Pages build variables.
 ARG VITE_SUPABASE_URL
 ARG VITE_SUPABASE_ANON_KEY
 ARG ADVENTURES_BUILD_REVISION=development
@@ -32,6 +33,9 @@ FROM ${CADDY_IMAGE} AS runtime
 ARG ADVENTURES_BUILD_REVISION=development
 LABEL org.opencontainers.image.revision=${ADVENTURES_BUILD_REVISION}
 LABEL org.opencontainers.image.source=https://github.com/The-Running-Dev/SubZeroDev.Adventures
+# The base binary requests cap_net_bind_service. With cap_drop=ALL, Linux refuses
+# to execute it. Port 8080 needs no capability, so remove the file capability.
+RUN setcap -r /usr/bin/caddy
 COPY frontend/Caddyfile /etc/caddy/Caddyfile
 COPY --from=build /app/dist /srv
 USER 1000:1000

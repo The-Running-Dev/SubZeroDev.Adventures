@@ -1,10 +1,6 @@
+import { useTranslation } from "react-i18next";
+import { useLocale } from "../app/locale/useLocale";
 import type { PersonnelRecords } from "./identity";
-
-const numberFormat = new Intl.NumberFormat();
-const percentFormat = new Intl.NumberFormat(undefined, {
-  style: "percent",
-  maximumFractionDigits: 0,
-});
 
 /**
  * `PERSONNEL FILE // PERMANENT RECORD` -- pure aggregates, always present once loaded
@@ -22,63 +18,68 @@ export function PersonnelFile({
   records: PersonnelRecords | null;
   findCampaignTitle: (campaignId: string) => string;
 }) {
+  const { t } = useTranslation("community");
+  const { number } = useLocale();
   if (!records) return null;
 
   return (
-    <section className="personnel-file" aria-label="Personnel file">
-      <p className="eyebrow">PERSONNEL FILE // PERMANENT RECORD</p>
+    <section className="personnel-file" aria-label={t("personnel")}>
+      <p className="eyebrow">{t("permanent")}</p>
       <dl>
         <div>
-          <dt>Longest Run</dt>
-          <dd>{numberFormat.format(records.longestRun)} moves</dd>
+          <dt>{t("longest")}</dt>
+          <dd>{t("movesCount", { count: records.longestRun })}</dd>
         </div>
         <div>
-          <dt>Longest Streak</dt>
-          <dd>
-            {numberFormat.format(records.longestStreak)}{" "}
-            {records.longestStreak === 1 ? "day" : "days"}
-          </dd>
+          <dt>{t("streak")}</dt>
+          <dd>{t("days", { count: records.longestStreak })}</dd>
         </div>
         <div>
-          <dt>Most Moves / Day</dt>
-          <dd>{numberFormat.format(records.mostMovesInADay)}</dd>
+          <dt>{t("mostDay")}</dt>
+          <dd>{number(records.mostMovesInADay)}</dd>
         </div>
         {records.favoriteDisk && (
           <div>
-            <dt>Favorite Disk</dt>
+            <dt>{t("favorite")}</dt>
             <dd>{findCampaignTitle(records.favoriteDisk.campaignId)}</dd>
           </div>
         )}
         <div>
-          <dt>Most Rejected Moves</dt>
-          <dd>{numberFormat.format(records.mostRejectedMoves)}</dd>
+          <dt>{t("mostRejected")}</dt>
+          <dd>{number(records.mostRejectedMoves)}</dd>
         </div>
         {records.fastestEnding !== null && (
           <div>
-            <dt>Fastest Ending</dt>
-            <dd>{numberFormat.format(records.fastestEnding)} moves</dd>
+            <dt>{t("fastest")}</dt>
+            <dd>{t("movesCount", { count: records.fastestEnding })}</dd>
           </div>
         )}
         {records.rarestEnding && (
           <div>
-            <dt>Rarest Ending</dt>
+            <dt>{t("rarest")}</dt>
             <dd>
               {findCampaignTitle(records.rarestEnding.campaignId)} —{" "}
-              {numberFormat.format(records.rarestEnding.discoverers)}{" "}
-              {records.rarestEnding.discoverers === 1
-                ? "operator has"
-                : "operators have"}{" "}
-              found it
+              {t("discoverers", { count: records.rarestEnding.discoverers })}
             </dd>
           </div>
         )}
         <div>
-          <dt>Completion Rate</dt>
-          <dd>{percentFormat.format(records.completionRate)}</dd>
+          <dt>{t("completion")}</dt>
+          <dd>
+            {number(records.completionRate, {
+              style: "percent",
+              maximumFractionDigits: 0,
+            })}
+          </dd>
         </div>
         <div>
-          <dt>Attempt Efficiency</dt>
-          <dd>{percentFormat.format(records.attemptEfficiency)}</dd>
+          <dt>{t("efficiency")}</dt>
+          <dd>
+            {number(records.attemptEfficiency, {
+              style: "percent",
+              maximumFractionDigits: 0,
+            })}
+          </dd>
         </div>
       </dl>
     </section>

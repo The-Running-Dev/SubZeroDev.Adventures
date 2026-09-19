@@ -22,7 +22,7 @@ const INTERIM_HEAD_OF_ABSURDITY: PositionTitle = {
 /** Ascending by position, each tier's `max` the last position it covers -- the mirror
  *  image of `PROFILE_RANKS`' `min`-bounded tiers, since standings count down from #1
  *  rather than up from zero badges. */
-const POSITION_TITLES: readonly {
+export const POSITION_TITLES: readonly {
   readonly max: number;
   readonly title: PositionTitle;
 }[] = [

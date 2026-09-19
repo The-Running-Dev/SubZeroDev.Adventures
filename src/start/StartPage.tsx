@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
 /**
  * `/start` -- the getting-started page.
@@ -47,7 +48,23 @@ function MenuRow({ path }: { readonly path: StartPath }) {
 }
 
 export function StartPage({ apiUrl }: { readonly apiUrl?: string }) {
-  const branch = useBranch(PATHS);
+  const { t } = useTranslation("onboarding");
+  const paths = PATHS.map((p) => ({
+    ...p,
+    title: t(`paths.${p.id}.title`),
+    meta: t(`paths.${p.id}.meta`),
+    time: t(`paths.${p.id}.time`),
+    walk: p.walk.map((w, i) => ({
+      ...w,
+      title: t(`paths.${p.id}.walk.${i}.title`),
+      body: t(`paths.${p.id}.walk.${i}.body`),
+      checks: w.checks.map((c, j) => ({
+        ...c,
+        label: t(`paths.${p.id}.walk.${i}.checks.${j}`),
+      })),
+    })),
+  }));
+  const branch = useBranch(paths);
   const [authoring, setAuthoring] = useState(false);
 
   function pick(id: string): void {
@@ -65,23 +82,19 @@ export function StartPage({ apiUrl }: { readonly apiUrl?: string }) {
           <Wizard apiUrl={apiUrl} onExit={() => setAuthoring(false)} />
         ) : (
           <div className="gs-dialog">
-            <div className="gs-dialog-title">SUBZERODEV ADVENTURES — SETUP</div>
+            <div className="gs-dialog-title">{t("setup")}</div>
 
             {branch.onLanding ? (
               <div className="gs-dialog-body">
                 <div className="gs-walk-body">
                   <h1 id="start-title" className="gs-shadow-title">
-                    What are you here to do?
+                    {t("title")}
                   </h1>
-                  <p className="gs-prose">
-                    Pick an option. Nothing here is a commitment — every path is
-                    a few minutes long, and you can come back and take a
-                    different one.
-                  </p>
+                  <p className="gs-prose">{t("intro")}</p>
                 </div>
 
                 <div className="gs-menu">
-                  {PATHS.map((path) =>
+                  {paths.map((path) =>
                     // A path with an `href` navigates rather than advancing the branch
                     // machine, so it is a real link -- middle-clickable, copyable, and
                     // announced as a link -- not a button that calls `location.assign`.
@@ -108,23 +121,19 @@ export function StartPage({ apiUrl }: { readonly apiUrl?: string }) {
 
                 <div className="gs-columns">
                   <div className="gs-col">
-                    <span className="gs-eyebrow gs-amber">WHAT IS RUNNING</span>
+                    <span className="gs-eyebrow gs-amber">{t("running")}</span>
                     <ul className="gs-checks">
-                      {BOOT_LINES.map((line) => (
+                      {BOOT_LINES.map((line, i) => (
                         <li key={line.label} className="gs-check gs-check-done">
                           <span aria-hidden="true">{CHECK_MARK.done}</span>{" "}
-                          {line.label} — {line.value}
+                          {t(`boot.${i}.label`)} — {t(`boot.${i}.value`)}
                         </li>
                       ))}
                     </ul>
                   </div>
                   <div className="gs-col">
-                    <span className="gs-eyebrow gs-amber">ALREADY HERE</span>
-                    <p className="gs-dim">
-                      The disk library needs no account. Standings, saved runs
-                      across devices, and submitting your own campaign are what
-                      an account adds.
-                    </p>
+                    <span className="gs-eyebrow gs-amber">{t("already")}</span>
+                    <p className="gs-dim">{t("accountNote")}</p>
                   </div>
                 </div>
               </div>
@@ -136,7 +145,11 @@ export function StartPage({ apiUrl }: { readonly apiUrl?: string }) {
                       {branch.selected?.key}) {branch.selected?.title}
                     </span>
                     <span className="gs-dim">
-                      STEP {branch.step} / {branch.total} · {branch.percent}%
+                      {t("progress", {
+                        step: branch.step,
+                        total: branch.total,
+                        percent: branch.percent,
+                      })}
                     </span>
                   </div>
 
@@ -145,6 +158,11 @@ export function StartPage({ apiUrl }: { readonly apiUrl?: string }) {
                   </div>
                   <progress
                     className="visually-hidden"
+                    aria-label={t("progress", {
+                      step: branch.step,
+                      total: branch.total,
+                      percent: branch.percent,
+                    })}
                     value={branch.step}
                     max={branch.total}
                   />
@@ -172,9 +190,8 @@ export function StartPage({ apiUrl }: { readonly apiUrl?: string }) {
 
                   {branch.isLast && (
                     <p className="gs-note">
-                      That is the whole path.{" "}
-                      <Link to="/">Open the disk library</Link> when you want to
-                      start.
+                      {t("finished")} <Link to="/">{t("openLibrary")}</Link>{" "}
+                      {t("whenReady")}
                     </p>
                   )}
                 </div>
@@ -188,7 +205,7 @@ export function StartPage({ apiUrl }: { readonly apiUrl?: string }) {
                 onClick={branch.restart}
                 disabled={branch.onLanding}
               >
-                F3 MENU
+                {t("menu")}
               </button>
               <div className="gs-actions">
                 <button
@@ -197,7 +214,7 @@ export function StartPage({ apiUrl }: { readonly apiUrl?: string }) {
                   onClick={branch.back}
                   disabled={branch.onLanding}
                 >
-                  ESC BACK
+                  {t("back")}
                 </button>
                 <button
                   type="button"
@@ -205,7 +222,7 @@ export function StartPage({ apiUrl }: { readonly apiUrl?: string }) {
                   onClick={branch.next}
                   disabled={branch.onLanding || branch.isLast}
                 >
-                  ENTER CONTINUE
+                  {t("next")}
                 </button>
               </div>
             </div>

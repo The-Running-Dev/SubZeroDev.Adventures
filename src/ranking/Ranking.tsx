@@ -1,3 +1,6 @@
+import { Button } from "../components/Button";
+import { useTranslation } from "react-i18next";
+import { useLocale } from "../app/locale/useLocale";
 import { Link } from "react-router";
 /**
  * The public standings page, reached via `/ranking` (main.tsx's routing) -- a standalone
@@ -11,8 +14,6 @@ import { getRanking } from "../api/ranking";
 import type { RankingData, RankingEntry } from "../play/identity";
 import { positionTitleFor } from "../play/ranking";
 
-const numberFormat = new Intl.NumberFormat();
-
 type Stage =
   | { readonly kind: "unavailable" }
   | { readonly kind: "loading" }
@@ -20,6 +21,8 @@ type Stage =
   | { readonly kind: "loaded"; readonly data: RankingData };
 
 export function Ranking({ apiUrl }: { apiUrl?: string }) {
+  const { t } = useTranslation("community");
+
   const query = useQuery({
     queryKey: ["public", apiUrl, "ranking"],
     queryFn: ({ signal }) => getRanking(apiUrl, signal),
@@ -35,31 +38,27 @@ export function Ranking({ apiUrl }: { apiUrl?: string }) {
 
   return (
     <>
-      <section className="archive" aria-labelledby="ranking-title">
+      <section className="feature-page archive" aria-labelledby="ranking-title">
         <div className="archive-heading">
-          <p className="eyebrow">SUBZERO STORY SYSTEM // STANDINGS</p>
-          <h1 id="ranking-title">Operator standings</h1>
-          <p>
-            Every operator who made their record public, ordered by how much
-            trouble they have generated. A private record is not a low score. It
-            is an absence.
-          </p>
+          <p className="eyebrow">{t("rankingEyebrow")}</p>
+          <h1 id="ranking-title">{t("rankingTitle")}</h1>
+          <p>{t("rankingIntro")}</p>
 
           {stage.kind === "unavailable" && (
-            <p className="profile-unavailable">
-              Standings aren't available on this build.
-            </p>
+            <p className="profile-unavailable">{t("rankingUnavailable")}</p>
           )}
           {stage.kind === "loading" && (
             <p className="profile-unavailable" role="status">
-              Compiling standings…
+              {t("rankingLoading")}
             </p>
           )}
           {stage.kind === "failed" && (
-            <p className="profile-unavailable">
-              The standings are not currently available. The system has no
-              further comment.
-            </p>
+            <div role="alert">
+              <p>{t("rankingFailed")}</p>
+              <Button onClick={() => void query.refetch()}>
+                {t("common:retry")}
+              </Button>
+            </div>
           )}
         </div>
 
@@ -70,12 +69,10 @@ export function Ranking({ apiUrl }: { apiUrl?: string }) {
 }
 
 function StandingsBoard({ data }: { data: RankingData }) {
+  const { t } = useTranslation("community");
+  const { number } = useLocale();
   if (data.entries.length === 0) {
-    return (
-      <p className="profile-unavailable">
-        No public records on file. The ranking is technically complete.
-      </p>
-    );
+    return <p className="profile-unavailable">{t("rankingEmpty")}</p>;
   }
 
   const leader = data.entries.find((entry) => entry.crowned);
@@ -85,31 +82,26 @@ function StandingsBoard({ data }: { data: RankingData }) {
       {leader ? (
         <CrownBlock entry={leader} />
       ) : (
-        <p className="profile-unavailable">
-          Too few public records to crown anyone. The top of a list of two is
-          not an achievement.
-        </p>
+        <p className="profile-unavailable">{t("noCrown")}</p>
       )}
       <div
         className="standings-scroll"
         tabIndex={0}
         role="region"
-        aria-label="Operator standings"
+        aria-label={t("rankingTitle")}
       >
         <table className="standings-table">
-          <caption className="sr-only">
-            Operator standings, ranked by Absurdity Index
-          </caption>
+          <caption className="sr-only">{t("rankingCaption")}</caption>
           <thead>
             <tr>
               <th scope="col">#</th>
-              <th scope="col">Operator</th>
-              <th scope="col">Standing</th>
-              <th scope="col">Absurdity index</th>
-              <th scope="col">Badges</th>
-              <th scope="col">Rejected moves</th>
-              <th scope="col">Endings</th>
-              <th scope="col">Moves</th>
+              <th scope="col">{t("operator")}</th>
+              <th scope="col">{t("standing")}</th>
+              <th scope="col">{t("index")}</th>
+              <th scope="col">{t("badges")}</th>
+              <th scope="col">{t("rejected")}</th>
+              <th scope="col">{t("endings")}</th>
+              <th scope="col">{t("moves")}</th>
             </tr>
           </thead>
           <tbody>
@@ -126,29 +118,26 @@ function StandingsBoard({ data }: { data: RankingData }) {
                       {entry.displayName}
                     </Link>
                   </td>
-                  <td>{title.label}</td>
-                  <td>{numberFormat.format(entry.absurdityIndex)}</td>
-                  <td>{numberFormat.format(entry.badgeCount)}</td>
-                  <td>{numberFormat.format(entry.rejected)}</td>
-                  <td>{numberFormat.format(entry.endings)}</td>
-                  <td>{numberFormat.format(entry.moves)}</td>
+                  <td>{t(`positions.${title.label}.label`)}</td>
+                  <td>{number(entry.absurdityIndex)}</td>
+                  <td>{number(entry.badgeCount)}</td>
+                  <td>{number(entry.rejected)}</td>
+                  <td>{number(entry.endings)}</td>
+                  <td>{number(entry.moves)}</td>
                 </tr>
               );
             })}
           </tbody>
         </table>
       </div>
-      <p className="standings-footnote">
-        Index: 100 per badge, 5 per rejected move, 25 per ending, 1 per ten
-        moves. Ties break toward more badges, then more rejected moves, then
-        seniority. Rejected moves are counted by a column that also counts other
-        things. The system stands by the number anyway.
-      </p>
+      <p className="standings-footnote">{t("rankingFootnote")}</p>
     </>
   );
 }
 
 function CrownBlock({ entry }: { entry: RankingEntry }) {
+  const { t } = useTranslation("community");
+
   const title = positionTitleFor(entry.position);
   return (
     <div className="profile-rank standings-crown" role="status">
@@ -156,9 +145,11 @@ function CrownBlock({ entry }: { entry: RankingEntry }) {
         ◆
       </span>
       <div>
-        <strong>{title.label}</strong>
-        <span>{title.description}</span>
-        <span className="badge-stamp">#1 // CURRENT — {entry.displayName}</span>
+        <strong>{t(`positions.${title.label}.label`)}</strong>
+        <span>{t(`positions.${title.label}.description`)}</span>
+        <span className="badge-stamp">
+          {t("current", { name: entry.displayName })}
+        </span>
       </div>
     </div>
   );

@@ -245,7 +245,7 @@ export interface ProfileRank {
  * instead would move it from 39 to 40 and silently demote a player who holds every
  * badge the game can actually give them, just for not also being #1 on the leaderboard.
  */
-const PROFILE_RANKS: readonly {
+export const PROFILE_RANKS: readonly {
   readonly min: number;
   readonly rank: ProfileRank;
 }[] = [

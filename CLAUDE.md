@@ -414,6 +414,21 @@ Reversibility: cheap | expensive
 
 ### Why it is installed this way
 
+#### 2026-09-19 — Explicit Cloudflare navigation routing and staged cutover
+
+Chosen: a dependency-free Pages advanced-mode Worker, a separate generated deployment
+artifact, and Cloudflare's Wrangler GitHub Action for upload. GitHub remains source/CI;
+`FRONTEND_HOST` selects the production deployer only after live verification. The
+[migration runbook](docs/cloudflare-migration.md) owns the cutover and rollback procedure.
+
+Rejected: a wildcard SPA redirect or Pages' implicit fallback (both can answer missing
+resources with HTML); proxying the existing API (changes cookie/origin contracts for no
+frontend benefit); replacing the GitHub workflow immediately (removes the working host
+before account, DNS and authentication checks). No npm runtime dependency is added.
+
+Reversibility: the generated artifact is separate; the saved GitHub-compatible deployment
+and DNS record remain the rollback until the cutover has been verified.
+
 #### 2026-09-19 — Query and locale foundations before feature redesign
 
 Context: the approved frontend handoff requires shared ordinary server data and English/

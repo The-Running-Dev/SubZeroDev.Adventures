@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { THEMES, type ThemeId } from "./theme";
 
 /**
@@ -12,10 +13,11 @@ export function ThemeSelector({
   theme: ThemeId;
   onChange: (id: ThemeId) => void;
 }) {
+  const { t } = useTranslation("shell");
   return (
     <div className="system-bar-group">
       <label className="system-bar-label" htmlFor="theme-select">
-        DISPLAY MODE
+        {t("display")}
       </label>
       <select
         id="theme-select"
@@ -25,7 +27,7 @@ export function ThemeSelector({
       >
         {THEMES.map((option) => (
           <option key={option.id} value={option.id}>
-            {option.label}
+            {t(`themes.${option.id}`)}
           </option>
         ))}
       </select>

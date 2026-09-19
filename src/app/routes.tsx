@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { lazy } from "react";
 import { Link, Route, Routes, useLocation, useParams } from "react-router";
 import { AppShell } from "./AppShell";
@@ -54,10 +55,11 @@ function ProfileRoute() {
 }
 
 function NotFound() {
+  const { t } = useTranslation("shell");
   return (
     <section className="archive">
-      <h1>Page not found</h1>
-      <Link to="/">Return to disk library</Link>
+      <h1>{t("missing")}</h1>
+      <Link to="/">{t("returnLibrary")}</Link>
     </section>
   );
 }

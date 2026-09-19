@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { Suspense, useEffect, useState } from "react";
 import { Outlet, useLocation } from "react-router";
+import { ResourceState } from "../components/ResourceState";
 import { PwaStatus } from "../pwa/PwaStatus";
 import { Header } from "../Header";
 import { AccountPanel } from "../play/AccountPanel";
@@ -61,6 +62,9 @@ export function AppShell() {
       <main
         className={player?.hidden ? "play-main onboarding-active" : "play-main"}
       >
+        <a className="skip-link" href="#route-content">
+          {t("skip", { ns: "shell" })}
+        </a>
         <Header
           hidden={player?.hidden}
           current={current}
@@ -85,17 +89,13 @@ export function AppShell() {
           )}
         </Header>
         <PwaStatus playing={Boolean(player?.title)} />
-        <ErrorBoundary key={location.pathname + location.search}>
-          <Suspense
-            fallback={
-              <div className="play-loading" role="status">
-                Loading screen…
-              </div>
-            }
-          >
-            <Outlet />
-          </Suspense>
-        </ErrorBoundary>
+        <div id="route-content" tabIndex={-1}>
+          <ErrorBoundary key={location.pathname + location.search}>
+            <Suspense fallback={<ResourceState state="loading" />}>
+              <Outlet />
+            </Suspense>
+          </ErrorBoundary>
+        </div>
       </main>
     </PlayerShellContext.Provider>
   );

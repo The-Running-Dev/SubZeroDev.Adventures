@@ -1,5 +1,6 @@
 @import "./tokens.css";
 @import "./components/navigation.css";
+@import "./components/features.css";
 
 .app-header {
   flex-wrap: wrap;

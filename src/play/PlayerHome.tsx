@@ -1,3 +1,6 @@
+import { useOnline } from "../pwa/usePwa";
+import { useTranslation } from "react-i18next";
+import { useLocale } from "../app/locale/useLocale";
 import { useState, type CSSProperties } from "react";
 import type { BrowserCampaign } from "./composition";
 import type {
@@ -11,8 +14,6 @@ import { EARNABLE_BADGE_IDS, playEarnedBadgeCount } from "./badges";
 import { ProfileRankBadge } from "./ProfileRankBadge";
 import { BadgeGrid } from "./BadgeGrid";
 import { PersonnelFile } from "./PersonnelFile";
-
-const numberFormat = new Intl.NumberFormat();
 
 function fill(part: number, whole: number): number {
   return whole > 0 ? Math.round((part / whole) * 100) : 0;
@@ -43,6 +44,8 @@ export function PlayerHome({
   settings: ProfileSettings;
   setPublic: (next: boolean) => Promise<void>;
 }) {
+  const { t } = useTranslation("community");
+  const { number } = useLocale();
   const entries = [...progress.values()];
   const storiesFinished = entries.filter((e) => e.status === "ended").length;
   const movesLogged = entries.reduce((sum, e) => sum + e.stepCount, 0);
@@ -67,49 +70,46 @@ export function PlayerHome({
 
   return (
     <section className="player-home" aria-labelledby="home-title">
-      <p className="eyebrow">OPERATOR RECORD</p>
-      <h2 id="home-title">{identity.displayName ?? "Guest operator"}</h2>
+      <p className="eyebrow">{t("record")}</p>
+      <h2 id="home-title">{identity.displayName ?? t("guest")}</h2>
       {identity.kind === "guest" && (
-        <p className="home-guest-note">
-          Playing as a guest -- sign in to keep this record if you clear this
-          browser.
-        </p>
+        <p className="home-guest-note">{t("guestNote")}</p>
       )}
       <ProfileRankBadge badgeCount={earnedBadgeCount} />
       <dl className="home-summary">
         <div>
-          <dt>Stories started</dt>
-          <dd>{numberFormat.format(progress.size)}</dd>
+          <dt>{t("started")}</dt>
+          <dd>{number(progress.size)}</dd>
         </div>
         <div
           className="stat-metered"
           style={{ "--stat-fill": `${finishedPct}%` } as CSSProperties}
         >
-          <dt>Stories finished</dt>
+          <dt>{t("finished")}</dt>
           <dd>
-            {numberFormat.format(storiesFinished)}
+            {number(storiesFinished)}
             <span className="stat-ceiling"> / {catalog.length}</span>
           </dd>
         </div>
         <div>
-          <dt>Moves logged</dt>
-          <dd>{numberFormat.format(movesLogged)}</dd>
+          <dt>{t("logged")}</dt>
+          <dd>{number(movesLogged)}</dd>
         </div>
         <div>
-          <dt>Endings found</dt>
-          <dd>{numberFormat.format(endingsFound)}</dd>
+          <dt>{t("found")}</dt>
+          <dd>{number(endingsFound)}</dd>
         </div>
         <div>
-          <dt>Achievements</dt>
-          <dd>{numberFormat.format(achievementsUnlocked)}</dd>
+          <dt>{t("achievements")}</dt>
+          <dd>{number(achievementsUnlocked)}</dd>
         </div>
         <div
           className="stat-metered"
           style={{ "--stat-fill": `${badgePct}%` } as CSSProperties}
         >
-          <dt>Badges</dt>
+          <dt>{t("badges")}</dt>
           <dd>
-            {numberFormat.format(earnedBadgeCount)}
+            {number(earnedBadgeCount)}
             <span className="stat-ceiling"> / {EARNABLE_BADGE_IDS.length}</span>
           </dd>
         </div>
@@ -135,6 +135,9 @@ function ProfileShare({
   settings: ProfileSettings;
   setPublic: (next: boolean) => Promise<void>;
 }) {
+  const { t } = useTranslation("community");
+
+  const online = useOnline();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -144,7 +147,7 @@ function ProfileShare({
     try {
       await setPublic(!settings.public);
     } catch {
-      setMessage("Couldn't update profile visibility. Try again.");
+      setMessage("visibilityError");
     } finally {
       setBusy(false);
     }
@@ -158,9 +161,9 @@ function ProfileShare({
     if (!shareUrl) return;
     try {
       await navigator.clipboard.writeText(shareUrl);
-      setMessage("Link copied.");
+      setMessage("copied");
     } catch {
-      setMessage("Couldn't copy the link. Select and copy it manually.");
+      setMessage("copyError");
     }
   }
 
@@ -168,10 +171,10 @@ function ProfileShare({
     <div className="profile-share">
       <button
         className="cabinet-button"
-        disabled={busy}
+        disabled={busy || !online}
         onClick={() => void toggle()}
       >
-        {settings.public ? "Make profile private" : "Make profile public"}
+        {settings.public ? t("makePrivate") : t("makePublic")}
       </button>
       {settings.public && shareUrl && (
         <>
@@ -179,18 +182,18 @@ function ProfileShare({
             type="text"
             readOnly
             value={shareUrl}
-            aria-label="Public profile link"
+            aria-label={t("profileLink")}
             onFocus={(event) => event.currentTarget.select()}
           />
           <button
             className="cabinet-button quiet"
             onClick={() => void copyLink()}
           >
-            Copy link
+            {t("copy")}
           </button>
         </>
       )}
-      {message && <p className="account-error">{message}</p>}
+      {message && <p className="account-error">{t(message)}</p>}
     </div>
   );
 }

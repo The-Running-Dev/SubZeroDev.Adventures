@@ -1,3 +1,7 @@
+import { ApiError } from "../api/client";
+import { ResourceState } from "../components/ResourceState";
+import { useTranslation } from "react-i18next";
+import { useLocale } from "../app/locale/useLocale";
 /**
  * A player's public profile, reached via `/u/<slug>` (main.tsx's routing) -- a standalone
  * top-level view, not nested under `PlayApp`/`BrowserDemo`, mirroring `src/oauth/`'s shape
@@ -18,8 +22,6 @@ import { ProfileRankBadge } from "../play/ProfileRankBadge";
 import { BadgeGrid } from "../play/BadgeGrid";
 import { PersonnelFile } from "../play/PersonnelFile";
 
-const numberFormat = new Intl.NumberFormat();
-
 function fill(part: number, whole: number): number {
   return whole > 0 ? Math.round((part / whole) * 100) : 0;
 }
@@ -28,6 +30,7 @@ type Stage =
   | { readonly kind: "unavailable" }
   | { readonly kind: "loading" }
   | { readonly kind: "not-found" }
+  | { readonly kind: "failed" }
   | { readonly kind: "loaded"; readonly data: PublicProfileData };
 
 export function PublicProfile({
@@ -37,6 +40,8 @@ export function PublicProfile({
   apiUrl?: string;
   slug: string;
 }) {
+  const { t } = useTranslation("community");
+  const { number, date } = useLocale();
   const query = useQuery({
     queryKey: ["public", apiUrl, "profile", slug],
     queryFn: ({ signal }) => getProfile(apiUrl, slug, signal),
@@ -48,7 +53,12 @@ export function PublicProfile({
     : query.isPending
       ? { kind: "loading" }
       : query.isError
-        ? { kind: "not-found" }
+        ? {
+            kind:
+              query.error instanceof ApiError && query.error.status === 404
+                ? "not-found"
+                : "failed",
+          }
         : { kind: "loaded", data: query.data };
 
   function findCampaignTitle(campaignId: string): string {
@@ -60,26 +70,28 @@ export function PublicProfile({
 
   return (
     <>
-      <section className="archive" aria-labelledby="profile-title">
+      <section className="feature-page archive" aria-labelledby="profile-title">
         <div className="archive-heading">
-          <p className="eyebrow">SUBZERO STORY SYSTEM // OPERATOR RECORD</p>
-          <h1 id="profile-title">Public profile</h1>
+          <p className="eyebrow">{t("profileEyebrow")}</p>
+          <h1 id="profile-title">{t("publicProfile")}</h1>
 
           {stage.kind === "unavailable" && (
-            <p className="profile-unavailable">
-              Profiles aren't available on this build.
-            </p>
+            <p className="profile-unavailable">{t("profileUnavailable")}</p>
           )}
           {stage.kind === "loading" && (
             <p className="profile-unavailable" role="status">
-              Loading operator record…
+              {t("publicLoading")}
             </p>
           )}
+          {stage.kind === "failed" && (
+            <ResourceState
+              state="error"
+              error={query.error}
+              onRetry={() => void query.refetch()}
+            />
+          )}
           {stage.kind === "not-found" && (
-            <p className="profile-unavailable">
-              No public profile at this link. It may never have existed, or the
-              operator has since made it private.
-            </p>
+            <p className="profile-unavailable">{t("profileMissing")}</p>
           )}
         </div>
 
@@ -91,8 +103,8 @@ export function PublicProfile({
             />
             <dl className="home-summary">
               <div>
-                <dt>Stories started</dt>
-                <dd>{numberFormat.format(stage.data.sessionsStarted)}</dd>
+                <dt>{t("started")}</dt>
+                <dd>{number(stage.data.sessionsStarted)}</dd>
               </div>
               <div
                 className="stat-metered"
@@ -102,8 +114,8 @@ export function PublicProfile({
                   } as CSSProperties
                 }
               >
-                <dt>Stories finished</dt>
-                <dd>{numberFormat.format(stage.data.sessionsFinished)}</dd>
+                <dt>{t("finished")}</dt>
+                <dd>{number(stage.data.sessionsFinished)}</dd>
               </div>
               <div
                 className="stat-metered"
@@ -113,9 +125,9 @@ export function PublicProfile({
                   } as CSSProperties
                 }
               >
-                <dt>Stories touched</dt>
+                <dt>{t("touched")}</dt>
                 <dd>
-                  {numberFormat.format(stage.data.campaignsPlayed)}
+                  {number(stage.data.campaignsPlayed)}
                   <span className="stat-ceiling">
                     {" "}
                     / {stage.data.campaignsTotal}
@@ -123,20 +135,20 @@ export function PublicProfile({
                 </dd>
               </div>
               <div>
-                <dt>Moves logged</dt>
-                <dd>{numberFormat.format(stage.data.stepsTaken)}</dd>
+                <dt>{t("logged")}</dt>
+                <dd>{number(stage.data.stepsTaken)}</dd>
               </div>
               <div>
-                <dt>Endings found</dt>
-                <dd>{numberFormat.format(stage.data.endingsFound)}</dd>
+                <dt>{t("found")}</dt>
+                <dd>{number(stage.data.endingsFound)}</dd>
               </div>
               <div>
-                <dt>Achievements</dt>
-                <dd>{numberFormat.format(stage.data.achievementsUnlocked)}</dd>
+                <dt>{t("achievements")}</dt>
+                <dd>{number(stage.data.achievementsUnlocked)}</dd>
               </div>
               <div>
-                <dt>Member since</dt>
-                <dd>{stage.data.joinedAt.slice(0, 10)}</dd>
+                <dt>{t("joined")}</dt>
+                <dd>{date(stage.data.joinedAt)}</dd>
               </div>
             </dl>
             <BadgeGrid badges={stage.data.badges} />

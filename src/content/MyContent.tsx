@@ -1,3 +1,6 @@
+import { useTranslation } from "react-i18next";
+import { ResourceState } from "../components/ResourceState";
+import { useOnline } from "../pwa/usePwa";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getMyContent,
@@ -18,10 +21,14 @@ import { useRef, useState } from "react";
 
 interface Outcome {
   readonly tone: "ok" | "warn" | "error";
-  readonly text: string;
+  readonly key?: string;
+  readonly error?: unknown;
 }
 
 function OutcomeNote({ outcome }: { readonly outcome: Outcome }) {
+  const { t } = useTranslation("content");
+  if (outcome.error)
+    return <ResourceState state="error" error={outcome.error} />;
   return (
     <p
       className={
@@ -33,19 +40,21 @@ function OutcomeNote({ outcome }: { readonly outcome: Outcome }) {
       }
       role={outcome.tone === "error" ? "alert" : "status"}
     >
-      {outcome.text}
+      {t(outcome.key ?? "loadFailed")}
     </p>
   );
 }
 
 function statusLabel(submission: Submission): string {
-  if (submission.visibility === "public") return "Public";
-  if (submission.status === "pending") return "Private — pending review";
-  if (submission.status === "rejected") return "Private — not approved";
-  return "Private";
+  if (submission.visibility === "public") return "public";
+  if (submission.status === "pending") return "pending";
+  if (submission.status === "rejected") return "rejected";
+  return "private";
 }
 
 export function MyContent({ apiUrl }: { apiUrl?: string }) {
+  const { t } = useTranslation("content");
+  const online = useOnline();
   const { identity, loading: identityLoading, refreshToken } = useAccount();
   const queryClient = useQueryClient();
   const queryKey = [
@@ -84,7 +93,7 @@ export function MyContent({ apiUrl }: { apiUrl?: string }) {
   const [fileOutcome, setFileOutcome] = useState<Outcome>();
 
   const [busyId, setBusyId] = useState<string>();
-  const [rowError, setRowError] = useState<{ id: string; text: string }>();
+  const [rowError, setRowError] = useState<{ id: string; error: unknown }>();
 
   const ready =
     Boolean(apiUrl) && !identityLoading && identity.kind !== "anonymous";
@@ -97,18 +106,18 @@ export function MyContent({ apiUrl }: { apiUrl?: string }) {
     if (!json?.refresh || json.refresh.ok) {
       return {
         tone: "ok",
-        text: "Submitted. It's live now, privately -- you can play it right away, and it's already queued for review. It becomes public if an admin approves it.",
+        key: "saved",
       };
     }
     if (json.source?.lastError) {
       return {
         tone: "error",
-        text: `Saved, but it failed to load: ${json.source.lastError}. Fix the content, then delete this row below and submit it again.`,
+        key: "loadFailed",
       };
     }
     return {
       tone: "warn",
-      text: "Saved, and it loaded cleanly -- but the catalog refresh itself failed for an unrelated reason. It will take effect once that clears.",
+      key: "refreshFailed",
     };
   }
 
@@ -127,7 +136,7 @@ export function MyContent({ apiUrl }: { apiUrl?: string }) {
     } catch (error) {
       setUrlOutcome({
         tone: "error",
-        text: error instanceof Error ? error.message : String(error),
+        error,
       });
     } finally {
       setAddingUrl(false);
@@ -142,7 +151,8 @@ export function MyContent({ apiUrl }: { apiUrl?: string }) {
       try {
         payload = JSON.parse(pasteText);
       } catch {
-        throw new Error("that isn't valid JSON");
+        setPasteOutcome({ tone: "error", key: "invalidJson" });
+        return;
       }
       const outcome = await postSubmission({ kind: "pasted", payload });
       setPasteText("");
@@ -150,7 +160,7 @@ export function MyContent({ apiUrl }: { apiUrl?: string }) {
     } catch (error) {
       setPasteOutcome({
         tone: "error",
-        text: error instanceof Error ? error.message : String(error),
+        error,
       });
     } finally {
       setAddingPaste(false);
@@ -166,7 +176,8 @@ export function MyContent({ apiUrl }: { apiUrl?: string }) {
       try {
         payload = JSON.parse(await selectedFile.text());
       } catch {
-        throw new Error(`${selectedFile.name} isn't valid JSON`);
+        setFileOutcome({ tone: "error", key: "invalidJson" });
+        return;
       }
       const outcome = await postSubmission({ kind: "pasted", payload });
       setSelectedFile(undefined);
@@ -175,7 +186,7 @@ export function MyContent({ apiUrl }: { apiUrl?: string }) {
     } catch (error) {
       setFileOutcome({
         tone: "error",
-        text: error instanceof Error ? error.message : String(error),
+        error,
       });
     } finally {
       setAddingFile(false);
@@ -191,7 +202,7 @@ export function MyContent({ apiUrl }: { apiUrl?: string }) {
     } catch (error) {
       setRowError({
         id,
-        text: error instanceof Error ? error.message : String(error),
+        error,
       });
     } finally {
       setBusyId(undefined);
@@ -207,7 +218,7 @@ export function MyContent({ apiUrl }: { apiUrl?: string }) {
     } catch (error) {
       setRowError({
         id,
-        text: error instanceof Error ? error.message : String(error),
+        error,
       });
     } finally {
       setBusyId(undefined);
@@ -216,46 +227,48 @@ export function MyContent({ apiUrl }: { apiUrl?: string }) {
 
   return (
     <>
-      <section className="archive admin" aria-labelledby="content-title">
+      <section
+        className="feature-page archive admin"
+        aria-labelledby="content-title"
+      >
         <div className="archive-heading">
-          <p className="eyebrow">SUBZERO STORY SYSTEM // AUTHOR SUBMISSIONS</p>
-          <h1 id="content-title">My content</h1>
-          <p className="admin-note">
-            Submit your own campaign or extension. It's playable by you the
-            moment it validates, privately, and it goes into the review queue
-            automatically — nobody else sees it unless an admin approves it.
-          </p>
+          <p className="eyebrow">{t("eyebrow")}</p>
+          <h1 id="content-title">{t("title")}</h1>
+          <p className="admin-note">{t("intro")}</p>
 
-          {!apiUrl && (
-            <p className="profile-unavailable">
-              Content submission isn't available on this build.
-            </p>
-          )}
+          {!apiUrl && <p className="profile-unavailable">{t("unavailable")}</p>}
           {apiUrl && identityLoading && (
             <p className="profile-unavailable" role="status">
-              Loading your record…
+              {t("loading")}
             </p>
           )}
           {apiUrl && !identityLoading && identity.kind === "anonymous" && (
-            <p className="profile-unavailable">
-              Play a story or sign in first -- there's nothing on record yet.
-            </p>
+            <p className="profile-unavailable">{t("anonymous")}</p>
           )}
         </div>
 
-        {ready && (
+        {ready && !online && <ResourceState state="offline" />}
+        {ready && query.isPending && <ResourceState state="loading" />}
+        {ready && query.isError && (
+          <ResourceState
+            state="error"
+            error={query.error}
+            onRetry={() => void query.refetch()}
+          />
+        )}
+        {ready && !query.isPending && !query.isError && (
           <>
             <section className="admin-block">
-              <h2 className="admin-heading">Your submissions</h2>
+              <h2 className="admin-heading">{t("submissions")}</h2>
               <div className="admin-table-scroll">
                 <table className="admin-table">
                   <thead>
                     <tr>
-                      <th scope="col">Label</th>
-                      <th scope="col">Kind</th>
-                      <th scope="col">Status</th>
-                      <th scope="col">Campaigns</th>
-                      <th scope="col">Issue</th>
+                      <th scope="col">{t("label")}</th>
+                      <th scope="col">{t("kind")}</th>
+                      <th scope="col">{t("status")}</th>
+                      <th scope="col">{t("campaigns")}</th>
+                      <th scope="col">{t("issue")}</th>
                       <th scope="col" />
                     </tr>
                   </thead>
@@ -263,34 +276,27 @@ export function MyContent({ apiUrl }: { apiUrl?: string }) {
                     {submissions.map((submission) => (
                       <tr key={submission.id}>
                         <td>{submission.label}</td>
-                        <td>{submission.kind}</td>
-                        <td>{statusLabel(submission)}</td>
+                        <td>{t(submission.kind)}</td>
+                        <td>{t(statusLabel(submission))}</td>
                         <td>{submission.campaignCount ?? "—"}</td>
                         <td>
-                          {submission.lastError ? (
-                            <span
-                              className="admin-cell-error-icon"
-                              title={submission.lastError}
-                              role="img"
-                              aria-label={`Error: ${submission.lastError}`}
-                            >
-                              ⚠
-                            </span>
-                          ) : submission.quarantineReason ? (
-                            <span
-                              className="admin-cell-error-icon"
-                              title={submission.quarantineReason}
-                              role="img"
-                              aria-label={`Not published: ${submission.quarantineReason}`}
-                            >
-                              ⚠
-                            </span>
-                          ) : submission.reviewNote ? (
-                            <span title={submission.reviewNote}>
-                              {submission.reviewNote}
-                            </span>
+                          {submission.lastError ||
+                          submission.quarantineReason ? (
+                            <details>
+                              <summary>
+                                {t(
+                                  submission.lastError
+                                    ? "loadIssue"
+                                    : "quarantined",
+                                )}
+                              </summary>
+                              <pre className="content-diagnostic">
+                                {submission.lastError ??
+                                  submission.quarantineReason}
+                              </pre>
+                            </details>
                           ) : (
-                            "—"
+                            (submission.reviewNote ?? "—")
                           )}
                         </td>
                         <td>
@@ -302,30 +308,33 @@ export function MyContent({ apiUrl }: { apiUrl?: string }) {
                                 onClick={() =>
                                   void handleRequestPublish(submission.id)
                                 }
-                                disabled={busyId === submission.id}
+                                disabled={!online || busyId === submission.id}
                               >
-                                Request another review
+                                {t("review")}
                               </button>
                             )}
                           <button
                             type="button"
                             className="admin-remove admin-row-action"
                             onClick={() => void handleDelete(submission.id)}
-                            disabled={busyId === submission.id}
+                            disabled={!online || busyId === submission.id}
                           >
-                            {busyId === submission.id ? "Removing…" : "Delete"}
+                            {busyId === submission.id
+                              ? t("removing")
+                              : t("delete")}
                           </button>
                           {rowError?.id === submission.id && (
-                            <p className="admin-cell-error-note" role="alert">
-                              {rowError.text}
-                            </p>
+                            <ResourceState
+                              state="error"
+                              error={rowError.error}
+                            />
                           )}
                         </td>
                       </tr>
                     ))}
                     {submissions.length === 0 && (
                       <tr>
-                        <td colSpan={6}>Nothing submitted yet.</td>
+                        <td colSpan={6}>{t("empty")}</td>
                       </tr>
                     )}
                   </tbody>
@@ -334,19 +343,21 @@ export function MyContent({ apiUrl }: { apiUrl?: string }) {
             </section>
 
             <section className="admin-block">
-              <h2 className="admin-heading">Submit</h2>
+              <h2 className="admin-heading">{t("submit")}</h2>
 
               <div className="admin-form">
-                <h3 className="admin-subheading">Add a URL source</h3>
+                <h3 className="admin-subheading">{t("urlSource")}</h3>
                 <div className="admin-form-row">
                   <input
                     type="text"
-                    placeholder="Label"
+                    aria-label={t("label")}
+                    placeholder={t("label")}
                     value={urlLabel}
                     onChange={(event) => setUrlLabel(event.target.value)}
                   />
                   <input
                     type="text"
+                    aria-label={t("sourceUrl")}
                     placeholder="https://…/campaigns/"
                     value={urlValue}
                     onChange={(event) => setUrlValue(event.target.value)}
@@ -355,21 +366,20 @@ export function MyContent({ apiUrl }: { apiUrl?: string }) {
                     type="button"
                     className="admin-sync"
                     onClick={() => void handleAddUrl()}
-                    disabled={addingUrl || !urlLabel || !urlValue}
+                    disabled={!online || addingUrl || !urlLabel || !urlValue}
                   >
-                    {addingUrl ? "Adding…" : "Add"}
+                    {addingUrl ? t("adding") : t("add")}
                   </button>
                 </div>
                 {urlOutcome && <OutcomeNote outcome={urlOutcome} />}
               </div>
 
               <div className="admin-form">
-                <h3 className="admin-subheading">
-                  Paste a campaign or extension
-                </h3>
+                <h3 className="admin-subheading">{t("paste")}</h3>
                 <textarea
                   className="admin-paste"
-                  placeholder="Paste a whole campaign or extension JSON file here…"
+                  aria-label={t("paste")}
+                  placeholder={t("pasteHint")}
                   value={pasteText}
                   onChange={(event) => setPasteText(event.target.value)}
                   rows={6}
@@ -379,24 +389,22 @@ export function MyContent({ apiUrl }: { apiUrl?: string }) {
                     type="button"
                     className="admin-sync"
                     onClick={() => void handleAddPaste()}
-                    disabled={addingPaste || !pasteText.trim()}
+                    disabled={!online || addingPaste || !pasteText.trim()}
                   >
-                    {addingPaste ? "Adding…" : "Add"}
+                    {addingPaste ? t("adding") : t("add")}
                   </button>
                 </div>
                 {pasteOutcome && <OutcomeNote outcome={pasteOutcome} />}
               </div>
 
               <div className="admin-form">
-                <h3 className="admin-subheading">
-                  Upload a campaign or extension JSON
-                </h3>
+                <h3 className="admin-subheading">{t("uploadTitle")}</h3>
                 <div className="admin-form-row">
                   <label
                     className="admin-file-label"
                     htmlFor="content-json-file"
                   >
-                    JSON file
+                    {t("file")}
                   </label>
                   <input
                     ref={fileInput}
@@ -407,20 +415,20 @@ export function MyContent({ apiUrl }: { apiUrl?: string }) {
                       setSelectedFile(event.target.files?.[0]);
                       setFileOutcome(undefined);
                     }}
-                    disabled={addingFile}
+                    disabled={!online || addingFile}
                   />
                   <button
                     type="button"
                     className="admin-sync"
                     onClick={() => void handleAddFile()}
-                    disabled={!selectedFile || addingFile}
+                    disabled={!online || !selectedFile || addingFile}
                   >
-                    {addingFile ? "Uploading…" : "Upload"}
+                    {addingFile ? t("uploading") : t("upload")}
                   </button>
                 </div>
                 {selectedFile && (
                   <p className="admin-file-name" role="status">
-                    Selected: {selectedFile.name}
+                    {t("selected", { name: selectedFile.name })}
                   </p>
                 )}
                 {fileOutcome && <OutcomeNote outcome={fileOutcome} />}

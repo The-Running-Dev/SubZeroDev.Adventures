@@ -81,7 +81,22 @@ try {
   await page.close();
   const offline = await context.newPage();
   await offline.goto(`${origin}/profile`);
-  await offline.getByText("Без интернет", { exact: true }).waitFor();
+  try {
+    await offline.getByText("Без интернет", { exact: true }).waitFor();
+  } catch (error) {
+    console.error(
+      "Offline launch diagnostics",
+      await offline.evaluate(() => ({
+        online: navigator.onLine,
+        language: navigator.language,
+        languages: navigator.languages,
+        lang: document.documentElement.lang,
+        body: document.body.innerText,
+        controller: navigator.serviceWorker.controller?.scriptURL,
+      })),
+    );
+    throw error;
+  }
   assert.equal(await offline.locator("html").getAttribute("lang"), "bg");
   assert.equal(
     await offline.locator('link[rel="manifest"]').getAttribute("href"),

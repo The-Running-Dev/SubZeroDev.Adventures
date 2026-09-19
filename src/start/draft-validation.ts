@@ -1,3 +1,4 @@
+import { validationEn } from "../app/locale/validation";
 /**
  * Draft validation -- the engine's own validator, run against an in-progress draft.
  *
@@ -80,46 +81,28 @@ export function useDraftValidation(draft: CampaignDraft): DraftValidation {
  * plain English, and falls back to the raw code for anything else rather than pretending to
  * recognise it.
  */
+export function findingMessage(finding: ValidationError | ValidationWarning) {
+  const key =
+    finding.code === "invalid_loc_key" && finding.path?.startsWith(".")
+      ? "unnamed_campaign"
+      : finding.code in validationEn
+        ? finding.code
+        : "unknown";
+  return {
+    key,
+    values: {
+      where: finding.path ? ` (${finding.path})` : "",
+      code: finding.code,
+    },
+  };
+}
+
 export function describeFinding(
   finding: ValidationError | ValidationWarning,
 ): string {
-  const where = finding.path ? ` (${finding.path})` : "";
-  switch (finding.code) {
-    case "invalid_identifier":
-      return `Campaign id must be lower-case words joined by hyphens${where}.`;
-    case "invalid_loc_key":
-      // Every key the wizard emits is `<campaign id>.<segments>` (`keyFor`, draft.ts), so a
-      // key whose first segment is empty has exactly one cause: the campaign has no id yet.
-      // Reporting that as a malformed text key sends an author looking for a key they never
-      // wrote and cannot find -- the id field is nowhere near the words "text key". This is
-      // the second of the two findings an unnamed draft always produces, alongside
-      // `invalid_identifier`, and naming the campaign clears both.
-      return finding.path?.startsWith(".")
-        ? `Name the campaign — until it has an id, the text keys it defines have nothing to prefix them${where}.`
-        : `Malformed text key${where}.`;
-    case "missing_string_key":
-      return `Some text is still blank${where}.`;
-    case "dangling_reference":
-      return `A choice leads to a scene that does not exist${where}.`;
-    case "duplicate_id":
-      return `Two things share the id${where}.`;
-    case "missing_label_key":
-      return `A visible stat needs a label${where}.`;
-    case "non_visible_variable_in_text":
-      return `Scene text uses a stat that is not marked visible${where}.`;
-    case "undeclared_variable":
-      return `An effect writes to a stat that is not declared${where}.`;
-    case "invalid_consequence_value":
-      return `An effect's value does not match its stat's type${where}.`;
-    case "unreachable_node":
-      return `Nothing leads to this scene${where}.`;
-    case "no_reachable_choice":
-      return `No scene with choices can be reached from the opening${where}.`;
-    case "no_reachable_ending":
-      return `No ending can be reached from the opening${where}.`;
-    case "unreachable_cycle":
-      return `This scene loops with no way out${where}.`;
-    default:
-      return `${finding.code}${where}`;
-  }
+  const { key, values } = findingMessage(finding);
+  return validationEn[key]!.replace("{{where}}", values.where).replace(
+    "{{code}}",
+    values.code,
+  );
 }

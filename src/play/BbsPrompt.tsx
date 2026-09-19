@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
 /**
@@ -28,6 +29,11 @@ function shouldAutoFocus(): boolean {
  * nothing fights this. On a touch device none of that focus-stealing
  * happens at all -- see `shouldAutoFocus` above.
  */
+export interface BbsResponse {
+  key: string;
+  values?: Record<string, string | number>;
+}
+
 export function BbsPrompt({
   sigil,
   hint,
@@ -42,10 +48,11 @@ export function BbsPrompt({
   resetToken: number;
   /** True while a submitted command's engine call is still in flight -- typing ahead of it raced the player into a scene that hadn't loaded yet. */
   busy: boolean;
-  onCommand: (command: string) => string | undefined;
+  onCommand: (command: string) => BbsResponse | undefined;
 }) {
+  const { t } = useTranslation("playerExtras");
   const [value, setValue] = useState("");
-  const [response, setResponse] = useState<string>();
+  const [response, setResponse] = useState<BbsResponse>();
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -73,10 +80,10 @@ export function BbsPrompt({
     <div className="bbs-prompt">
       {response && (
         <p className="bbs-response" role="status">
-          {response}
+          {t(response.key, response.values)}
         </p>
       )}
-      <p className="bbs-hint">{busy ? "Loading…" : hint}</p>
+      <p className="bbs-hint">{busy ? t("loading") : hint}</p>
       <form className="bbs-input-line" onSubmit={handleSubmit}>
         <span className="bbs-sigil" aria-hidden="true">
           {sigil}
@@ -85,7 +92,7 @@ export function BbsPrompt({
           ref={inputRef}
           className="bbs-input"
           type="text"
-          aria-label="Command"
+          aria-label={t("command")}
           autoComplete="off"
           disabled={busy}
           spellCheck={false}

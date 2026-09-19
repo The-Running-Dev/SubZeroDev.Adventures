@@ -1,3 +1,6 @@
+import { useOnline } from "../pwa/usePwa";
+import { ResourceState } from "../components/ResourceState";
+import { useTranslation } from "react-i18next";
 /**
  * The authorization UI Supabase's OAuth 2.1 Server redirects to (Site URL + Authorization
  * Path, configured in that Supabase project's dashboard as `/oauth/consent`) -- see
@@ -30,6 +33,8 @@ type Stage =
   | { readonly kind: "error"; readonly message: string };
 
 export function OAuthConsent() {
+  const { t } = useTranslation("account");
+  const online = useOnline();
   const [stage, setStage] = useState<Stage>({ kind: "loading" });
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
@@ -79,7 +84,9 @@ export function OAuthConsent() {
         window.location.href = data.redirect_url;
       }
     }
-    void load(supabase, authorizationId);
+    void load(supabase, authorizationId).catch(() => {
+      if (!cancelled) setStage({ kind: "error", message: "network_error" });
+    });
     return () => {
       cancelled = true;
     };
@@ -123,81 +130,84 @@ export function OAuthConsent() {
 
   return (
     <>
-      <section className="archive" aria-labelledby="oauth-consent-title">
+      <section
+        className="feature-page archive"
+        aria-labelledby="oauth-consent-title"
+      >
+        {!online && <ResourceState state="offline" />}
         <div className="archive-heading">
-          <p className="eyebrow">SUBZERO STORY SYSTEM // ACCOUNT LINK</p>
-          <h1 id="oauth-consent-title">Sign-in request</h1>
-          {stage.kind === "loading" && <p>Checking your session…</p>}
-          {stage.kind === "not_configured" && (
-            <p>
-              This deployment hasn't configured a Supabase identity provider
-              yet. There is nothing to authorize here.
-            </p>
-          )}
+          <p className="eyebrow">{t("eyebrow")}</p>
+          <h1 id="oauth-consent-title">{t("consentTitle")}</h1>
+          {stage.kind === "loading" && <p>{t("checking")}</p>}
+          {stage.kind === "not_configured" && <p>{t("notConfigured")}</p>}
           {stage.kind === "missing_authorization_id" && (
-            <p>
-              This page only makes sense as a redirect target from a third-party
-              sign-in request -- there's no request to show.
-            </p>
+            <p>{t("missingRequest")}</p>
           )}
           {stage.kind === "error" && (
             <p className="account-error" role="alert">
-              {stage.message}
+              {t("oauth_token_exchange_failed")}
             </p>
           )}
-          {stage.kind === "redirecting" && <p>Redirecting…</p>}
+          {stage.kind === "redirecting" && <p>{t("redirecting")}</p>}
           {stage.kind === "sign_in" && (
             <div className="account-panel">
-              <p>
-                Enter your email and we'll send a one-time sign-in link to
-                confirm it's you before you approve anything.
-              </p>
+              <p>{t("emailIntro")}</p>
               <div className="account-chip">
                 <input
                   type="email"
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
                   placeholder="you@example.com"
-                  aria-label="Email address"
+                  aria-label={t("email")}
                 />
                 <button
                   className="cabinet-button primary"
-                  disabled={busy || !email.trim()}
-                  onClick={() => void sendMagicLink()}
+                  disabled={!online || busy || !email.trim()}
+                  onClick={() =>
+                    void sendMagicLink().catch(() => {
+                      setBusy(false);
+                      setStage({ kind: "error", message: "network_error" });
+                    })
+                  }
                 >
-                  Send sign-in link
+                  {t("sendLink")}
                 </button>
               </div>
             </div>
           )}
           {stage.kind === "sign_in_sent" && (
-            <p>
-              Sign-in link sent to <strong>{stage.email}</strong>. Open it on
-              this device to continue -- this tab will pick up where it left
-              off.
-            </p>
+            <p>{t("sent", { email: stage.email })}</p>
           )}
           {stage.kind === "consent" && (
             <div className="account-panel">
-              <p>
-                <strong>{stage.client.name}</strong> wants to sign you in using
-                this account.
-              </p>
-              {stage.scope.trim() && <p>Requested access: {stage.scope}</p>}
+              <p>{t("clientRequest", { client: stage.client.name })}</p>
+              {stage.scope.trim() && (
+                <p>{t("scope", { scope: stage.scope })}</p>
+              )}
               <div className="account-chip">
                 <button
                   className="cabinet-button primary"
-                  disabled={busy}
-                  onClick={() => void decide(stage.authorizationId, "approve")}
+                  disabled={!online || busy}
+                  onClick={() =>
+                    void decide(stage.authorizationId, "approve").catch(() => {
+                      setBusy(false);
+                      setStage({ kind: "error", message: "network_error" });
+                    })
+                  }
                 >
-                  Approve
+                  {t("approve")}
                 </button>
                 <button
                   className="cabinet-button quiet"
-                  disabled={busy}
-                  onClick={() => void decide(stage.authorizationId, "deny")}
+                  disabled={!online || busy}
+                  onClick={() =>
+                    void decide(stage.authorizationId, "deny").catch(() => {
+                      setBusy(false);
+                      setStage({ kind: "error", message: "network_error" });
+                    })
+                  }
                 >
-                  Deny
+                  {t("deny")}
                 </button>
               </div>
             </div>

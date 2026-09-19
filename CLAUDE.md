@@ -1,5 +1,7 @@
 # Project Instructions
 
+**Read `AGENTS.shared.md` (home install: `C:/Users/Ben/.agent-kit/AGENTS.shared.md`) completely before this file.** It holds the rules every repository using the kit shares.
+
 ## What This Project Is
 
 **SubZeroDev.Adventures** — the standalone browser play surface for
@@ -26,7 +28,7 @@ src/
   test/                  jsdom + real-browser test setup and shared assertion helpers
 shared/                 code both compositions import — environment-neutral, no DOM, no Node
 server/                 the hosted Node API: its own npm project, its own Dockerfile
-frontend/               production static frontend Dockerfile, Caddy config and HTTP tests
+frontend/               production static frontend Dockerfile, nginx config and HTTP tests
 preview/                the preview static host — see "The Three Compose Files" below
 docker-compose.yml      the deployment stack — see "The Three Compose Files" below
 ```
@@ -39,12 +41,13 @@ docker-compose.yml      the deployment stack — see "The Three Compose Files" b
   engine, so `npm install` alone does not work. Run `npm run setup` first (or just
   `npm install` — it runs as a `prepare` script and builds the submodule automatically).
 - **Bumping the submodule pin is a real dependency upgrade**, not a formality. After moving
-  `engine/` to a new commit: rebuild it (`npm run setup`), re-run
-  `npm run sync:campaigns` and diff `public/campaigns/` for unreviewed content changes, and
-  run the full `npm run check` gate — an engine change can change campaign content, validation
-  behavior, or (per the browser-portability gate in `scripts/verify-build.mjs`) reintroduce a
-  Node-only import into a browser bundle. It can also change the rendered UI enough to need
-  new visual baselines — see "Visual Baselines" below.
+  `engine/` to a new commit: rebuild it (`npm run setup`) and run the full `npm run check`
+  gate — an engine change can change validation behavior or (per the browser-portability gate
+  in `scripts/verify-build.mjs`) reintroduce a Node-only import into a browser bundle. It can
+  also change the rendered UI enough to need new visual baselines — see "Visual Baselines"
+  below. `npm run sync:campaigns` no longer reads the engine for campaign _content_, but the
+  digest recipe it verifies against still comes from there, so a portable-format change is
+  still a reason to re-run it and diff `public/campaigns/`.
 - **The portable campaign format graduated out of spike status** (engine `0.6.0`):
   `fromPortable`, `digestPortableCampaign`, and the `Portable*` types are now real exports
   from `engine/src/engine/src/index.ts`, not disclaimed ones. `formatVersion` is `2`:
@@ -79,13 +82,17 @@ Regenerate with:
 npm run sync:campaigns
 ```
 
-This runs the engine submodule's own exporter (`engine/src/engine/scripts/export-campaigns.ts`,
-graduated out of spike status alongside the portable format) and copies its output here — see
-`scripts/sync-campaigns.mjs` for why it copies rather than pointing the exporter's hardcoded
-output path at this repo. Nothing enforces that this stays in lockstep with the engine or with
-`SubZeroDev.Adventures.Content` — it is a fixture snapshot now, not shipped content, so it is
-free to drift until a test actually needs the refresh. Diff the result after running it, and
-regenerate the visual baselines (below) if rendered output changed.
+This reads `SubZeroDev.Adventures.Content` — the same published feed the deployed server's
+only content source points at (`server/src/deployment.ts`) — verifying each fetched campaign
+against its manifest entry's digest before writing it, and preserving the two hand-authored
+`getting-started` files (see `scripts/sync-campaigns.mjs`'s header, and the decision log
+below for why it no longer runs the engine's exporter). Nothing enforces that the result
+stays in lockstep with the feed — it is a fixture snapshot, not shipped content, so it is
+free to drift until a test actually needs the refresh, **and as of 2026-09-19 it does**: the
+feed publishes 12 campaigns to this snapshot's 10, and five of the shared ones have moved on.
+Closing that gap is a content review plus a full visual-baseline regeneration, so it is its
+own change. Diff the result after running it, and regenerate the visual baselines (below) if
+rendered output changed.
 
 ## The Three Compose Files
 
@@ -429,19 +436,66 @@ Reversibility: cheap
 Context: the owner selected the existing VPS and Portainer deployment instead of the
 proposed Cloudflare Pages migration.
 
-Chosen: reuse the preview host's Caddy image family for a static frontend runtime;
-publish it through the API's existing GHCR workflow and redeploy the same root Compose
-stack with the existing webhook. Wait for both image builds and test the actual frontend
-container before publication. TLS remains at the existing proxy-net reverse proxy.
-The [hosting runbook](docs/frontend-hosting.md) owns cutover and rollback.
+Chosen: `nginx:alpine` serving the Vite output, the same release shape
+`SubZeroDev.com/Dockerfile` already uses across the estate — a base image, the built
+tree, and one `conf.d/default.conf`. Publish it through the API's existing GHCR workflow
+and redeploy the same root Compose stack with the existing webhook. Wait for both image
+builds and test the actual frontend container before publication. TLS remains at the
+existing proxy-net reverse proxy. The [hosting runbook](docs/frontend-hosting.md) owns
+cutover and rollback.
 
 Rejected: Cloudflare Pages (unnecessary second hosting system), a separate frontend
 webhook (can redeploy before the other image exists), and a blanket index.html fallback
-(hides missing resources). No npm runtime dependency is added. Caddy is already used by
-the preview stack; nginx would introduce another server configuration without a benefit.
+(hides missing resources). Also rejected: Caddy, which this change replaced. It was
+picked because `preview/` already runs it, but `preview/` is a dev-only static host that
+serves whatever was last uploaded — it is not the estate's deployment pattern, and
+SubZeroDev.com's published site is. Two static servers in one repository is two syntaxes
+to keep a hosting contract in, and the Caddy runtime needed `setcap -r /usr/bin/caddy`
+purely because its base binary requests a capability `cap_drop: ALL` then refuses to
+grant. nginx needs no such removal; it costs two tmpfs mounts instead, for the pid file
+and request temp directories. No npm runtime dependency is added either way.
 
+Known and retained: `preview/` still runs Caddy. It is a separate, pre-existing, dev-only
+stack with no deployment role, so it was left alone rather than churned inside this
+change.
 Reversibility: cheap — pin the frontend image independently; GitHub Pages compatibility
 remains until the live host has passed verification.
+
+#### 2026-09-19 — `sync:campaigns` reads the published feed, not the engine
+
+Context: the script was broken at the current engine pin — it shells out to
+`npm run export:campaigns` in the submodule, and that script no longer exists. Not a rename:
+the engine retired its own play surface and then removed the published campaign builders from
+the package root, and `engine/src/engine/src/index.ts` now says outright that
+"Adventures.Content owns the source and publication of published campaigns." There is nothing
+left in the submodule to export from, so the only question was where the fixtures come from
+now.
+
+Chosen: fetch them from `SubZeroDev.Adventures.Content` over the same GitHub Pages URL
+`createPublishedCampaignSource` (`server/src/deployment.ts`) reads, verifying each campaign
+against its manifest entry's `digest` and the manifest against its own `resolution` before
+anything is written — all three checks fire before the wholesale `rm`, so a bad feed leaves
+the existing snapshot on disk. Everything downstream of the fetch is unchanged: the
+hand-authored `getting-started` pair still survives the rebuild, the manifest is still patched
+to describe what is actually on disk, and the deep import the 2026-08-15 entry below argues
+for still does the recomputation. That keeps the diff to the _source_ of the bytes, which is
+the only thing that actually changed.
+
+Rejected: retiring the script and declaring `public/campaigns/` hand-maintained (it is a
+fixture set _and_ the deployment's bootstrap snapshot, and "regenerate it when it drifts" is
+advice with nothing behind it once the regenerator is gone); vendoring the content repository
+as a second submodule (a whole checkout, a pin to bump, and a second thing to keep in step,
+to read twelve JSON files this repo only reads at author time); pointing it at the content
+repository's raw GitHub URLs instead of the published feed (the feed is what the server
+actually consumes, so reading anything else would make the fixtures a snapshot of something
+no deployment sees).
+
+Known and retained: fixing the script does not refresh the snapshot, and running it now
+produces real drift — 12 published campaigns against this repo's 10, plus content changes to
+five shared ones. Taking that refresh means reviewing new campaign content and regenerating
+all 24 visual baselines, so it is deliberately left as its own change.
+
+Reversibility: cheap — the script is self-contained and the feed URL is one constant.
 
 #### 2026-09-19 — Query and locale foundations before feature redesign
 
@@ -690,6 +744,11 @@ npm run setup           # build the engine submodule (only needed after a fresh 
 npm run check            # format:check, lint, typecheck, test, test:browser, test:build
 npm run sync:campaigns && git diff --exit-code -- public/campaigns   # campaign drift
 ```
+
+The drift check is informational, not a gate — nothing in CI runs it, and it currently
+reports drift on purpose (see "Campaign Content"). Restore with
+`git checkout -- public/campaigns` unless you are deliberately taking the refresh, which
+means reviewing the new content and regenerating every visual baseline.
 
 `server/` is a separate npm project and `npm run check` does not reach into it — CI runs it
 as its own job. Validate it directly:

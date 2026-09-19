@@ -5,6 +5,7 @@ import {
   submitContent,
   requestPublication,
   deleteContent,
+  type Submission,
 } from "../api/content";
 import { useAccount } from "../app/providers/AccountProvider";
 import { useOnline } from "../pwa/usePwa";
@@ -29,7 +30,16 @@ export function useMyContent(apiUrl?: string) {
     queryFn: ({ signal }) => getMyContent(apiUrl, signal),
     enabled: Boolean(apiUrl && identity.playerId) && !identityLoading,
   });
-  const submissions = query.data?.submissions ?? [];
+  // Shape-guarded, not just null-guarded: `request` hands back whatever parsed, so a
+  // malformed `submissions` would otherwise reach `.map` below and take the page down.
+  // Annotated rather than inferred -- `Array.isArray` narrows a `readonly T[]` to `any[]`,
+  // which would quietly make every `submission` below untyped. The guard is arrayness only;
+  // element shape is trusted here exactly as it was before it.
+  const submissions: readonly Submission[] = Array.isArray(
+    query.data?.submissions,
+  )
+    ? query.data.submissions
+    : [];
   const refetch = () => {
     void queryClient.invalidateQueries({ queryKey });
     void queryClient.invalidateQueries({

@@ -108,6 +108,19 @@ services:
     # Static assets only. TLS terminates at the existing reverse proxy.
     # No host ports, database network, API credentials or writable content mounts.
     read_only: true
+    # The only two paths nginx writes: its pid file and the request temp directories it
+    # creates at startup. Everything served is baked into the image, so these are the
+    # whole cost of `read_only` -- and they are wiped with the container. The mode is
+    # load-bearing: a tmpfs mounts root-owned, and the image runs as `nginx`.
+    volumes:
+      - type: tmpfs
+        target: /var/run
+        tmpfs:
+          mode: 01777
+      - type: tmpfs
+        target: /var/cache/nginx
+        tmpfs:
+          mode: 01777
     security_opt:
       - no-new-privileges:true
     cap_drop:

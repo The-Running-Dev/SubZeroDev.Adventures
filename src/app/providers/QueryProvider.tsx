@@ -10,7 +10,10 @@ export function QueryProvider({ children }: { children: ReactNode }) {
             retry: false,
             refetchOnWindowFocus: false,
           },
-          // Mutations must fail visibly offline; never silently resume a queued action.
+          // The posture any mutation added later inherits: fail visibly offline, never
+          // silently resume a queued action. Nothing routes through it yet -- every write
+          // in the tree today is a plain async call against `api/client.ts`, which does not
+          // retry either, so the two agree rather than one covering for the other.
           mutations: { retry: false, networkMode: "always" },
         },
       }),

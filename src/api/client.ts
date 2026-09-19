@@ -43,17 +43,30 @@ export async function request<T>(
     if (init.signal?.aborted) throw error;
     throw new ApiError(0, "network_error", error);
   }
-  const data =
-    response.status === 204
-      ? undefined
-      : await response.json().catch(() => undefined);
-  if (!response.ok)
+  // Read as text first so an empty body and a malformed one stay distinguishable. A
+  // bodyless success is legitimate (204, and any route that answers a write with no
+  // content); a non-empty body that will not parse is not, and only the second is an
+  // `invalid_response`.
+  const text = response.status === 204 ? "" : await response.text();
+  let data: unknown;
+  let parsed = text === "";
+  if (!parsed) {
+    try {
+      data = JSON.parse(text);
+      parsed = true;
+    } catch {
+      data = undefined;
+    }
+  }
+  if (!response.ok) {
+    const code = (data as { error?: { code?: string } } | undefined)?.error
+      ?.code;
     throw new ApiError(
       response.status,
-      data?.error?.code ?? "request_failed",
-      data,
+      code ?? "request_failed",
+      parsed ? data : text,
     );
-  if (data === undefined && response.status !== 204)
-    throw new ApiError(response.status, "invalid_response");
+  }
+  if (!parsed) throw new ApiError(response.status, "invalid_response", text);
   return data as T;
 }

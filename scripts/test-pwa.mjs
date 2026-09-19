@@ -91,6 +91,24 @@ try {
     uploadThroughput: -1,
   });
   await offline.goto(`${origin}/profile`);
+  assert.equal(
+    await offline.evaluate(async () => {
+      try {
+        await fetch("/__network-probe", { cache: "no-store" });
+        return false;
+      } catch {
+        return true;
+      }
+    }),
+    true,
+    "Cold launch must have outbound networking blocked",
+  );
+  await network.send("Network.emulateNetworkConditions", {
+    offline: true,
+    latency: 0,
+    downloadThroughput: -1,
+    uploadThroughput: -1,
+  });
   try {
     await offline.getByText("Без интернет", { exact: true }).waitFor();
   } catch (error) {

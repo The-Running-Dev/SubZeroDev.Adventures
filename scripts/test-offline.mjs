@@ -159,7 +159,12 @@ try {
     ["run", "build"],
     {
       stdio: "inherit",
-      env: { ...process.env, VITE_ENABLE_PWA: "true", VITE_API_URL: api },
+      env: {
+        ...process.env,
+        NODE_ENV: "production",
+        VITE_ENABLE_PWA: "true",
+        VITE_API_URL: api,
+      },
     },
   );
   assert.equal(build.status, 0);

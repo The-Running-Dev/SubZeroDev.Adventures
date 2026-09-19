@@ -1,0 +1,124 @@
+import assert from "node:assert/strict";
+import { createServer } from "node:http";
+import { readFile } from "node:fs/promises";
+import { resolve, extname } from "node:path";
+import { spawnSync } from "node:child_process";
+import { chromium } from "playwright";
+
+const build = spawnSync(
+  process.platform === "win32" ? "npm.cmd" : "npm",
+  ["run", "build"],
+  {
+    stdio: "inherit",
+    env: {
+      ...process.env,
+      VITE_ENABLE_PWA: "true",
+      VITE_API_URL: "https://api.invalid",
+    },
+  },
+);
+assert.equal(build.status, 0, "PWA test build must succeed");
+let version = "A";
+const mime = {
+  ".html": "text/html",
+  ".js": "text/javascript",
+  ".css": "text/css",
+  ".png": "image/png",
+  ".svg": "image/svg+xml",
+  ".webmanifest": "application/manifest+json",
+};
+const server = createServer(async (req, res) => {
+  try {
+    const path = new URL(req.url, "http://localhost").pathname;
+    const file = path === "/" || !extname(path) ? "/index.html" : path;
+    if (file.includes("..")) throw new Error("invalid path");
+    let content = await readFile(resolve("dist", `.${file}`));
+    if (file === "/sw.js")
+      content = Buffer.from(
+        content
+          .toString()
+          .replaceAll("adventures-shell-", `adventures-shell-${version}-`),
+      );
+    res.writeHead(200, {
+      "Content-Type": mime[extname(file)] ?? "application/octet-stream",
+      "Cache-Control": "no-store",
+    });
+    res.end(content);
+  } catch {
+    res.writeHead(404);
+    res.end("Not found");
+  }
+});
+await new Promise((done) => server.listen(0, "127.0.0.1", done));
+const origin = `http://127.0.0.1:${server.address().port}`;
+const browser = await chromium.launch({
+  executablePath: process.env.PWA_CHROMIUM_PATH || undefined,
+  args: ["--no-sandbox", "--disable-dev-shm-usage"],
+});
+try {
+  const context = await browser.newContext({ locale: "bg-BG" });
+  const page = await context.newPage();
+  await page.goto(origin);
+  await page.evaluate(async () => {
+    await navigator.serviceWorker.ready;
+  });
+  await page.waitForFunction(() => Boolean(navigator.serviceWorker.controller));
+  const urls = await page.evaluate(async () => {
+    const keys = await caches.keys();
+    return (
+      await Promise.all(
+        keys.map(async (key) =>
+          (await (await caches.open(key)).keys()).map((r) => r.url),
+        ),
+      )
+    ).flat();
+  });
+  assert(urls.some((url) => url.endsWith("/index.html")));
+  assert(
+    urls.every((url) => !url.includes("/api/") && !url.includes("/campaigns/")),
+  );
+  await context.setOffline(true);
+  await page.close();
+  const offline = await context.newPage();
+  await offline.goto(`${origin}/profile`);
+  await offline.getByText("Без интернет", { exact: true }).waitFor();
+  assert.equal(await offline.locator("html").getAttribute("lang"), "bg");
+  assert.equal(
+    await offline.locator('link[rel="manifest"]').getAttribute("href"),
+    "/manifest.webmanifest",
+  );
+  await offline.goto(`${origin}/ranking`);
+  await offline.getByText("Без интернет", { exact: true }).waitFor();
+  await context.setOffline(false);
+  version = "B";
+  await offline.evaluate(async () => {
+    const r = await navigator.serviceWorker.getRegistration();
+    await r.update();
+  });
+  await offline.getByText("Има нова версия", { exact: true }).waitFor();
+  const other = await context.newPage();
+  await other.goto(origin);
+  await offline
+    .getByRole("button", { name: "Обнови сега", exact: true })
+    .click();
+  await offline
+    .getByRole("button", { name: "Презареди и обнови", exact: true })
+    .click();
+  await offline
+    .getByRole("alert")
+    .filter({ hasText: "Затвори другите раздели" })
+    .waitFor();
+  await other.close();
+  await offline
+    .getByRole("button", { name: "Презареди и обнови", exact: true })
+    .click();
+  await offline.waitForEvent("load");
+  assert.equal(await offline.locator("html").getAttribute("lang"), "bg");
+  await context.close();
+  console.log(
+    "PWA verified: complete static precache, no API/catalog cache, offline cold navigation in Bulgarian, prompted update and multi-tab protection.",
+  );
+} finally {
+  await browser.close();
+  await new Promise((done) => server.close(done));
+}

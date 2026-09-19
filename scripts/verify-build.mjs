@@ -79,3 +79,33 @@ for (const bundle of bundles) {
 console.log(
   `The built HTML entry point contains its required static metadata, and ${bundles.length} bundle(s) are free of Node-only runtime references.`,
 );
+
+// Follow static edges only: navigating to these features may fetch their lazy chunks,
+// but starting a game must not execute creator/admin/discussion implementations.
+const manifest = JSON.parse(
+  await readFile(
+    new URL("../dist/.vite/manifest.json", import.meta.url),
+    "utf8",
+  ),
+);
+const player = Object.keys(manifest).find((key) =>
+  key.endsWith("/PlayApp.tsx"),
+);
+if (!player) throw new Error("Missing lazy player entry in build manifest.");
+const visited = new Set();
+function visit(key) {
+  if (visited.has(key)) return;
+  visited.add(key);
+  for (const imported of manifest[key]?.imports ?? []) visit(imported);
+}
+visit(player);
+for (const feature of ["Wizard", "AdminPanel", "Discussions"]) {
+  const entry = Object.keys(manifest).find((key) =>
+    key.endsWith(`/${feature}.tsx`),
+  );
+  if (!entry || visited.has(entry))
+    throw new Error(`${feature} must remain a separate lazy feature.`);
+}
+console.log(
+  "Creator, admin and discussions remain outside the player's static import graph.",
+);

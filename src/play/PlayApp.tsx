@@ -1,3 +1,4 @@
+import type { TFunction } from "i18next";
 import { SceneRegion } from "../features/play/SceneRegion";
 import { ArrivalReceipt } from "../features/play/ArrivalReceipt";
 import { ActionDeck } from "../features/play/ActionDeck";
@@ -11,6 +12,8 @@ import { ResourceState } from "../components/ResourceState";
 import { ApiError } from "../api/client";
 import { Link } from "react-router";
 import {
+  lazy,
+  Suspense,
   useEffect,
   useCallback,
   useMemo,
@@ -22,8 +25,10 @@ import { useLocation, useNavigate } from "react-router";
 import { useTheme } from "../app/providers/ThemeProvider";
 import { useAccount } from "../app/providers/AccountProvider";
 import { usePlayerShell } from "../app/playerShell";
-import { AdminPanel } from "./AdminPanel";
-import { BbsPrompt } from "./BbsPrompt";
+const AdminPanel = lazy(() =>
+  import("./AdminPanel").then((m) => ({ default: m.AdminPanel })),
+);
+import { BbsPrompt, type BbsResponse } from "./BbsPrompt";
 import { BrowserClient, type PlayState } from "./browser-client";
 import {
   createBrowserDemo,
@@ -51,25 +56,21 @@ import { PlatformStats } from "./PlatformStats";
  * reuses `violet` simply because there is no seventh accent. The eyebrow is
  * what actually distinguishes them.
  */
-const cabinetThemes: Readonly<
-  Record<string, { accent: string; eyebrow: string }>
-> = {
-  "what-would-lucifer-do": { accent: "cobalt", eyebrow: "PREDICTION LOG" },
+const cabinetThemes: Readonly<Record<string, { accent: string }>> = {
+  "what-would-lucifer-do": { accent: "cobalt" },
   "what-would-lucifer-do-engineers-cut": {
     accent: "cobalt",
-    eyebrow: "PREDICTION LOG // ENGINEER'S CUT",
   },
-  "lucifer-chronicles": { accent: "ember", eyebrow: "CELESTIAL CASE FILE" },
-  "bulgaria-bureaucracy": { accent: "red", eyebrow: "MUNICIPAL ARCHIVE" },
-  "bulgaria-return": { accent: "teal", eyebrow: "RETURN DEPARTMENT" },
-  "bulgaria-driving": { accent: "yellow", eyebrow: "ROAD SAFETY OFFICE" },
-  "bulgaria-inheritance": { accent: "green", eyebrow: "ESTATE RECORDS" },
-  "bulgaria-enterprise": { accent: "violet", eyebrow: "ENTERPRISE DESK" },
+  "lucifer-chronicles": { accent: "ember" },
+  "bulgaria-bureaucracy": { accent: "red" },
+  "bulgaria-return": { accent: "teal" },
+  "bulgaria-driving": { accent: "yellow" },
+  "bulgaria-inheritance": { accent: "green" },
+  "bulgaria-enterprise": { accent: "violet" },
   "saki-quest-for-redemption": {
     accent: "violet",
-    eyebrow: "REDEMPTION FILE",
   },
-  [GETTING_STARTED_CAMPAIGN_ID]: { accent: "green", eyebrow: "SYSTEM FILE" },
+  [GETTING_STARTED_CAMPAIGN_ID]: { accent: "green" },
 };
 
 /** A permanent, shareable link that loads a campaign directly -- no click-through required. */
@@ -92,13 +93,17 @@ function rangeLabel(count: number): string {
 function progressLabel(
   campaign: BrowserCampaign,
   entry: CampaignProgress,
+  t: TFunction,
 ): string {
   if (campaign.endingCount > 0) {
-    return `${entry.endings.discovered.length}/${campaign.endingCount} endings found`;
+    return t("library:endings", {
+      found: entry.endings.discovered.length,
+      total: campaign.endingCount,
+    });
   }
   return entry.status === "ended"
-    ? "Finished"
-    : `In progress · ${entry.stepCount} steps`;
+    ? t("library:finished")
+    : t("library:inProgress", { count: entry.stepCount });
 }
 
 /** A retro 8.3-style DOS name for the prompt sigil -- e.g. "The Bureaucracy" -> "BUREAUCR". */
@@ -516,17 +521,17 @@ function PlayAppReady({
    * genuinely unparseable input -- which answers with the actual GW-BASIC
    * `INPUT` error, the one joke in the theme.
    */
-  function runCommand(raw: string): string | undefined {
+  function runCommand(raw: string): BbsResponse | undefined {
     const upper = raw.toUpperCase();
     const index = /^\d+$/.test(raw) ? Number.parseInt(raw, 10) : undefined;
 
     if (upper === "HELP" || upper === "?") {
       if (!state)
         return profileAvailable
-          ? "Commands: [number] select a disk, LOAD, RESUME, PROFILE, HELP."
-          : "Commands: [number] select a disk, LOAD, RESUME, HELP.";
-      if (ended) return "Commands: AGAIN (or RESTART), QUIT, HELP.";
-      return "Commands: [number] take that action, QUIT, HELP.";
+          ? { key: "helpProfile" }
+          : { key: "helpLibrary" };
+      if (ended) return { key: "helpEnded" };
+      return { key: "helpPlay" };
     }
 
     if (!state) {
@@ -538,23 +543,29 @@ function PlayAppReady({
         if (index >= 1 && index <= demo.catalog.length) {
           const campaign = demo.catalog[index - 1]!;
           setSelectedId(campaign.campaignId);
-          return `Selected disk ${index}: ${campaign.title}.`;
+          return {
+            key: "selectedDisk",
+            values: { number: index, title: campaign.title },
+          };
         }
-        return `Invalid choice. Type ${rangeLabel(demo.catalog.length)}.`;
+        return {
+          key: "invalidChoice",
+          values: { range: rangeLabel(demo.catalog.length) },
+        };
       }
       if (upper === "LOAD" || upper === "GO") {
-        if (!selected) return "?Redo from start";
+        if (!selected) return { key: "redo" };
         void start(selected.campaignId);
         return undefined;
       }
       if (upper === "RESUME") {
-        if (!selected) return "?Redo from start";
+        if (!selected) return { key: "redo" };
         const saveId = demo.findLocalSave(selected.campaignId);
-        if (!saveId) return "No saved run for this disk.";
+        if (!saveId) return { key: "noSave" };
         void resume(selected.campaignId, saveId);
         return undefined;
       }
-      return "?Redo from start";
+      return { key: "redo" };
     }
 
     if (ended) {
@@ -566,7 +577,7 @@ function PlayAppReady({
         returnToShelf();
         return undefined;
       }
-      return "?Redo from start";
+      return { key: "redo" };
     }
 
     if (upper === "QUIT") {
@@ -577,13 +588,19 @@ function PlayAppReady({
       if (index >= 1 && index <= state.actions.length) {
         const action = state.actions[index - 1]!;
         if (!action.available)
-          return `Unavailable: ${action.reason ?? "This choice is not available."}`;
+          return {
+            key: "unavailable",
+            values: { reason: action.reason ?? t("playerExtras:notAvailable") },
+          };
         void choose(action.id);
         return undefined;
       }
-      return `Invalid choice. Type ${rangeLabel(state.actions.length)}.`;
+      return {
+        key: "invalidChoice",
+        values: { range: rangeLabel(state.actions.length) },
+      };
     }
-    return "?Redo from start";
+    return { key: "redo" };
   }
 
   /** Reads like a real DOS path -- updates the moment a disk is selected, on the shelf or in play, not only once loaded. */
@@ -594,11 +611,13 @@ function PlayAppReady({
     !state && selected ? demo.findLocalSave(selected.campaignId) : undefined;
   const bbsHint = !state
     ? selectedSave
-      ? `Saved run found. Type RESUME to continue, or ${rangeLabel(demo.catalog.length)} for a different disk.`
-      : `Type ${rangeLabel(demo.catalog.length)}, LOAD, RESUME, or HELP.`
+      ? t("playerExtras:hintResume", { range: rangeLabel(demo.catalog.length) })
+      : t("playerExtras:hintLibrary", {
+          range: rangeLabel(demo.catalog.length),
+        })
     : ended
-      ? "Type AGAIN, QUIT, or HELP."
-      : `Type ${rangeLabel(state.actions.length)}, QUIT, or HELP.`;
+      ? t("playerExtras:hintEnded")
+      : t("playerExtras:hintPlay", { range: rangeLabel(state.actions.length) });
   /** Any game-state change -- typed or mouse-driven -- hands focus back to the prompt. */
   const bbsFocusToken = `${selectedId ?? ""}|${campaignId ?? ""}|${sceneText ?? ""}|${ended}`;
   // Content administration keeps the same header and archive shell as the main surface;
@@ -653,29 +672,29 @@ function PlayAppReady({
       {isAdminPage ? (
         adminAccessLoading ? (
           <div className="play-loading" role="status">
-            Checking admin access…
+            {t("playerExtras:adminLoading")}
           </div>
         ) : isAdmin ? (
-          <AdminPanel
-            demo={demo}
-            syncing={syncing}
-            syncError={syncError}
-            lastSyncedAt={lastSyncedAt}
-            onSync={onSync}
-          />
+          <Suspense fallback={<ResourceState state="loading" />}>
+            <AdminPanel
+              demo={demo}
+              syncing={syncing}
+              syncError={syncError}
+              lastSyncedAt={lastSyncedAt}
+              onSync={onSync}
+            />
+          </Suspense>
         ) : (
           <section
             className="archive admin"
             aria-labelledby="admin-denied-title"
           >
             <div className="archive-heading">
-              <p className="eyebrow">RESTRICTED SYSTEM // ACCESS DENIED</p>
-              <h1 id="admin-denied-title">Admin access required</h1>
-              <p>
-                This page is available only to an authorized signed-in account.
-              </p>
+              <p className="eyebrow">{t("playerExtras:restricted")}</p>
+              <h1 id="admin-denied-title">{t("playerExtras:adminRequired")}</h1>
+              <p>{t("playerExtras:adminBody")}</p>
               <Link className="cabinet-button" to="/">
-                Return to disk library
+                {t("playerExtras:returnLibrary")}
               </Link>
             </div>
           </section>
@@ -689,14 +708,11 @@ function PlayAppReady({
                 catalogSize={demo.catalog.length}
               />
             )}
-            <p className="eyebrow">SUBZERO STORY SYSTEM // INSERT DISK</p>
-            <h1 id="shelf-title">Adventure disk library</h1>
-            <p>
-              Select a program. Your choices, bad luck, and improbable
-              consequences run entirely on this machine.
-            </p>
+            <p className="eyebrow">{t("playerExtras:insertDisk")}</p>
+            <h1 id="shelf-title">{t("playerExtras:legacyTitle")}</h1>
+            <p>{t("playerExtras:legacyIntro")}</p>
           </div>
-          <div className="dossier-grid" aria-label="Story dossiers">
+          <div className="dossier-grid" aria-label={t("playerExtras:dossiers")}>
             {demo.catalog.map((campaign, index) => {
               const isSelected = selectedId === campaign.campaignId;
               // An odd-numbered catalog's final tile has no partner column, so it
@@ -732,14 +748,17 @@ function PlayAppReady({
                     aria-expanded={isSelected}
                   >
                     <span className="dossier-number">
-                      DISK {String(index + 1).padStart(2, "0")} //{" "}
+                      {t("playerExtras:disk", {
+                        number: String(index + 1).padStart(2, "0"),
+                      })}{" "}
+                      //{" "}
                       {campaign.mine
                         ? campaign.visibility === "public"
-                          ? "PUBLISHED BY YOU"
-                          : "PRIVATE"
+                          ? t("playerExtras:published")
+                          : t("playerExtras:private")
                         : campaign.featured
-                          ? "FEATURED"
-                          : "READY"}
+                          ? t("playerExtras:featured")
+                          : t("playerExtras:ready")}
                     </span>
                     <strong>{campaign.title}</strong>
                     <span>{campaign.duration}</span>
@@ -748,6 +767,7 @@ function PlayAppReady({
                         {progressLabel(
                           campaign,
                           progress.get(campaign.campaignId)!,
+                          t,
                         )}
                       </span>
                     )}
@@ -763,7 +783,7 @@ function PlayAppReady({
                           disabled={busy}
                           onClick={() => void start(campaign.campaignId)}
                         >
-                          Load
+                          {t("playerExtras:load")}
                         </button>
                         {demo.findLocalSave(campaign.campaignId) && (
                           <button
@@ -776,7 +796,7 @@ function PlayAppReady({
                               )
                             }
                           >
-                            Resume
+                            {t("playerExtras:resume")}
                           </button>
                         )}
                       </div>
@@ -795,12 +815,16 @@ function PlayAppReady({
       ) : (
         <section
           className={`cabinet accent-${cabinetTheme?.accent ?? "default"}${isOnboarding ? " onboarding" : ""}`}
-          aria-label={`${selected?.title ?? "Story"} adventure terminal`}
+          aria-label={t("playerExtras:terminal", {
+            title: selected?.title ?? t("playerExtras:story"),
+          })}
         >
           <header className="cabinet-marquee">
             <div>
               <p className="eyebrow">
-                {cabinetTheme?.eyebrow ?? "STORY IN PROGRESS"}
+                {t(`playerExtras:eyebrows.${campaignId}`, {
+                  defaultValue: t("playerExtras:inProgress"),
+                })}
               </p>
               <h1>{selected?.title}</h1>
             </div>
@@ -832,14 +856,14 @@ function PlayAppReady({
                   <ArrivalReceipt arrivalChoice={arrivalChoice} />
                   <div className="ending-controls">
                     <p className="ending-placard">
-                      This matter has been concluded with excessive ceremony.
+                      {t("playerExtras:concluded")}
                     </p>
                     <button
                       className="cabinet-button primary"
                       disabled={busy}
                       onClick={() => void start(campaignId!)}
                     >
-                      Start another run
+                      {t("playerExtras:startAnother")}
                     </button>
                     {campaignId === demo.catalog[0]?.campaignId && (
                       <button

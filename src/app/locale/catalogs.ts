@@ -1,3 +1,8 @@
+import { playerExtrasEn, playerExtrasBg } from "./playerExtras";
+import { accountEn, accountBg } from "./account";
+import { adminEn, adminBg } from "./admin";
+import { creatorEn, creatorBg } from "./creator";
+import { validationEn, validationBg } from "./validation";
 import { onboardingEn, onboardingBg } from "./onboarding";
 import { contentEn, contentBg } from "./content";
 import { communityEn, communityBg } from "./community";
@@ -5,6 +10,11 @@ import { BADGE_DEFINITIONS } from "../../play/badges";
 import { badgesBg } from "./badges.bg";
 export const resources = {
   en: {
+    playerExtras: playerExtrasEn,
+    account: accountEn,
+    admin: adminEn,
+    creator: creatorEn,
+    validation: validationEn,
     onboarding: onboardingEn,
     content: contentEn,
     community: communityEn,
@@ -168,6 +178,8 @@ export const resources = {
       offline: "You are offline. Reconnect to use this action.",
       unavailable: "This feature is not available on this build.",
       errors: {
+        unrecognized_payload_shape:
+          "This file is not a supported campaign or extension.",
         network_error: "The server could not be reached. Try again.",
         request_failed: "The request could not be completed.",
         not_configured: "This feature is not configured.",
@@ -196,6 +208,11 @@ export const resources = {
     },
   },
   bg: {
+    playerExtras: playerExtrasBg,
+    account: accountBg,
+    admin: adminBg,
+    creator: creatorBg,
+    validation: validationBg,
     onboarding: onboardingBg,
     content: contentBg,
     community: communityBg,
@@ -360,6 +377,8 @@ export const resources = {
         "Няма връзка с интернет. Свържи се, за да използваш това действие.",
       unavailable: "Тази функция не е налична в тази версия.",
       errors: {
+        unrecognized_payload_shape:
+          "Този файл не е поддържана кампания или разширение.",
         network_error: "Няма връзка със сървъра. Опитай отново.",
         request_failed: "Заявката не можа да бъде изпълнена.",
         not_configured: "Тази функция не е настроена.",

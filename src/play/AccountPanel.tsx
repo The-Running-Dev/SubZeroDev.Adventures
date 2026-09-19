@@ -1,14 +1,9 @@
+import { ApiError, request } from "../api/client";
+import { useOnline } from "../pwa/usePwa";
+import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
 import { useEffect, useRef, useState } from "react";
 import { signInUrl, signOut, type Identity } from "./identity";
-
-const AUTH_ERROR_MESSAGES: Readonly<Record<string, string>> = {
-  oauth_not_configured: "Sign-in isn't set up on this deployment yet.",
-  invalid_oauth_state: "That sign-in link expired. Try again.",
-  oauth_token_exchange_failed: "Sign-in failed. Try again.",
-  oauth_provider_unavailable:
-    "The sign-in provider isn't reachable right now. Everything else still works — try again shortly.",
-};
 
 interface AccountPanelProps {
   readonly apiUrl: string;
@@ -52,6 +47,9 @@ export function AccountPanel({
   isAdmin,
   profileAvailable,
 }: AccountPanelProps) {
+  const { t, i18n } = useTranslation("account");
+  const online = useOnline();
+  const [logoutError, setLogoutError] = useState(false);
   /* A failed sign-in round trip is reported inside the menu, so it opens itself rather
      than leaving the message behind a click nobody knows to make. */
   const [open, setOpen] = useState(Boolean(authError));
@@ -84,15 +82,14 @@ export function AccountPanel({
     setBusy(true);
     setTransferMessage(null);
     try {
-      const response = await fetch(`${apiUrl}/api/transfer/create`, {
-        method: "POST",
-        credentials: "include",
-      });
-      if (!response.ok) throw new Error("create failed");
-      const body = (await response.json()) as { code: string };
+      const body = await request<{ code: string }>(
+        apiUrl,
+        "/api/transfer/create",
+        { method: "POST" },
+      );
       setIssuedCode(body.code);
     } catch {
-      setTransferMessage("Couldn't create a transfer code. Try again.");
+      setTransferMessage("createFailed");
     } finally {
       setBusy(false);
     }
@@ -102,43 +99,35 @@ export function AccountPanel({
     setBusy(true);
     setTransferMessage(null);
     try {
-      const response = await fetch(`${apiUrl}/api/transfer/redeem`, {
+      await request(apiUrl, "/api/transfer/redeem", {
         method: "POST",
-        credentials: "include",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ code: redeemInput }),
+        body: { code: redeemInput },
       });
-      if (!response.ok) {
-        const body = (await response.json().catch(() => undefined)) as
-          { error?: { code?: string } } | undefined;
-        setTransferMessage(
-          body?.error?.code === "invalid_or_expired_code"
-            ? "That code is invalid or has expired."
-            : body?.error?.code === "already_linked_account"
-              ? "Sign out of this account before redeeming a transfer code."
-              : "Couldn't redeem that code. Try again.",
-        );
-        return;
-      }
       setRedeemInput("");
       setTransferOpen(false);
       onChanged();
-    } catch {
-      setTransferMessage("Couldn't redeem that code. Try again.");
+    } catch (error) {
+      setTransferMessage(
+        error instanceof ApiError && error.code === "invalid_or_expired_code"
+          ? "invalidCode"
+          : error instanceof ApiError && error.code === "already_linked_account"
+            ? "alreadyLinked"
+            : "redeemFailed",
+      );
     } finally {
       setBusy(false);
     }
   }
 
   const member = identity.kind === "member";
-  const name = identity.displayName ?? (member ? "player" : "Guest operator");
-  const label = member ? `Signed in as ${name}` : "Playing as a guest";
+  const name = identity.displayName ?? (member ? t("player") : t("guest"));
+  const label = member ? t("signedIn", { name }) : t("playingGuest");
 
   return (
     <>
       {isAdmin && (
         <Link className="system-bar-link" to="/?admin">
-          Admin
+          {t("admin")}
         </Link>
       )}
       <div className="account-menu" ref={menu}>
@@ -149,83 +138,81 @@ export function AccountPanel({
           onClick={() => setOpen((current) => !current)}
         >
           <span aria-hidden="true">{sigilFor(name, member)}</span>
-          <span className="sr-only">{label} -- account menu</span>
+          <span className="sr-only">{t("menu", { label })}</span>
         </button>
         {open && (
           <div className="account-dropdown">
             <p className="account-dropdown-name">{label}</p>
             {authError && (
               <p className="account-error" role="alert">
-                {AUTH_ERROR_MESSAGES[authError] ?? "Sign-in failed. Try again."}
+                {t(
+                  i18n.exists(`account:${authError}`)
+                    ? authError
+                    : "oauth_token_exchange_failed",
+                )}
               </p>
             )}
+            {logoutError && <p role="alert">{t("logoutFailed")}</p>}
             {profileAvailable && (
               <Link
                 className="cabinet-button"
                 to="/profile"
                 onClick={() => setOpen(false)}
               >
-                Profile
+                {t("profile")}
               </Link>
             )}
             {member ? (
               <button
                 className="cabinet-button"
-                disabled={busy}
+                disabled={!online || busy}
                 onClick={() => {
                   setBusy(true);
-                  void signOut(apiUrl).finally(() => {
-                    setBusy(false);
-                    onChanged();
-                  });
+                  setLogoutError(false);
+                  void signOut(apiUrl)
+                    .then(onChanged)
+                    .catch(() => setLogoutError(true))
+                    .finally(() => setBusy(false));
                 }}
               >
-                Sign out
+                {t("signOut")}
               </button>
             ) : (
               <>
-                <p className="account-note">
-                  Progress lives only in this browser until you sign in.
-                </p>
+                <p className="account-note">{t("guestNote")}</p>
                 {identity.signInProvider && (
                   <a
                     className="cabinet-button primary"
                     href={signInUrl(apiUrl, identity.signInProvider)}
                   >
-                    Sign In
+                    {t("signIn")}
                   </a>
                 )}
                 <button
                   className="cabinet-button"
                   onClick={() => setTransferOpen((isOpen) => !isOpen)}
                 >
-                  Transfer progress
+                  {t("transfer")}
                 </button>
               </>
             )}
             {transferOpen && (
               <div className="account-transfer">
-                <p className="account-transfer-intro">
-                  Playing on a second device without signing in? A code moves
-                  this browser's progress there, or the reverse.
-                </p>
+                <p className="account-transfer-intro">{t("transferIntro")}</p>
 
                 <div className="account-transfer-section">
-                  <p className="account-transfer-label">
-                    Send this device's progress elsewhere
-                  </p>
+                  <p className="account-transfer-label">{t("sendProgress")}</p>
                   {issuedCode ? (
                     <p className="account-transfer-code">
-                      Enter <strong>{issuedCode}</strong> on the other device
-                      within 15 minutes.
+                      {t("enterCode", { code: issuedCode })}
                     </p>
                   ) : (
                     <button
                       className="cabinet-button"
-                      disabled={busy}
+                      disabled={!online || busy}
                       onClick={() => void createTransferCode()}
                     >
-                      Get a code
+                      {t("getCode")}
                     </button>
                   )}
                 </div>
@@ -235,7 +222,7 @@ export function AccountPanel({
                     className="account-transfer-label"
                     htmlFor="transfer-code-input"
                   >
-                    Bring another device's progress here
+                    {t("bringProgress")}
                   </label>
                   <div className="account-transfer-redeem">
                     <input
@@ -246,16 +233,16 @@ export function AccountPanel({
                     />
                     <button
                       className="cabinet-button"
-                      disabled={busy || !redeemInput.trim()}
+                      disabled={!online || busy || !redeemInput.trim()}
                       onClick={() => void redeemTransferCode()}
                     >
-                      Redeem
+                      {t("redeem")}
                     </button>
                   </div>
                 </div>
 
                 {transferMessage && (
-                  <p className="account-error">{transferMessage}</p>
+                  <p className="account-error">{t(transferMessage)}</p>
                 )}
               </div>
             )}

@@ -60,6 +60,7 @@ function previewReload(): Plugin {
 
 // https://vite.dev/config/
 export default defineConfig({
+  build: { manifest: true },
   plugins: [react(), previewReload(), pwaShell()],
   server: { fs: { allow: [projectRoot, resolve(projectRoot, "engine")] } },
   test: {

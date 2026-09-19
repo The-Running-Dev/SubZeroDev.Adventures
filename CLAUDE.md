@@ -458,7 +458,6 @@ and request temp directories. No npm runtime dependency is added either way.
 Known and retained: `preview/` still runs Caddy. It is a separate, pre-existing, dev-only
 stack with no deployment role, so it was left alone rather than churned inside this
 change.
-
 Reversibility: cheap — pin the frontend image independently; GitHub Pages compatibility
 remains until the live host has passed verification.
 

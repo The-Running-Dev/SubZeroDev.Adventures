@@ -25,6 +25,9 @@ beforeEach(() => {
   failStats = false;
   failCatalog = false;
   window.history.replaceState({}, "", "/");
+  // The library home is the returning visitor's landing; a first-ever load belongs to the
+  // getting-started wizard (`App.test.tsx`), which would otherwise take `/` from under these.
+  localStorage.setItem("subzerodev.play.onboarding-seen.v1", "1");
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: RequestInfo | URL) => {
@@ -74,8 +77,14 @@ beforeEach(() => {
           ],
         },
         "/api/badges": {
+          // The crown is an appointment, not an earned badge -- it must not inflate the
+          // readout against the fixed ceiling (`playEarnedBadgeCount`, play/badges.ts).
           badges: [
             { badgeId: "first-steps", unlockedAt: "2026-09-01T00:00:00Z" },
+            {
+              badgeId: "interim-head-of-absurdity",
+              unlockedAt: "2026-09-02T00:00:00Z",
+            },
           ],
           records: null,
         },
@@ -103,6 +112,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   vi.unstubAllGlobals();
+  localStorage.clear();
   window.history.replaceState({}, "", "/");
 });
 
@@ -161,6 +171,26 @@ describe("library home", () => {
     ).toHaveValue("First");
     expect(screen.getByRole("link", { name: "Играй: First" })).toBeVisible();
     expect(screen.getByText("Story First")).toBeVisible();
+  });
+  it("drops a signed-in-only filter when the session ends rather than showing an empty shelf", async () => {
+    member = true;
+    const user = userEvent.setup();
+    render(<App apiUrl="https://api.test" />);
+    await screen.findByRole("button", { name: /Signed in as Ada/i });
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: "Show" }),
+      "started",
+    );
+    expect(
+      screen.queryByRole("link", { name: "Play: Latest" }),
+    ).not.toBeInTheDocument();
+    member = false;
+    await user.click(screen.getByRole("button", { name: /Signed in as Ada/i }));
+    await user.click(screen.getByRole("button", { name: "Sign out" }));
+    expect(
+      await screen.findByRole("link", { name: "Play: Latest" }),
+    ).toBeVisible();
+    expect(screen.getByRole("combobox", { name: "Show" })).toHaveValue("all");
   });
   it("shows catalog and aggregate failures explicitly without substituting invented zeros", async () => {
     failStats = true;

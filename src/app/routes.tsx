@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { lazy } from "react";
+import { lazy, useState } from "react";
 import {
   Link,
   Navigate,
@@ -9,6 +9,7 @@ import {
   useParams,
 } from "react-router";
 import { AppShell } from "./AppShell";
+import { hasSeenOnboarding } from "../play/onboarding";
 import { useAccount } from "./providers/AccountProvider";
 
 const Library = lazy(() => import("../features/library/Library"));
@@ -43,6 +44,15 @@ function LibraryRoute() {
   const { search } = useLocation();
   const query = new URLSearchParams(search);
   const requested = query.get("campaign");
+  /**
+   * A first-ever visit still lands in the getting-started wizard rather than the library
+   * -- `PlayApp` owns that decision (`GETTING_STARTED_CAMPAIGN_ID`, composition.ts) and is
+   * the only thing that can auto-start it, so this route has to mount it to let the effect
+   * run at all. Read once at mount, not on every render: `PlayApp` calls
+   * `markOnboardingSeen()` as it starts, and re-reading storage would flip this route to
+   * the library mid-wizard and unmount the run it just began.
+   */
+  const [firstVisit] = useState(() => !hasSeenOnboarding());
   if (requested) {
     query.delete("campaign");
     const remainder = query.toString();
@@ -53,7 +63,7 @@ function LibraryRoute() {
       />
     );
   }
-  return query.has("admin") ? <PlayApp /> : <Library />;
+  return query.has("admin") || firstVisit ? <PlayApp /> : <Library />;
 }
 
 function ThreadRoute() {

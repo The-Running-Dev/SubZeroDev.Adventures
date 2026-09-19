@@ -1,9 +1,11 @@
 import { useTranslation } from "react-i18next";
-import { lazy } from "react";
+import { lazy, useState } from "react";
 import { Link, Route, Routes, useLocation, useParams } from "react-router";
 import { AppShell } from "./AppShell";
+import { hasSeenOnboarding } from "../play/onboarding";
 import { useAccount } from "./providers/AccountProvider";
 
+const Library = lazy(() => import("../features/library/Library"));
 const PlayApp = lazy(() => import("../play/PlayApp"));
 const Ranking = lazy(() =>
   import("../ranking/Ranking").then((m) => ({ default: m.Ranking })),
@@ -34,6 +36,18 @@ const OAuthConsent = lazy(() =>
 function PlayRoute() {
   const { search } = useLocation();
   const { sessionGeneration } = useAccount();
+  const params = new URLSearchParams(search);
+  /**
+   * A first-ever visit still lands in the getting-started wizard rather than the library
+   * -- `PlayApp` owns that decision (`GETTING_STARTED_CAMPAIGN_ID`, composition.ts) and is
+   * the only thing that can auto-start it, so this route has to mount it to let the effect
+   * run at all. Read once at mount, not on every render: `PlayApp` calls
+   * `markOnboardingSeen()` as it starts, and re-reading storage would flip this route to
+   * the library mid-wizard and unmount the run it just began.
+   */
+  const [firstVisit] = useState(() => !hasSeenOnboarding());
+  if (!params.has("campaign") && !params.has("admin") && !firstVisit)
+    return <Library />;
   // Until PR 7 moves gameplay to /play/:campaignId, query changes are real entries.
   return <PlayApp key={`${search}:${sessionGeneration}`} />;
 }

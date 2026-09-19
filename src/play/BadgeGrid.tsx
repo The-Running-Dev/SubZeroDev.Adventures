@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+import { useLocale } from "../app/locale/useLocale";
 import type { Badge } from "./identity";
 import { BADGE_DEFINITIONS, BADGE_ORDER } from "./badges";
 
@@ -7,10 +9,12 @@ import { BADGE_DEFINITIONS, BADGE_ORDER } from "./badges";
  *  instead of crashing. Shared between `PlayerHome` (own view) and `PublicProfile`
  *  (visitor view) -- identical rendering either way. */
 export function BadgeGrid({ badges }: { badges: readonly Badge[] }) {
+  const { t } = useTranslation("badges");
+  const { date } = useLocale();
   const unlockedByBadge = new Map(badges.map((b) => [b.badgeId, b]));
 
   return (
-    <ul className="badge-grid" aria-label="Badges">
+    <ul className="badge-grid" aria-label={t("title")}>
       {BADGE_ORDER.map((id) => {
         const def = BADGE_DEFINITIONS[id]!;
         const earned = unlockedByBadge.get(id);
@@ -19,10 +23,20 @@ export function BadgeGrid({ badges }: { badges: readonly Badge[] }) {
             <span className="badge-emblem" aria-hidden="true">
               {earned ? "◆" : "◇"}
             </span>
-            <strong>{def.label}</strong>
-            <span>{def.description}</span>
+            <strong>{t(`${id}.label`, { defaultValue: def.label })}</strong>
+            <span>
+              {t(`${id}.description`, { defaultValue: def.description })}
+            </span>
             <span className="badge-stamp">
-              {earned ? `UNLOCKED ${earned.unlockedAt.slice(0, 10)}` : "LOCKED"}
+              {earned
+                ? t("unlocked", {
+                    date: date(earned.unlockedAt, {
+                      year: "numeric",
+                      month: "2-digit",
+                      day: "2-digit",
+                    }),
+                  })
+                : t("locked")}
             </span>
           </li>
         );

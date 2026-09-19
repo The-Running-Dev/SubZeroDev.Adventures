@@ -84,8 +84,8 @@ describe("persistent application routing", () => {
       </StrictMode>,
     );
     await screen.findByRole(
-      "button",
-      { name: /The Bureaucracy/i },
+      "link",
+      { name: /Play: The Bureaucracy/i },
       { timeout: 5000 },
     );
     await screen.findByRole("button", { name: /Signed in as Operator/i });
@@ -148,6 +148,22 @@ describe("persistent application routing", () => {
     expect(window.location.search).toBe("?campaign=getting-started");
     expect(
       screen.queryByRole("navigation", { name: "Primary" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("keeps a first-ever visit on the getting-started wizard instead of the library", async () => {
+    // The library home is what a returning visitor sees; the wizard still owns the very first
+    // load, and `PlayApp` is the only thing that can auto-start it.
+    localStorage.removeItem("subzerodev.play.onboarding-seen.v1");
+    render(<App />);
+    await waitFor(() =>
+      expect(document.querySelector(".onboarding-active")).not.toBeNull(),
+    );
+    expect(localStorage.getItem("subzerodev.play.onboarding-seen.v1")).toBe(
+      "1",
+    );
+    expect(
+      screen.queryByRole("heading", { name: "Adventure library" }),
     ).not.toBeInTheDocument();
   });
 

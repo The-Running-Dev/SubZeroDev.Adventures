@@ -45,6 +45,7 @@ jobs:
         with:
           name: vitest-attachments
           path: .vitest-attachments/
+          include-hidden-files: true
           if-no-files-found: ignore
 
   frontend-container:

@@ -1,3 +1,4 @@
+import { offlineEn, offlineBg } from "./offline";
 import { playerExtrasEn, playerExtrasBg } from "./playerExtras";
 import { accountEn, accountBg } from "./account";
 import { adminEn, adminBg } from "./admin";
@@ -10,6 +11,7 @@ import { BADGE_DEFINITIONS } from "../../play/badges";
 import { badgesBg } from "./badges.bg";
 export const resources = {
   en: {
+    offline: offlineEn,
     playerExtras: playerExtrasEn,
     account: accountEn,
     admin: adminEn,
@@ -146,7 +148,7 @@ export const resources = {
     pwa: {
       offlineTitle: "Offline",
       offlineBody:
-        "The app shell is available. Reconnect to load your library, play online, save to the server or change your account. Actions are not queued.",
+        "Downloaded adventures can be played and saved on this device. Reconnect to synchronize, play online or change your account.",
       install: "Install Adventures",
       ios: "In Safari, open Share, then choose Add to Home Screen.",
       updateTitle: "A new build has arrived",
@@ -195,6 +197,7 @@ export const resources = {
     },
     titles: {
       library: "Library",
+      offline: "Offline adventures",
       play: "Play",
       ranking: "Standings",
       profile: "Profile",
@@ -208,6 +211,7 @@ export const resources = {
     },
   },
   bg: {
+    offline: offlineBg,
     playerExtras: playerExtrasBg,
     account: accountBg,
     admin: adminBg,
@@ -345,7 +349,7 @@ export const resources = {
     pwa: {
       offlineTitle: "Без интернет",
       offlineBody:
-        "Приложението е достъпно. Свържи се, за да заредиш библиотеката, да играеш онлайн, да запазиш на сървъра или да промениш профила си. Действията не се изпращат по-късно.",
+        "Изтеглените приключения могат да се играят и запазват на това устройство. Свържи се за синхронизация, онлайн игра или смяна на профила.",
       install: "Инсталирай Adventures",
       ios: "В Safari отвори „Сподели“, след което избери „Добави към началния екран“.",
       updateTitle: "Има нова версия",
@@ -394,6 +398,7 @@ export const resources = {
     },
     titles: {
       library: "Библиотека",
+      offline: "Приключения без интернет",
       play: "Играй",
       ranking: "Класация",
       profile: "Профил",

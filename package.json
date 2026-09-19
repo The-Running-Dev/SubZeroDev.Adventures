@@ -23,7 +23,8 @@
     "test:build": "npm run build && node scripts/verify-build.mjs",
     "typecheck": "tsc -b",
     "sync:campaigns": "node scripts/sync-campaigns.mjs",
-    "test:pwa": "node scripts/test-pwa.mjs"
+    "test:pwa": "node scripts/test-pwa.mjs",
+    "test:offline": "node scripts/test-offline.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.2",

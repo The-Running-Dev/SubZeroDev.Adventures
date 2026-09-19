@@ -30,5 +30,5 @@
   },
   "include": ["src", "../shared"],
   // Tests are typechecked by `npm run typecheck`, never shipped.
-  "exclude": ["src/**/*.test.ts"]
+  "exclude": ["src/**/*.test.ts", "../shared/**/*.test.ts"]
 }

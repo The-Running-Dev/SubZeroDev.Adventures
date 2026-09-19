@@ -30,6 +30,7 @@ export interface StatBounds {
 }
 
 export interface CatalogEntry {
+  readonly offline?: boolean;
   readonly campaignId: string;
   /** The engine kind this campaign runs on (`story-graph`, `simulation`, `world-graph` --
    *  see `KINDS` below). Every shipped campaign today is `story-graph`; read by the
@@ -136,6 +137,7 @@ export function endingCountOf(content: unknown): number {
 }
 
 export interface BuiltCatalog {
+  readonly portables: readonly PortableCampaign[];
   readonly registry: ContentRegistry;
   /** Every registered campaign, listed and hidden. Callers filter for their own listing surface. */
   readonly all: readonly CatalogEntry[];
@@ -233,6 +235,7 @@ export function hydrateCatalog(
   return {
     ok: true,
     value: {
+      portables: merged,
       registry: registry.value,
       all: Object.freeze(all),
       campaignStringKeys,

@@ -12,6 +12,17 @@ export function pwaShell(): Plugin {
     configResolved(config) {
       outDir = resolve(config.root, config.build.outDir);
     },
+    async generateBundle() {
+      const directory = new URL("../shared/offline/runtimes/", import.meta.url);
+      for (const file of await readdir(directory)) {
+        if (file.endsWith(".mjs"))
+          this.emitFile({
+            type: "asset",
+            fileName: `/assets/offline-${file.replace(".mjs", ".js")}`.slice(1),
+            source: await readFile(new URL(file, directory)),
+          });
+      }
+    },
     async closeBundle() {
       const assets = (await readdir(resolve(outDir, "assets"))).map(
         (name) => `/assets/${name}`,

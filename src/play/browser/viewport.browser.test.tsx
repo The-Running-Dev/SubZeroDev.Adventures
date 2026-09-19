@@ -1,4 +1,5 @@
-import { render, screen } from "@testing-library/react";
+import { render } from "../../test/render";
+import { screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { page } from "vitest/browser";
 import { assertNoHorizontalOverflow } from "../../test/browser/assertions";

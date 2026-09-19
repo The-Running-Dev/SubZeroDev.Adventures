@@ -5,7 +5,7 @@
  * `usePlatformStats` are per-player and only ever used in remote mode (`BrowserDemo.apiUrl`
  * set); there is nothing for any of these to fetch against the local, in-browser store.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export interface Identity {
   readonly playerId: string | null;
@@ -173,13 +173,36 @@ export function useIdentity(
 ): { identity: Identity; loading: boolean } {
   const [identity, setIdentity] = useState<Identity>(anonymousIdentity);
   const [loading, setLoading] = useState(apiUrl !== undefined);
+  const request = useRef<{
+    apiUrl: string;
+    token: number;
+    promise: Promise<Identity>;
+  } | null>(null);
 
   useEffect(() => {
-    if (!apiUrl) return;
+    if (!apiUrl) {
+      setIdentity(anonymousIdentity);
+      setLoading(false);
+      return;
+    }
     let cancelled = false;
     setLoading(true);
-    fetch(`${apiUrl}/api/me`, { credentials: "include" })
-      .then((response) => (response.ok ? response.json() : anonymousIdentity))
+    // Share StrictMode's effect replay without a cross-root/account global cache.
+    if (
+      request.current?.apiUrl !== apiUrl ||
+      request.current.token !== refreshToken
+    ) {
+      request.current = {
+        apiUrl,
+        token: refreshToken,
+        promise: fetch(`${apiUrl}/api/me`, { credentials: "include" })
+          .then((response) =>
+            response.ok ? response.json() : anonymousIdentity,
+          )
+          .catch(() => anonymousIdentity),
+      };
+    }
+    request.current.promise
       .then((body: Identity) => {
         if (!cancelled) setIdentity(body);
       })

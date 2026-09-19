@@ -13,7 +13,10 @@
 	@write not method GET HEAD
 	@api path /api /api/*
 	@build path /__build-id
-	@asset file {path}
+	# `/` is a directory: without the index candidate it misses @asset entirely and only
+	# reaches the shell through @navigation, which 404s every client that does not send
+	# `Accept: text/html` -- curl, uptime monitors, link-unfurl bots, `*/*` crawlers.
+	@asset file {path} {path}/index.html
 	@hashed path_regexp hashed ^/assets/[^/]+-[A-Za-z0-9_-]{8,}\.[^/]+$
 	@navigation {
 		header Accept *text/html*

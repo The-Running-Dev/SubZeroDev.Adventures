@@ -28,7 +28,12 @@ no Cloudflare Pages project, Wrangler dependency, new stack or new deploy secret
   Docker healthcheck and external deployment verification use this endpoint.
 
 The static server rewrites only HTML application navigations. Missing assets,
-SW files, manifests and API resources return errors. Existing hashed bundles
+SW files, manifests and API resources return errors. The site root is served as a
+file, so `/` answers every client -- uptime monitors, link-unfurl bots and `*/*`
+crawlers included -- without depending on navigation headers; a deeper route still
+requires an HTML navigation. A route segment containing a dot is read as a resource
+and returns 404, which is why `/u/<slug>` (base64url) and `/discussions/<id>`
+(`[A-Za-z0-9_-]`) are safe: a future `/play/<campaign-id>` must stay dot-free too. Existing hashed bundles
 cache immutably; HTML, service workers and manifests revalidate. The API is not
 proxied through this container. See [Caddy's SPA pattern](https://caddyserver.com/docs/caddyfile/patterns#single-page-apps-spas)
 and the stricter matchers in [frontend/Caddyfile](../frontend/Caddyfile).

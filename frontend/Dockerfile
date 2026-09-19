@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 # Repository-root context, matching the API image and engine submodule layout.
 ARG NODE_IMAGE=node:24-bookworm-slim
-ARG CADDY_IMAGE=caddy:2-alpine
+ARG NGINX_IMAGE=nginx:alpine
 
 FROM ${NODE_IMAGE} AS build
 WORKDIR /app
@@ -29,17 +29,18 @@ RUN npm run test:build \
     && rm -f dist/404.html \
     && printf '%s\n' "$ADVENTURES_BUILD_REVISION" > dist/__build-id
 
-FROM ${CADDY_IMAGE} AS runtime
+FROM ${NGINX_IMAGE} AS runtime
 ARG ADVENTURES_BUILD_REVISION=development
 LABEL org.opencontainers.image.revision=${ADVENTURES_BUILD_REVISION}
 LABEL org.opencontainers.image.source=https://github.com/The-Running-Dev/SubZeroDev.Adventures
-# The base binary requests cap_net_bind_service. With cap_drop=ALL, Linux refuses
-# to execute it. Port 8080 needs no capability, so remove the file capability.
-RUN setcap -r /usr/bin/caddy
-COPY frontend/Caddyfile /etc/caddy/Caddyfile
-COPY --from=build /app/dist /srv
-USER 1000:1000
+COPY frontend/default.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /app/dist /usr/share/nginx/html
+# Port 8080 needs no capability and nothing here templates a config at boot, so the image
+# runs as its own unprivileged user from PID 1 and skips the base entrypoint. Compose and
+# CI mount tmpfs over the two paths nginx writes, so the filesystem stays read-only.
+USER nginx
 EXPOSE 8080
 HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=3 \
     CMD wget -q -O /dev/null http://127.0.0.1:8080/__build-id || exit 1
-CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
+ENTRYPOINT []
+CMD ["nginx", "-g", "daemon off;"]

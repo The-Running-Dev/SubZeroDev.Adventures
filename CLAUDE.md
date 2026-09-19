@@ -28,7 +28,7 @@ src/
   test/                  jsdom + real-browser test setup and shared assertion helpers
 shared/                 code both compositions import — environment-neutral, no DOM, no Node
 server/                 the hosted Node API: its own npm project, its own Dockerfile
-frontend/               production static frontend Dockerfile, Caddy config and HTTP tests
+frontend/               production static frontend Dockerfile, nginx config and HTTP tests
 preview/                the preview static host — see "The Three Compose Files" below
 docker-compose.yml      the deployment stack — see "The Three Compose Files" below
 ```
@@ -426,16 +426,28 @@ Reversibility: cheap | expensive
 Context: the owner selected the existing VPS and Portainer deployment instead of the
 proposed Cloudflare Pages migration.
 
-Chosen: reuse the preview host's Caddy image family for a static frontend runtime;
-publish it through the API's existing GHCR workflow and redeploy the same root Compose
-stack with the existing webhook. Wait for both image builds and test the actual frontend
-container before publication. TLS remains at the existing proxy-net reverse proxy.
-The [hosting runbook](docs/frontend-hosting.md) owns cutover and rollback.
+Chosen: `nginx:alpine` serving the Vite output, the same release shape
+`SubZeroDev.com/Dockerfile` already uses across the estate — a base image, the built
+tree, and one `conf.d/default.conf`. Publish it through the API's existing GHCR workflow
+and redeploy the same root Compose stack with the existing webhook. Wait for both image
+builds and test the actual frontend container before publication. TLS remains at the
+existing proxy-net reverse proxy. The [hosting runbook](docs/frontend-hosting.md) owns
+cutover and rollback.
 
 Rejected: Cloudflare Pages (unnecessary second hosting system), a separate frontend
 webhook (can redeploy before the other image exists), and a blanket index.html fallback
-(hides missing resources). No npm runtime dependency is added. Caddy is already used by
-the preview stack; nginx would introduce another server configuration without a benefit.
+(hides missing resources). Also rejected: Caddy, which this change replaced. It was
+picked because `preview/` already runs it, but `preview/` is a dev-only static host that
+serves whatever was last uploaded — it is not the estate's deployment pattern, and
+SubZeroDev.com's published site is. Two static servers in one repository is two syntaxes
+to keep a hosting contract in, and the Caddy runtime needed `setcap -r /usr/bin/caddy`
+purely because its base binary requests a capability `cap_drop: ALL` then refuses to
+grant. nginx needs no such removal; it costs two tmpfs mounts instead, for the pid file
+and request temp directories. No npm runtime dependency is added either way.
+
+Known and retained: `preview/` still runs Caddy. It is a separate, pre-existing, dev-only
+stack with no deployment role, so it was left alone rather than churned inside this
+change.
 
 Reversibility: cheap — pin the frontend image independently; GitHub Pages compatibility
 remains until the live host has passed verification.

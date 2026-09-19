@@ -12,7 +12,10 @@ try {
     "-d",
     "--name",
     name,
+    // The same restrictions the deployment stack applies, so CI exercises what runs.
     "--read-only",
+    "--tmpfs=/var/run:rw,mode=1777",
+    "--tmpfs=/var/cache/nginx:rw,mode=1777",
     "--cap-drop=ALL",
     "--security-opt=no-new-privileges:true",
     "-p",

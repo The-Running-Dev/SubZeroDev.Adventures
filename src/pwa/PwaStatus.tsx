@@ -1,3 +1,4 @@
+import { Link } from "react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { usePwa } from "./usePwa";
@@ -14,6 +15,7 @@ export function PwaStatus({ playing }: { playing: boolean }) {
         <aside className="pwa-status" role="status">
           <strong>{t("offlineTitle")}</strong>
           <p>{t("offlineBody")}</p>
+          <Link to="/offline">{t("offline:title")}</Link>
         </aside>
       )}
       {pwa.canInstall && (

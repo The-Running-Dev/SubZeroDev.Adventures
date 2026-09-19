@@ -3,7 +3,7 @@ const PRECACHE = /* PRECACHE */ [];
 const CACHE = "adventures-shell-BUILD_VERSION";
 const STATIC = new Set(PRECACHE);
 const ROUTES =
-  /^\/(?:|ranking\/?|profile\/?|content\/?|start\/?|discussions(?:\/[^/.]+)?\/?|u\/[^/.]+\/?|play\/[^/.]+\/?|oauth\/consent\/?)$/;
+  /^\/(?:|offline(?:\/[^/.]+)?\/?|ranking\/?|profile\/?|content\/?|start\/?|discussions(?:\/[^/.]+)?\/?|u\/[^/.]+\/?|play\/[^/.]+\/?|oauth\/consent\/?)$/;
 
 self.addEventListener("install", (event) => {
   event.waitUntil(

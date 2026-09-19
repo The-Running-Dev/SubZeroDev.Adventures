@@ -1,3 +1,4 @@
+import { registerOfflineRoutes } from "./routes/offline.js";
 import Fastify, { type FastifyInstance } from "fastify";
 import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
@@ -153,6 +154,7 @@ export async function buildApp(
   const identityProviders = await loadIdentityProviders();
   registerSessionRoutes(app, pool, cell, identityProviders);
   registerReplayRoutes(app, pool, cell);
+  registerOfflineRoutes(app, pool, cell);
   registerIdentityRoutes(app, pool, identityProviders, { siteUrl, apiUrl });
   registerProgressRoutes(app, pool, cell);
   registerTransferRoutes(app, pool);

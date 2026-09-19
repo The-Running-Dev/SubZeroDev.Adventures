@@ -1,0 +1,41 @@
+.offline-page {
+  min-width: 0;
+}
+.offline-policy {
+  color: var(--muted);
+  max-width: 70ch;
+}
+.offline-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+  gap: 1rem;
+}
+.offline-grid article,
+.offline-player {
+  min-width: 0;
+  border: 1px solid var(--rule-soft);
+  padding: 1rem;
+  background: var(--surface);
+}
+.offline-controls,
+.offline-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+.offline-page .app-button {
+  min-height: var(--control-height);
+  white-space: normal;
+}
+.offline-page li {
+  padding-block: 0.5rem;
+  overflow-wrap: anywhere;
+}
+.offline-page li a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--control-height);
+}
+.offline-player .scene-body {
+  white-space: pre-wrap;
+}

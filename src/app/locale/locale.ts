@@ -41,6 +41,7 @@ export function createLocaleInstance() {
       "account",
       "playerExtras",
       "validation",
+      "offline",
     ],
     defaultNS: "common",
     initAsync: false,

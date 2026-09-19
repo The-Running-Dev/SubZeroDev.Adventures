@@ -414,6 +414,20 @@ Reversibility: cheap | expensive
 
 ### Why it is installed this way
 
+#### 2026-09-19 — Offline histories retain runtime bytes and synchronize into a personal archive
+
+Context: the frontend handoff requires real offline gameplay, durable recovery and
+server replay without changing deterministic identity or trusting competitive results.
+Chosen: reuse portable format 2, resolved content digests and serialized engine action
+logs; retain a self-contained engine snapshot in git and IndexedDB; enforce ownership,
+server-issued lineage UUIDs and transactional idempotent receipts. The
+[offline protocol](docs/offline-play.md) owns the support matrix, compatibility and
+eligibility rules. No new package dependency; the existing build tool freezes the module.
+Rejected: service-worker API caching, automatic remote-to-local fallback after a timeout,
+current-engine replay of historical runs, and counting offline results in competitive
+online aggregates. None can establish the required history or timing guarantees.
+Reversibility: expensive for stored histories; retain each published runtime and protocol.
+
 #### 2026-09-19 — PWA caches build assets and waits for explicit updates
 
 Context: remote sessions and the campaign catalog are principal-dependent; installing

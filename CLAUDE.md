@@ -28,6 +28,7 @@ src/
   test/                  jsdom + real-browser test setup and shared assertion helpers
 shared/                 code both compositions import — environment-neutral, no DOM, no Node
 server/                 the hosted Node API: its own npm project, its own Dockerfile
+frontend/               production static frontend Dockerfile, nginx config and HTTP tests
 preview/                the preview static host — see "The Three Compose Files" below
 docker-compose.yml      the deployment stack — see "The Three Compose Files" below
 ```
@@ -99,7 +100,8 @@ There are three, they are independent, and none is an override layer over anothe
 mirrors how `SubZeroDev.com` and `SubZeroDev.Blog/tools/blog-mcp` are laid out.
 
 - **`docker-compose.yml` (root) is the deployment stack.** It pulls
-  `ghcr.io/the-running-dev/adventures-api` and builds nothing. Requires a `.env` beside it
+  `ghcr.io/the-running-dev/adventures-api` and `adventures-web` and builds nothing.
+  Manual Compose usage requires a `.env` beside it
   (copy `.env.example`) and a pre-existing external `proxy-net` network — TLS and public
   routing belong to whatever reverse proxy already lives on that network, not to this repo.
 - **`server/docker-compose.yml` is the dev stack.** `build: context: ..` — the context is
@@ -418,6 +420,37 @@ Reversibility: cheap | expensive
   local reason is a rule nobody can evaluate.
 
 ### Why it is installed this way
+
+#### 2026-09-19 — Frontend container uses the existing API GitOps deployment
+
+Context: the owner selected the existing VPS and Portainer deployment instead of the
+proposed Cloudflare Pages migration.
+
+Chosen: `nginx:alpine` serving the Vite output, the same release shape
+`SubZeroDev.com/Dockerfile` already uses across the estate — a base image, the built
+tree, and one `conf.d/default.conf`. Publish it through the API's existing GHCR workflow
+and redeploy the same root Compose stack with the existing webhook. Wait for both image
+builds and test the actual frontend container before publication. TLS remains at the
+existing proxy-net reverse proxy. The [hosting runbook](docs/frontend-hosting.md) owns
+cutover and rollback.
+
+Rejected: Cloudflare Pages (unnecessary second hosting system), a separate frontend
+webhook (can redeploy before the other image exists), and a blanket index.html fallback
+(hides missing resources). Also rejected: Caddy, which this change replaced. It was
+picked because `preview/` already runs it, but `preview/` is a dev-only static host that
+serves whatever was last uploaded — it is not the estate's deployment pattern, and
+SubZeroDev.com's published site is. Two static servers in one repository is two syntaxes
+to keep a hosting contract in, and the Caddy runtime needed `setcap -r /usr/bin/caddy`
+purely because its base binary requests a capability `cap_drop: ALL` then refuses to
+grant. nginx needs no such removal; it costs two tmpfs mounts instead, for the pid file
+and request temp directories. No npm runtime dependency is added either way.
+
+Known and retained: `preview/` still runs Caddy. It is a separate, pre-existing, dev-only
+stack with no deployment role, so it was left alone rather than churned inside this
+change.
+
+Reversibility: cheap — pin the frontend image independently; GitHub Pages compatibility
+remains until the live host has passed verification.
 
 #### 2026-09-19 — `sync:campaigns` reads the published feed, not the engine
 

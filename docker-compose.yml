@@ -1,5 +1,5 @@
 # The deployment artifact. Pulls the image `deploy-api.yml` already built and pushed to
-# GHCR -- it never builds. `server/docker-compose.yml` is the local-development
+# GHCR -- it never builds. The same workflow publishes the frontend image. `server/docker-compose.yml` is the local-development
 # counterpart; it has `build:` and a deliberately different image name so that
 # `up --build` there can never tag something as the deployable image.
 #
@@ -10,6 +10,7 @@
 # the previous compose.prod.yml needed `build: !reset null` to un-declare things it had
 # inherited, which meant neither file described a whole stack.
 #
+# The frontend joins proxy-net as adventures-web:8080.
 # TLS and public routing are not this file's to declare. `api` joins the pre-existing
 # `proxy-net` and nothing more; whatever terminates TLS on that network forwards to
 # `adventures-api:8787` by container name. That boundary moved out of this repo when the
@@ -99,6 +100,34 @@ x-adventures-api-common: &adventures-api-common
     DISCUSSIONS_CATEGORY: "${DISCUSSIONS_CATEGORY:-}"
 
 services:
+  frontend:
+    image: "${ADVENTURES_FRONTEND_IMAGE:-ghcr.io/the-running-dev/adventures-web:latest}"
+    container_name: adventures-web
+    pull_policy: always
+    restart: unless-stopped
+    # Static assets only. TLS terminates at the existing reverse proxy.
+    # No host ports, database network, API credentials or writable content mounts.
+    read_only: true
+    # The only two paths nginx writes: its pid file and the request temp directories it
+    # creates at startup. Everything served is baked into the image, so these are the
+    # whole cost of `read_only` -- and they are wiped with the container. The mode is
+    # load-bearing: a tmpfs mounts root-owned, and the image runs as `nginx`.
+    volumes:
+      - type: tmpfs
+        target: /var/run
+        tmpfs:
+          mode: 01777
+      - type: tmpfs
+        target: /var/cache/nginx
+        tmpfs:
+          mode: 01777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    networks:
+      - proxy-net
+
   db:
     image: postgres:17
     container_name: adventures-db

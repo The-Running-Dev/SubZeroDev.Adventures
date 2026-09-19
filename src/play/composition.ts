@@ -19,6 +19,9 @@ import {
   type PortableManifestWithExtensions,
 } from "../../shared/campaign-extension";
 import { createRemoteSessionStore, fetchSaveIndex } from "./remote-store";
+import { browserStorageAvailable } from "./onboarding";
+// The router reads these before any play code loads, so they live in an engine-free module.
+export { hasSeenOnboarding, markOnboardingSeen } from "./onboarding";
 
 export type { StatBounds };
 /** Alias retained so nothing downstream of the browser composition needs to change name. */
@@ -90,17 +93,6 @@ function localPersistence(): SessionPersistence {
   };
 }
 
-function browserStorageAvailable(): boolean {
-  try {
-    const probe = "subzerodev.play.storage-probe";
-    localStorage.setItem(probe, "1");
-    localStorage.removeItem(probe);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 /** The saveId of the most recent local save for a campaign, if any -- the resume affordance
  *  the `SaveRecordStore` contract has no query for, since it is keyed by saveId alone. Guarded
  *  the same way `browserStorageAvailable` is: storage can be absent or throw (private
@@ -117,33 +109,11 @@ export function findLocalSave(campaignId: string): string | undefined {
 /**
  * A hidden campaign (`catalog.hidden`, `shared/campaign-registry.ts`) that doubles as the
  * landing experience: `PlayApp.tsx` auto-starts it in place of the disk shelf on a visitor's
- * first-ever load, the same way a `?campaign=` link auto-starts any other hidden campaign.
+ * first-ever load, the same way a `?campaign=` link auto-starts any other hidden campaign --
+ * which is why `app/routes.tsx` keeps that one load on `PlayApp` rather than the library.
  * Its own "Skip" control (and simply playing it through) both mark it seen.
  */
 export const GETTING_STARTED_CAMPAIGN_ID = "getting-started";
-
-const ONBOARDING_SEEN_KEY = "subzerodev.play.onboarding-seen.v1";
-
-/** Whether the landing wizard has already run (or been skipped) in this browser. Storage
- *  being unavailable is treated as "seen" -- there is nowhere to remember "skipped" in that
- *  environment, and re-showing it on every load would be worse than never showing it. */
-export function hasSeenOnboarding(): boolean {
-  if (!browserStorageAvailable()) return true;
-  try {
-    return localStorage.getItem(ONBOARDING_SEEN_KEY) === "1";
-  } catch {
-    return true;
-  }
-}
-
-export function markOnboardingSeen(): void {
-  if (!browserStorageAvailable()) return;
-  try {
-    localStorage.setItem(ONBOARDING_SEEN_KEY, "1");
-  } catch {
-    // Nothing to fall back to -- the wizard may simply run again next load.
-  }
-}
 
 // SPIKE: campaigns are runtime-loaded JSON under /campaigns/, not compiled into the
 // engine package. See plans/spike-notes.md. `base` matches Vite's `BASE_URL` so this

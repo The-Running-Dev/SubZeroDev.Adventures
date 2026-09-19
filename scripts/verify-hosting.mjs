@@ -4,10 +4,12 @@ import { setTimeout } from "node:timers/promises";
 const origin = new URL(process.argv[2] ?? process.env.HOSTING_URL);
 if (origin.protocol !== "https:" || origin.pathname !== "/")
   throw new Error("Supply the HTTPS deployment origin, not a route");
-// Portainer acknowledges its webhook before the new container is serving.
+// Portainer acknowledges its webhook before the new container is serving, and the
+// redeploy pulls two fresh images first. Five minutes, not one -- a slow pull must not
+// fail a deployment that then succeeds twenty seconds later.
 if (process.env.EXPECTED_BUILD_REVISION) {
   let ready = false;
-  for (let attempt = 0; attempt < 30; attempt++) {
+  for (let attempt = 0; attempt < 150; attempt++) {
     try {
       const response = await fetch(new URL("/__build-id", origin), {
         cache: "no-store",

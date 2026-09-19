@@ -144,3 +144,21 @@ test("health/revision endpoint identifies the exact build without caching", asyn
   if (process.env.EXPECTED_BUILD_REVISION)
     assert.equal(response.body.trim(), process.env.EXPECTED_BUILD_REVISION);
 });
+
+// Non-browser clients -- curl, uptime monitors, link-unfurl bots, `*/*` crawlers -- send
+// no navigation headers at all. The root must not depend on @navigation to be reachable.
+for (const headers of [
+  { accept: "*/*" },
+  { accept: "*/*", "user-agent": "facebookexternalhit/1.1" },
+  {},
+]) {
+  test(`the site root answers without navigation headers: ${JSON.stringify(headers)}`, async () => {
+    const response = await get("/", headers);
+    assert.equal(response.status, 200);
+    assert.match(response.headers["content-type"], /text\/html/);
+    assert.match(response.body, /id="root"/);
+  });
+}
+test("a deep route still requires an HTML navigation", async () => {
+  assert.equal((await get("/profile", { accept: "*/*" })).status, 404);
+});

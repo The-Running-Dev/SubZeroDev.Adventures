@@ -1,8 +1,11 @@
+/* Ids only: the display names live in the `shell.themes.*` catalog entries, which
+   `ThemeSelector` reads, so a second copy here would be one nothing renders -- and one
+   that stays English in Bulgarian. */
 export const THEMES = [
-  { id: "dos", label: "DOS Blue" },
-  { id: "matrix", label: "Matrix" },
-  { id: "amber", label: "Amber CRT" },
-  { id: "bbs", label: "Terminal" },
+  { id: "dos" },
+  { id: "matrix" },
+  { id: "amber" },
+  { id: "bbs" },
 ] as const;
 
 export type ThemeId = (typeof THEMES)[number]["id"];

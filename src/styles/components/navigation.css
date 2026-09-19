@@ -24,10 +24,10 @@
   gap: 0.6rem;
 }
 
-/* "Disk library", the loaded story's title while playing, "Standings", "My content",
-   "Getting started", and "Discussions" -- pushed to the far left of the bar, opposite the
-   account menu and display-mode select. Wraps: a long story title is the one item here
-   without a fixed short label. */
+/* "Disk library", "Standings" and "Community", plus a "More" disclosure holding "Me",
+   "My content" and "Getting started" -- pushed to the far left of the bar, opposite the
+   preferences cluster. Every item here has a fixed short label; the loaded story's title,
+   the one thing with no length bound, is a sibling of this nav rather than inside it. */
 .system-bar-nav {
   align-items: center;
   display: flex;
@@ -66,8 +66,12 @@
   outline-offset: 2px;
 }
 
-/* The current page/view -- filled, like the account sigil while its menu is open. */
-.system-bar-link[aria-current="page"] {
+/* The current page/view -- filled, like the account sigil while its menu is open. Matches
+   any `aria-current`, not just `"page"`: the "More" summary carries `aria-current="true"`
+   when the open page is one of its own, because a closed `<details>` is
+   `content-visibility: hidden` and the real `aria-current="page"` link inside it reaches
+   neither the screen nor the accessibility tree. */
+.system-bar-link[aria-current] {
   background: var(--cyan);
   color: var(--screen);
 }

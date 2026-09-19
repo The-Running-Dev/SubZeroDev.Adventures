@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { LanguageSelector } from "./components/LanguageSelector";
 import "./styles/app.css";
 import { Link, useLocation } from "react-router";
@@ -23,8 +23,10 @@ interface HeaderProps {
     | "start"
     | "discussions";
   /** The loaded story's title -- required, and only ever shown, while `current` is
-   *  `"playing"`. A third nav item next to "Standings", marking that specific story
-   *  current instead of "Disk library" while it's the thing actually on screen. */
+   *  `"playing"`. A sibling of the nav rather than an item inside it: the primary
+   *  destinations are a fixed set of short labels, and a story title is the one thing
+   *  here with no length bound. Hidden outright below 768px (`play.css`), where the
+   *  cabinet marquee's own `<h1>` names the loaded story a row further down. */
   playingTitle?: string;
   /**
    * Supplied by the player through AppShell: lets "Disk library" return to
@@ -44,8 +46,12 @@ interface HeaderProps {
  * The global header, shared across every page this site has: the single-page app
  * (PlayApp.tsx), the standings page (src/ranking/Ranking.tsx), a player's own profile
  * (src/profile/OwnProfile.tsx), and the operator channel (src/discussions/Discussions.tsx).
- * "Disk library", "Standings", "My content", "Getting started", and "Discussions" are peer
- * nav items; the account menu (when present) and the display-mode select sit alongside them.
+ * "Disk library", "Standings" and "Community" are the primary destinations; "Me", "My
+ * content" and "Getting started" sit behind a "More" disclosure, which marks itself
+ * `aria-current` when the page is one of its own (the real `aria-current="page"` link is
+ * unreachable while the panel is closed -- see the `<summary>` below). The account menu
+ * (when present), the display-mode select and the language select sit in
+ * `.app-preferences`, on their own row.
  */
 export function Header({
   current,
@@ -59,9 +65,27 @@ export function Header({
   const { t } = useTranslation("shell");
   const { pathname } = useLocation();
   const more = useRef<HTMLDetailsElement>(null);
-  useEffect(() => {
+  /* `<details>` owns its own `open`, so this mirrors it rather than driving it -- the
+     `toggle` event fires for a real click and for the imperative closes below alike. */
+  const [moreOpen, setMoreOpen] = useState(false);
+  const closeMore = useCallback(() => {
     if (more.current) more.current.open = false;
-  }, [pathname]);
+    setMoreOpen(false);
+  }, []);
+  useEffect(() => {
+    closeMore();
+  }, [pathname, closeMore]);
+  /* Dismiss on an outside click, the same way the account menu beside it does
+     (`AccountPanel.tsx`) -- two adjacent disclosures that closed differently would read
+     as one of them being broken. */
+  useEffect(() => {
+    if (!moreOpen) return;
+    function onPointerDown(event: MouseEvent) {
+      if (!more.current?.contains(event.target as Node)) closeMore();
+    }
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
+  }, [moreOpen, closeMore]);
   if (hidden)
     return (
       <div className="onboarding-language">
@@ -69,6 +93,8 @@ export function Header({
       </div>
     );
   const playing = current === "playing";
+  const moreCurrent =
+    current === "profile" || current === "content" || current === "start";
   return (
     <header
       className={`system-bar app-header${playing ? " app-header--playing" : ""}`}
@@ -111,14 +137,25 @@ export function Header({
         <details
           className="nav-more"
           ref={more}
+          onToggle={(event) => setMoreOpen(event.currentTarget.open)}
           onKeyDown={(event) => {
             if (event.key === "Escape" && more.current) {
-              more.current.open = false;
-              more.current.querySelector("summary")?.focus();
+              const summary = more.current.querySelector("summary");
+              closeMore();
+              summary?.focus();
             }
           }}
         >
-          <summary className="system-bar-link">{t("more")}</summary>
+          {/* A closed `<details>` is `content-visibility: hidden`, so the
+              `aria-current="page"` link inside the panel is painted by nothing and
+              reaches no accessibility tree. Without this the three destinations behind
+              "More" are the only pages on the site with no navigation state at all. */}
+          <summary
+            className="system-bar-link"
+            aria-current={moreCurrent ? "true" : undefined}
+          >
+            {t("more")}
+          </summary>
           <div className="nav-more-panel">
             <Link
               className="system-bar-link"

@@ -10,6 +10,8 @@ export const offlineEn = {
   download: "Download",
   downloading: "Downloading · {{progress}}%",
   ready: "Ready on this device",
+  needsSetup:
+    "Offline launch is not ready. Wait for app installation to finish, then reload. Your existing local saves are retained.",
   remove: "Remove download",
   start: "Start offline run",
   resume: "Resume offline run",
@@ -98,6 +100,8 @@ export const offlineBg = {
   download: "Изтегли",
   downloading: "Изтегляне · {{progress}}%",
   ready: "Готово на това устройство",
+  needsSetup:
+    "Стартирането без интернет още не е готово. Изчакай инсталирането на приложението и презареди. Съществуващите локални записи са запазени.",
   remove: "Премахни изтегленото",
   start: "Започни игра без интернет",
   resume: "Продължи играта без интернет",

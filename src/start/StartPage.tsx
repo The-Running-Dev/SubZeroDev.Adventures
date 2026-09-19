@@ -20,7 +20,7 @@ import { Link } from "react-router";
  * visitor's first-ever load (`src/play/composition.ts`). They answer different questions --
  * that one is played, this one is read -- and the campaign is unchanged by this file.
  */
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { blockBar, useBranch } from "./branch";
 import {
   AUTHOR_PATH_ID,
@@ -29,7 +29,10 @@ import {
   PATHS,
   type StartPath,
 } from "./content";
-import { Wizard } from "./Wizard";
+import { ResourceState } from "../components/ResourceState";
+const Wizard = lazy(() =>
+  import("./Wizard").then((m) => ({ default: m.Wizard })),
+);
 
 /** One menu row's contents, shared by the button and link forms above.
  *
@@ -79,7 +82,9 @@ export function StartPage({ apiUrl }: { readonly apiUrl?: string }) {
     <>
       <section className="gs-page" aria-labelledby="start-title">
         {authoring ? (
-          <Wizard apiUrl={apiUrl} onExit={() => setAuthoring(false)} />
+          <Suspense fallback={<ResourceState state="loading" />}>
+            <Wizard apiUrl={apiUrl} onExit={() => setAuthoring(false)} />
+          </Suspense>
         ) : (
           <div className="gs-dialog">
             <div className="gs-dialog-title">{t("setup")}</div>

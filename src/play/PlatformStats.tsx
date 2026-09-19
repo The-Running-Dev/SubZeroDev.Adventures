@@ -1,7 +1,7 @@
+import { useLocale } from "../app/locale/useLocale";
+import { useTranslation } from "react-i18next";
 import type { CSSProperties } from "react";
 import type { PlatformStats as PlatformStatsData } from "./identity";
-
-const numberFormat = new Intl.NumberFormat();
 
 function fill(part: number, whole: number): number {
   return whole > 0 ? Math.round((part / whole) * 100) : 0;
@@ -25,49 +25,51 @@ export function PlatformStats({
   stats: PlatformStatsData;
   catalogSize: number;
 }) {
+  const { t } = useTranslation("playerExtras");
+  const { number } = useLocale();
   const finishedPct = fill(stats.sessionsFinished, stats.sessions);
   const touchedPct = fill(stats.campaignsPlayed, catalogSize);
 
   return (
-    <section className="platform-stats" aria-label="System activity">
-      <p className="eyebrow">SYSTEM ACTIVITY // ALL NODES</p>
+    <section className="platform-stats" aria-label={t("activity")}>
+      <p className="eyebrow">{t("activityEyebrow")}</p>
       <dl>
         <div>
-          <dt>Players on record</dt>
-          <dd>{numberFormat.format(stats.players)}</dd>
+          <dt>{t("players")}</dt>
+          <dd>{number(stats.players)}</dd>
         </div>
         <div>
-          <dt>Runs started</dt>
-          <dd>{numberFormat.format(stats.sessions)}</dd>
+          <dt>{t("runs")}</dt>
+          <dd>{number(stats.sessions)}</dd>
         </div>
         <div
           className="stat-metered"
           style={{ "--stat-fill": `${finishedPct}%` } as CSSProperties}
         >
-          <dt>Runs completed</dt>
-          <dd>{numberFormat.format(stats.sessionsFinished)}</dd>
+          <dt>{t("completed")}</dt>
+          <dd>{number(stats.sessionsFinished)}</dd>
         </div>
         <div
           className="stat-metered"
           style={{ "--stat-fill": `${touchedPct}%` } as CSSProperties}
         >
-          <dt>Stories touched</dt>
+          <dt>{t("touched")}</dt>
           <dd>
-            {numberFormat.format(stats.campaignsPlayed)}
+            {number(stats.campaignsPlayed)}
             <span className="stat-ceiling"> / {catalogSize}</span>
           </dd>
         </div>
         <div>
-          <dt>Moves logged</dt>
-          <dd>{numberFormat.format(stats.stepsTaken)}</dd>
+          <dt>{t("moves")}</dt>
+          <dd>{number(stats.stepsTaken)}</dd>
         </div>
         <div>
-          <dt>Achievements</dt>
-          <dd>{numberFormat.format(stats.achievementsUnlocked)}</dd>
+          <dt>{t("achievements")}</dt>
+          <dd>{number(stats.achievementsUnlocked)}</dd>
         </div>
         <div>
-          <dt>Badges</dt>
-          <dd>{numberFormat.format(stats.badgesUnlocked)}</dd>
+          <dt>{t("badges")}</dt>
+          <dd>{number(stats.badgesUnlocked)}</dd>
         </div>
       </dl>
     </section>

@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 /**
  * The wizard's playtest step: the author's draft, running in the real engine.
  *
@@ -21,53 +22,49 @@ interface PlaytestProps {
 }
 
 export function Playtest({ session, playable }: PlaytestProps) {
+  const { t } = useTranslation("creator");
   const { state, busy, error, stale, start, choose } = session;
   const ended = state?.scene.status === "ended";
 
   return (
     <div className="gs-playtest">
       <div className="gs-playtest-bar">
-        <span className="gs-eyebrow">PLAYTEST — REAL ENGINE, NOT SAVED</span>
+        <span className="gs-eyebrow">{t("playtestTitle")}</span>
         <button
           type="button"
           className="gs-btn gs-btn-primary"
           onClick={() => void start()}
           disabled={!playable || busy}
         >
-          {state ? "RESTART ▸" : "RUN ▸"}
+          {state ? t("restart") : t("run")}
         </button>
       </div>
 
       {!playable && (
         <p className="gs-note" role="status">
-          Fix the findings below first — a campaign has to validate before the
-          engine will load it. That is the same gate it meets when you submit,
-          so nothing here is stricter than the real thing.
+          {t("fixFirst")}
         </p>
       )}
       {stale && (
         <p className="gs-note" role="status">
-          You edited the draft, so that run was against content that no longer
-          exists. Start a new one.
+          {t("stale")}
         </p>
       )}
       {error && (
         <p className="gs-error" role="alert">
-          {error}
+          {t("playtestError")}
         </p>
       )}
 
       {state && (
         <div className="gs-playtest-stage">
-          <p className="gs-eyebrow">{ended ? "ENDING REACHED" : "SCENE"}</p>
+          <p className="gs-eyebrow">{ended ? t("ended") : t("scene")}</p>
           <p className="gs-scene-text">{state.scene.body.text}</p>
 
           {ended ? (
-            <p className="gs-note">
-              This run reached an ending. Restart to try a different route.
-            </p>
+            <p className="gs-note">{t("endedBody")}</p>
           ) : (
-            <ul className="gs-playtest-actions" aria-label="Available choices">
+            <ul className="gs-playtest-actions" aria-label={t("choices")}>
               {state.actions.map((action, index) => (
                 <li key={action.id}>
                   <button
@@ -85,10 +82,7 @@ export function Playtest({ session, playable }: PlaytestProps) {
                 </li>
               ))}
               {state.actions.length === 0 && (
-                <li className="gs-dim">
-                  This scene offers no choices and is not an ending — the run
-                  cannot continue.
-                </li>
+                <li className="gs-dim">{t("stuck")}</li>
               )}
             </ul>
           )}

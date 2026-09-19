@@ -78,7 +78,7 @@ describe("StartPage", () => {
     const user = userEvent.setup();
     render(<StartPage />);
     await user.click(screen.getByRole("button", { name: /Write a campaign/i }));
-    expect(screen.getByText(/CAMPAIGN AUTHORING/)).toBeInTheDocument();
+    expect(await screen.findByText(/CAMPAIGN AUTHORING/)).toBeInTheDocument();
     // The authoring door is not gated on having finished a run -- the mockup locked it, this
     // page deliberately does not (see StartPage.tsx's header).
     expect(screen.queryByText(/finish a run first/i)).not.toBeInTheDocument();

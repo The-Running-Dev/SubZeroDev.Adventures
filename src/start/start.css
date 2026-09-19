@@ -33,6 +33,8 @@
 }
 
 .gs-dialog-title {
+  margin: 0;
+  font-weight: normal;
   background: var(--cyan);
   color: var(--on-cyan);
   font-size: 0.8125rem;
@@ -362,6 +364,7 @@
    of the column-direction `.gs-form`, where `flex: 1` would make it grow *vertically* and
    spread six inputs down the whole dialog. */
 .gs-field {
+  min-width: 0;
   display: flex;
   flex: none;
   flex-direction: column;
@@ -411,6 +414,7 @@
 }
 
 .gs-group {
+  min-width: 0;
   border: 1px solid var(--rule-soft);
   display: flex;
   flex-direction: column;
@@ -470,6 +474,7 @@
 /* -------------------------------------------------------- validation console */
 
 .gs-console {
+  overflow-wrap: anywhere;
   background: var(--surface-sunken);
   border-top: 1px solid var(--rule-soft);
   display: flex;
@@ -530,6 +535,25 @@
 }
 
 /* ------------------------------------------------------------------ narrow */
+
+.gs-btn,
+.gs-legend-btn,
+.gs-check-field,
+.gs-json summary,
+.gs-field input,
+.gs-field select,
+.gs-field textarea {
+  min-height: var(--control-height);
+}
+
+.gs-btn,
+.gs-legend-btn {
+  min-width: var(--control-height);
+}
+
+.gs-json {
+  min-width: 0;
+}
 
 @media (max-width: 40rem) {
   .gs-dialog-body {

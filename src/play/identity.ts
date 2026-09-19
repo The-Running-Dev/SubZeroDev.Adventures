@@ -1,3 +1,4 @@
+import { request } from "../api/client";
 /**
  * The account chip's data: `/api/me`, sign-in/out, `/api/progress`, `/api/badges`, and the
  * public `/api/stats` -- everything PlayApp.tsx needs to show "guest vs signed in",
@@ -286,10 +287,7 @@ export function signInUrl(apiUrl: string, provider: string): string {
 }
 
 export async function signOut(apiUrl: string): Promise<void> {
-  await fetch(`${apiUrl}/api/auth/logout`, {
-    method: "POST",
-    credentials: "include",
-  });
+  await request(apiUrl, "/api/auth/logout", { method: "POST" });
 }
 
 /** Reads and strips `?auth_error=` left by a failed OAuth round trip

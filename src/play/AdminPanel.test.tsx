@@ -210,7 +210,9 @@ describe("AdminPanel authorization", () => {
     await user.click(pasteAddButton(textarea));
 
     expect(
-      await screen.findByText("400 (unrecognized_payload_shape)"),
+      await within(textarea.closest(".admin-form")!).findByText(
+        "This file is not a supported campaign or extension.",
+      ),
     ).toBeVisible();
     expect(screen.queryByText(/no longer authorized/i)).not.toBeInTheDocument();
     expect(textarea).toBeEnabled();

@@ -26,7 +26,8 @@
     "@supabase/supabase-js": "^2.112.2",
     "@the-running-dev/game-engine": "file:./engine/src/engine",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "react-router": "^8.4.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

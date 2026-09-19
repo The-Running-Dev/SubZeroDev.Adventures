@@ -1,3 +1,4 @@
+import { Link } from "react-router";
 import { useEffect, useRef, useState } from "react";
 import type { BrowserDemo } from "./composition";
 import { formatTimestamp } from "../format";
@@ -564,7 +565,7 @@ export function AdminPanel({
           {adminStatus && !adminStatus.isAdmin && (
             <p className="admin-notice admin-notice-warn" role="status">
               Source management needs an authorized session.{" "}
-              <a href="/">Sign in on the main page</a>, then reload{" "}
+              <Link to="/">Sign in on the main page</Link>, then reload{" "}
               <code>?admin</code>.
             </p>
           )}

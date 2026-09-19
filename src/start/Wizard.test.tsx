@@ -1,3 +1,4 @@
+import { render } from "../test/render";
 /**
  * The wizard's two load-bearing claims, tested end to end through the UI:
  *
@@ -10,7 +11,7 @@
  * are asserted against real output rather than against the component's own state.
  */
 import { StrictMode } from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Wizard } from "./Wizard";
@@ -264,11 +265,14 @@ describe("Wizard — submit", () => {
     await waitFor(() => expect(submit).toBeEnabled());
     await user.click(submit);
 
-    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
-    const [url, init] = fetchMock.mock.calls[0] as unknown as [
-      string,
-      RequestInit,
-    ];
+    await waitFor(() =>
+      expect(
+        fetchMock.mock.calls.some(([, init]) => init?.method === "POST"),
+      ).toBe(true),
+    );
+    const [url, init] = fetchMock.mock.calls.find(
+      ([, init]) => init?.method === "POST",
+    ) as unknown as [string, RequestInit];
     expect(String(url)).toBe("https://api.example/api/content");
     expect(init.method).toBe("POST");
     expect(init.credentials).toBe("include");

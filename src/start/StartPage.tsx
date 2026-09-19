@@ -1,3 +1,4 @@
+import { Link } from "react-router";
 /**
  * `/start` -- the getting-started page.
  *
@@ -18,15 +19,7 @@
  * visitor's first-ever load (`src/play/composition.ts`). They answer different questions --
  * that one is played, this one is read -- and the campaign is unchanged by this file.
  */
-import { useEffect, useState } from "react";
-import { Header } from "../Header";
-import {
-  applyTheme,
-  DEFAULT_THEME,
-  readStoredTheme,
-  storeTheme,
-  type ThemeId,
-} from "../theme";
+import { useState } from "react";
 import { blockBar, useBranch } from "./branch";
 import {
   AUTHOR_PATH_ID,
@@ -54,16 +47,6 @@ function MenuRow({ path }: { readonly path: StartPath }) {
 }
 
 export function StartPage({ apiUrl }: { readonly apiUrl?: string }) {
-  const [theme, setTheme] = useState<ThemeId>(DEFAULT_THEME);
-  useEffect(() => {
-    setTheme(readStoredTheme());
-  }, []);
-  function changeTheme(id: ThemeId): void {
-    setTheme(id);
-    applyTheme(id);
-    storeTheme(id);
-  }
-
   const branch = useBranch(PATHS);
   const [authoring, setAuthoring] = useState(false);
 
@@ -76,9 +59,7 @@ export function StartPage({ apiUrl }: { readonly apiUrl?: string }) {
   }
 
   return (
-    <main className="play-main">
-      <Header current="start" theme={theme} onThemeChange={changeTheme} />
-
+    <>
       <section className="gs-page" aria-labelledby="start-title">
         {authoring ? (
           <Wizard apiUrl={apiUrl} onExit={() => setAuthoring(false)} />
@@ -105,9 +86,13 @@ export function StartPage({ apiUrl }: { readonly apiUrl?: string }) {
                     // machine, so it is a real link -- middle-clickable, copyable, and
                     // announced as a link -- not a button that calls `location.assign`.
                     path.href ? (
-                      <a key={path.id} className="gs-menu-row" href={path.href}>
+                      <Link
+                        key={path.id}
+                        className="gs-menu-row"
+                        to={path.href}
+                      >
                         <MenuRow path={path} />
-                      </a>
+                      </Link>
                     ) : (
                       <button
                         key={path.id}
@@ -188,7 +173,7 @@ export function StartPage({ apiUrl }: { readonly apiUrl?: string }) {
                   {branch.isLast && (
                     <p className="gs-note">
                       That is the whole path.{" "}
-                      <a href="/">Open the disk library</a> when you want to
+                      <Link to="/">Open the disk library</Link> when you want to
                       start.
                     </p>
                   )}
@@ -227,6 +212,6 @@ export function StartPage({ apiUrl }: { readonly apiUrl?: string }) {
           </div>
         )}
       </section>
-    </main>
+    </>
   );
 }

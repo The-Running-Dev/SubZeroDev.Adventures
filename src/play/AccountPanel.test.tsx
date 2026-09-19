@@ -1,4 +1,5 @@
-import { render, screen } from "@testing-library/react";
+import { render } from "../test/render";
+import { screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { AccountPanel } from "./AccountPanel";
 import type { Identity } from "./identity";

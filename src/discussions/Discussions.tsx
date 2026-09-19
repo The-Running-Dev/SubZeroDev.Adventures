@@ -1,9 +1,11 @@
+import { Link } from "react-router";
+import { useAccount } from "../app/providers/AccountProvider";
 /**
  * `/discussions` and `/discussions/<id>`, reached via `main.tsx`'s routing -- a
  * purpose-built forum page over this repository's GitHub Discussions
  * (`server/src/routes/discussions.ts`), mirroring `src/ranking/Ranking.tsx`'s shape:
  * same `apiUrl`-as-prop convention (read once by `main.tsx`, never `import.meta.env`
- * here), same theme block, same `Header` nav item. The compose form instead follows
+ * here), shared AppShell theme and navigation. The compose form instead follows
  * `src/content/MyContent.tsx`'s flat `useState` + `Outcome` shape, since that is this
  * codebase's convention for a page that writes rather than only reads.
  *
@@ -13,23 +15,11 @@
  * the same property on its side, so nothing crossing either boundary is ever markup.
  */
 import { useEffect, useState } from "react";
-import { Header } from "../Header";
-import { AccountPanel } from "../play/AccountPanel";
 import {
-  consumeAuthError,
-  useAdminAccess,
-  useIdentity,
   type DiscussionListData,
   type DiscussionThreadData,
 } from "../play/identity";
 import { formatTimestamp } from "../format";
-import {
-  applyTheme,
-  DEFAULT_THEME,
-  readStoredTheme,
-  storeTheme,
-  type ThemeId,
-} from "../theme";
 
 type Stage =
   | { readonly kind: "unavailable" }
@@ -55,23 +45,7 @@ export function Discussions({
   readonly apiUrl?: string;
   readonly threadId?: string;
 }) {
-  const [theme, setTheme] = useState<ThemeId>(DEFAULT_THEME);
-  useEffect(() => {
-    setTheme(readStoredTheme());
-  }, []);
-  function changeTheme(id: ThemeId): void {
-    setTheme(id);
-    applyTheme(id);
-    storeTheme(id);
-  }
-
-  const [identityRefreshToken, setIdentityRefreshToken] = useState(0);
-  const { identity, loading: identityLoading } = useIdentity(
-    apiUrl,
-    identityRefreshToken,
-  );
-  const { isAdmin } = useAdminAccess(apiUrl, identity.playerId);
-  const [authError] = useState(() => consumeAuthError());
+  const { identity, loading: identityLoading } = useAccount();
 
   const [refreshToken, setRefreshToken] = useState(0);
   const [stage, setStage] = useState<Stage>(
@@ -198,20 +172,7 @@ export function Discussions({
   }
 
   return (
-    <main className="play-main">
-      <Header current="discussions" theme={theme} onThemeChange={changeTheme}>
-        {apiUrl && (
-          <AccountPanel
-            apiUrl={apiUrl}
-            identity={identity}
-            loading={identityLoading}
-            authError={authError}
-            onChanged={() => setIdentityRefreshToken((t) => t + 1)}
-            isAdmin={isAdmin}
-            profileAvailable={true}
-          />
-        )}
-      </Header>
+    <>
       <section
         className="archive discussions"
         aria-labelledby="discussions-title"
@@ -230,7 +191,7 @@ export function Discussions({
           )}
           {threadId && (
             <p>
-              <a href="/discussions">&larr; Back to the channel</a>
+              <Link to="/discussions">&larr; Back to the channel</Link>
             </p>
           )}
 
@@ -326,7 +287,7 @@ export function Discussions({
           </section>
         )}
       </section>
-    </main>
+    </>
   );
 }
 
@@ -338,7 +299,7 @@ function ThreadList({ data }: { readonly data: DiscussionListData }) {
     <ul className="discussions-list">
       {data.threads.map((thread) => (
         <li key={thread.id} className="discussions-list-item">
-          <a href={`/discussions/${thread.id}`}>{thread.title}</a>
+          <Link to={`/discussions/${thread.id}`}>{thread.title}</Link>
           <p className="discussions-excerpt">{thread.excerpt}</p>
           <p className="discussions-meta">
             {thread.authorName} &mdash; {formatTimestamp(thread.updatedAt)}

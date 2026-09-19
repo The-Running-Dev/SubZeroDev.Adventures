@@ -2,8 +2,7 @@
  * The authorization UI Supabase's OAuth 2.1 Server redirects to (Site URL + Authorization
  * Path, configured in that Supabase project's dashboard as `/oauth/consent`) -- see
  * supabaseClient.ts's header for how this differs from `../play/identity.ts`. Rendered
- * directly by main.tsx when `location.pathname === "/oauth/consent"`; there is no router in
- * this app, so this is the one other path it knows about besides `/`.
+ * by the application router at `/oauth/consent`.
  *
  * Two logins happen across this flow and they are not the same thing: signing in here
  * (email magic link, against Supabase's own auth) only proves who's granting consent. The
@@ -123,7 +122,7 @@ export function OAuthConsent() {
   }
 
   return (
-    <main className="play-main">
+    <>
       <section className="archive" aria-labelledby="oauth-consent-title">
         <div className="archive-heading">
           <p className="eyebrow">SUBZERO STORY SYSTEM // ACCOUNT LINK</p>
@@ -205,6 +204,6 @@ export function OAuthConsent() {
           )}
         </div>
       </section>
-    </main>
+    </>
   );
 }

@@ -1,4 +1,5 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render } from "../../test/render";
+import { screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { page } from "vitest/browser";
 import PlayApp from "../PlayApp";

@@ -14,7 +14,10 @@ import { describe, expect, it } from "vitest";
 // against a fake http://localhost:3000/ origin instead of this file's real path.
 describe("update-visual-baselines workflow", () => {
   const workflow = readFileSync(
-    path.join(path.dirname(fileURLToPath(import.meta.url)), "update-visual-baselines.yml"),
+    path.join(
+      path.dirname(fileURLToPath(import.meta.url)),
+      "update-visual-baselines.yml",
+    ),
     "utf-8",
   );
 
@@ -23,6 +26,8 @@ describe("update-visual-baselines workflow", () => {
       /- name: Checkout \(with submodules\)[\s\S]*?- name: Setup Node/,
     )?.[0];
     expect(checkoutStep).toBeDefined();
-    expect(checkoutStep).toMatch(/token:\s*\$\{\{\s*secrets\.BASELINE_UPDATE_TOKEN\b/);
+    expect(checkoutStep).toMatch(
+      /token:\s*\$\{\{\s*secrets\.BASELINE_UPDATE_TOKEN\b/,
+    );
   });
 });

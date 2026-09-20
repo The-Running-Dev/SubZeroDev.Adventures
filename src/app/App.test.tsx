@@ -76,8 +76,18 @@ afterEach(() => {
 });
 
 describe("persistent application routing", () => {
+  // Regression for #70: this walk drives four real userEvent interactions across a
+  // StrictMode double-render, so its own duration is legitimately close to vitest's
+  // 5000ms default -- fine on an idle machine, but a `Test timed out in 5000ms` away
+  // from one under CPU contention (observed 16/16 pass at 1 concurrent `npm test`,
+  // 3/3 fail at 3 concurrent). `userEvent`'s own `delay` option stands in for that
+  // contention deterministically -- it only paces the interactions themselves, so it
+  // can't also trip any of this test's `findByRole` wait timeouts the way stalling
+  // fetch responses would -- keeping this a fixed regression rather than a flake that
+  // only reproduces on a loaded machine. Revert the raised test timeout below to see
+  // it fail with the same bare "Test timed out in 5000ms" the issue reports.
   it("keeps one document, shell, theme and identity through Library → Standings → Profile → Back/Forward", async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: 1000 });
     render(
       <StrictMode>
         <App apiUrl={apiUrl} />
@@ -114,7 +124,7 @@ describe("persistent application routing", () => {
     );
     expect(selector).toHaveValue("amber");
     expect(requests.filter((url) => url.endsWith("/api/me"))).toHaveLength(1);
-  });
+  }, 15000);
 
   it.each([
     ["/ranking", "Operator standings"],

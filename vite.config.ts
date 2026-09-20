@@ -80,7 +80,11 @@ export default defineConfig({
     // src/**/*.browser.test.* and run only via vitest.browser.config.ts's
     // `npm run test:browser` -- jsdom performs no layout, so they'd fail here for the wrong
     // reason.
-    include: ["src/**/*.test.{ts,tsx}", "shared/**/*.test.{ts,tsx}"],
+    include: [
+      "src/**/*.test.{ts,tsx}",
+      "shared/**/*.test.{ts,tsx}",
+      ".github/workflows/**/*.test.{ts,tsx}",
+    ],
     exclude: ["**/*.browser.test.{ts,tsx}"],
   },
 });

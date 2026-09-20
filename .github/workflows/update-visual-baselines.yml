@@ -13,6 +13,15 @@ name: Update visual baselines
 # Run `npm run baselines:update` locally instead when the change is still uncommitted --
 # that regenerates in the same kind of container without a round-trip at all, and keeps
 # the baseline commit and the code change together, which is what a reviewer wants to see.
+#
+# The checkout below authenticates with the BASELINE_UPDATE_TOKEN secret rather than the
+# implicit default token: GitHub deliberately never raises `pull_request` or `push` for a
+# commit pushed with the default GITHUB_TOKEN, so ci.yml would otherwise never re-run on the
+# regenerated baselines, leaving the PR showing checks from the commit before them. The
+# secret is a fine-grained PAT scoped to this repo with only Contents: Read and write, added
+# by hand in the repo's settings -- there is nothing here for this workflow to create it
+# from. Where the secret is unset, the `||` fallback keeps this workflow exactly as
+# functional as before this comment, minus the CI re-trigger.
 on:
   workflow_dispatch:
     inputs:
@@ -46,6 +55,7 @@ jobs:
         with:
           submodules: true
           ref: ${{ inputs.ref }}
+          token: ${{ secrets.BASELINE_UPDATE_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Setup Node
         uses: actions/setup-node@v5

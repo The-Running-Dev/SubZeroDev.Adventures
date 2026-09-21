@@ -1,0 +1,22 @@
+[
+  {
+    "name": "Check (format, lint, typecheck, unit + browser tests, build)",
+    "status": "Passed",
+    "detail": "npm run check -- format:check, lint (oxlint, 8 pre-existing warnings, no errors), typecheck (tsc -b), test (28 files, 259 tests), test:browser (9 files, 59 tests; visual-baseline.browser.test.tsx excluded on Windows per vitest.browser.config.ts), test:build (tsc -b && vite build, then verify-build.mjs: 'The built HTML entry point contains its required static metadata, and 22 bundle(s) are free of Node-only runtime references.'). Initial run failed format:check on the new .github/workflows/update-visual-baselines.test.ts (not yet prettier-formatted); fixed with `npx prettier --write` and re-run to a clean pass, both disclosed here."
+  },
+  {
+    "name": "Verify vendored contract artifact matches Platform's",
+    "status": "Passed",
+    "detail": "npm run verify:contract --prefix server -> 'contract artifact sha256 matches the pinned value.'"
+  },
+  {
+    "name": "Typecheck",
+    "status": "Passed",
+    "detail": "npm run typecheck --prefix server -> tsc --noEmit, no output, exit 0."
+  },
+  {
+    "name": "Test",
+    "status": "Passed",
+    "detail": "npm test --prefix server with DATABASE_URL set against a local Postgres (server/docker-compose.yml, brought up and torn down for this run) -> 'Test Files 21 passed (21)', 'Tests 250 passed (250)', including the integration suite that is skipped without DATABASE_URL."
+  }
+]

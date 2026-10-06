@@ -1,6 +1,6 @@
 # Project Instructions
 
-**Read `AGENTS.shared.md` (home install: `C:/Users/Ben/.agent-kit/AGENTS.shared.md`) completely before this file.** It holds the rules every repository using the kit shares.
+**Read `AGENTS.shared.md` completely before this file.** It holds the rules every repository using the kit shares, resolved from the `AGENTKIT_HOME` environment variable if set, else `.agent-kit` in the home directory.
 
 ## What This Project Is
 

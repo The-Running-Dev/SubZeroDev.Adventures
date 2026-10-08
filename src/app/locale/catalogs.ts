@@ -133,6 +133,7 @@ export const resources = {
       home: "Adventures home",
       display: "DISPLAY MODE",
       skip: "Skip to content",
+      poweredBy: "Powered by",
       themes: {
         dos: "DOS Blue",
         matrix: "Matrix",
@@ -334,6 +335,7 @@ export const resources = {
       home: "Начало на Adventures",
       display: "ИЗГЛЕД",
       skip: "Към съдържанието",
+      poweredBy: "Задвижвано от",
       themes: {
         dos: "Син DOS",
         matrix: "Матрица",

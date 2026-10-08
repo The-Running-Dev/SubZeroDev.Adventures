@@ -59,6 +59,14 @@
   color: var(--text-quiet);
   overflow-wrap: anywhere;
 }
+.site-footer {
+  margin-top: var(--space-6);
+  color: var(--text-quiet);
+  text-align: center;
+}
+.site-footer a {
+  color: var(--cyan);
+}
 .skip-link {
   position: fixed;
   top: 0;

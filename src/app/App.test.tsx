@@ -143,6 +143,13 @@ describe("persistent application routing", () => {
     await screen.findByRole("heading", { name: heading });
     expect(screen.getAllByRole("main")).toHaveLength(1);
     expect(screen.getByRole("navigation", { name: "Primary" })).toBeVisible();
+    expect(document.querySelector(".site-footer")).toHaveTextContent(
+      "Powered by GodComplex",
+    );
+    expect(screen.getByRole("link", { name: "GodComplex" })).toHaveAttribute(
+      "href",
+      "https://game-engine.subzerodev.com/",
+    );
   });
 
   it("retains legacy campaign query links when entered from another route", async () => {
@@ -159,6 +166,9 @@ describe("persistent application routing", () => {
     expect(window.location.search).toBe("");
     expect(
       screen.queryByRole("navigation", { name: "Primary" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "GodComplex" }),
     ).not.toBeInTheDocument();
   });
 

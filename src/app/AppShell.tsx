@@ -102,6 +102,12 @@ export function AppShell() {
           </ErrorBoundary>
         </div>
       </main>
+      {!player?.hidden && (
+        <footer className="site-footer">
+          {t("poweredBy", { ns: "shell" })}{" "}
+          <a href="https://game-engine.subzerodev.com/">GodComplex</a>
+        </footer>
+      )}
     </PlayerShellContext.Provider>
   );
 }

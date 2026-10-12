@@ -1,0 +1,96 @@
+name: Container
+
+# Builds, smoke-tests and publishes the API and frontend images to GHCR through the shared
+# container workflow, and (when DEPLOY_ENABLED is set) triggers the Portainer stack webhook
+# to redeploy them -- the same mechanism SubZeroDev.com uses. Pull requests build and
+# smoke-test both images and push nothing. The deploy half is a no-op until DEPLOY_ENABLED
+# is set, so this workflow is safe to run before the Portainer stack exists.
+#
+# This repo does not manage the VPS or SSH into it. The Portainer stack (pointed at this
+# repo's root docker-compose.yml) owns its own environment variables -- DB_PASSWORD,
+# OIDC_CLIENT_ID, OIDC_CLIENT_SECRET, and the proxy-net network -- configured directly
+# in Portainer's UI, not written by this workflow. The webhook redeploy re-pulls whatever
+# image tag the stack is already configured for (docker-compose.yml defaults
+# ADVENTURES_API_IMAGE to :latest, which this workflow also pushes).
+#
+# Required repository secret for the deploy half:
+#   PORTAINER_REDEPLOY_WEBHOOK_URL -- the stack's webhook URL from Portainer
+#
+# The checks to require are `api / Result` and `web / Result`.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  api:
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    uses: The-Running-Dev/GitHub-ActionTemplates/.github/workflows/container.yml@v0
+    with:
+      image-name: adventures-api
+      dockerfile: server/Dockerfile
+      context: .
+      # The Dockerfile's last stage, named explicitly so that adding a stage after it
+      # cannot silently change what gets published.
+      target: runtime
+      submodules: true
+      build-args: |
+        ADVENTURES_BUILD_REVISION=${{ github.sha }}
+      tags: sha latest
+      # The server cannot start without a Postgres, so the smoke test keeps the container
+      # alive with a stand-in serve command and checks the image from inside.
+      smoke-env: |
+        ADVENTURES_SERVE_CMD=sleep infinity
+      smoke-exec: scripts/smoke-api-image.sh
+
+  web:
+    # The deploy runs from this job, so it must start after the API image is pushed.
+    needs: api
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    uses: The-Running-Dev/GitHub-ActionTemplates/.github/workflows/container.yml@v0
+    with:
+      image-name: adventures-web
+      dockerfile: frontend/Dockerfile
+      context: .
+      target: runtime
+      submodules: true
+      build-args: |
+        ADVENTURES_BUILD_REVISION=${{ github.sha }}
+        VITE_ENABLE_PWA=${{ vars.FRONTEND_HOST == 'vps' }}
+        VITE_API_URL=https://adventures-api.subzerodev.com
+        VITE_SUPABASE_URL=${{ vars.VITE_SUPABASE_URL }}
+        VITE_SUPABASE_ANON_KEY=${{ vars.VITE_SUPABASE_ANON_KEY }}
+      tags: sha latest
+      # The Dockerfile's HEALTHCHECK on /__build-id gates readiness; the script then checks
+      # routing, assets and the revision against the running container.
+      smoke-port: "8080"
+      smoke-path: /__build-id
+      # The restrictions the deployment stack applies, so the smoke test exercises what runs.
+      smoke-options: |
+        --read-only
+        --tmpfs=/var/run:rw,mode=1777
+        --tmpfs=/var/cache/nginx:rw,mode=1777
+        --cap-drop=ALL
+        --security-opt=no-new-privileges:true
+      smoke-scripts: scripts/test-frontend-container.mjs
+      node-version: "24"
+      deploy: ${{ vars.DEPLOY_ENABLED == 'true' }}
+      # Once the frontend is on the VPS, wait until it serves this commit, then check its
+      # routing from the outside. Empty skips both.
+      health-url: ${{ vars.FRONTEND_HOST == 'vps' && 'https://adventures.subzerodev.com/__build-id' || '' }}
+      health-expect: ${{ github.sha }}
+      post-deploy: ${{ vars.FRONTEND_HOST == 'vps' && 'scripts/verify-hosting.mjs' || '' }}
+    secrets:
+      DEPLOY_WEBHOOK_URL: ${{ secrets.PORTAINER_REDEPLOY_WEBHOOK_URL }}

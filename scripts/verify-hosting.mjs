@@ -1,7 +1,14 @@
+#!/usr/bin/env node
+// Run by container.yml after a deploy (no arguments), and by hand with the origin as the
+// argument or HOSTING_URL; without either it checks the production frontend.
 import { execFileSync } from "node:child_process";
 import { setTimeout } from "node:timers/promises";
 
-const origin = new URL(process.argv[2] ?? process.env.HOSTING_URL);
+const origin = new URL(
+  process.argv[2] ??
+    process.env.HOSTING_URL ??
+    "https://adventures.subzerodev.com/",
+);
 if (origin.protocol !== "https:" || origin.pathname !== "/")
   throw new Error("Supply the HTTPS deployment origin, not a route");
 // Portainer acknowledges its webhook before the new container is serving, and the

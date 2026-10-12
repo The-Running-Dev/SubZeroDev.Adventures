@@ -10,11 +10,13 @@ no Cloudflare Pages project, Wrangler dependency, new stack or new deploy secret
   static output into `nginx:alpine` -- the same release shape SubZeroDev.com uses,
   rather than a second static server. Node and API credentials are absent from the
   runtime.
-- `.github/workflows/deploy-api.yml` publishes `adventures-api` and
-  `adventures-web` with immutable commit tags and `:latest`. It tests the exact
-  frontend image before publishing and waits for both images before calling the
-  existing `PORTAINER_REDEPLOY_WEBHOOK_URL`, gated by existing `DEPLOY_ENABLED`.
-  Workflow concurrency prevents overlapping runs from racing the moving tags.
+- `.github/workflows/container.yml` publishes `adventures-api` and
+  `adventures-web` through the shared container workflow with immutable commit
+  tags and `:latest`. It tests the exact frontend image before publishing and
+  waits for both images before calling the existing
+  `PORTAINER_REDEPLOY_WEBHOOK_URL`, gated by existing `DEPLOY_ENABLED`. The
+  shared workflow's branch-tip gate stops an older run from overwriting the
+  moving tags a newer run pushed.
 - Root `docker-compose.yml` remains the existing Portainer Git stack. Its new
   `frontend` service pulls `ghcr.io/the-running-dev/adventures-web:latest`, is
   named `adventures-web`, and listens on HTTP port 8080 on `proxy-net`. It has no

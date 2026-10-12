@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 #
 # Build context is the repository root -- server/docker-compose.yml sets `context: ..` and
-# deploy-api.yml sets `context: .`. This image needs engine/, shared/, and server/: the same
+# container.yml sets `context: .`. This image needs engine/, shared/, and server/: the same
 # three things server/src/composition.ts and shared/campaign-registry.ts reach across at
 # runtime, plus public/campaigns/.
 #
@@ -20,7 +20,7 @@
 # Two targets the compose files pick between:
 #   dev      -- server/docker-compose.yml. TypeScript straight through tsx, full
 #               devDependencies, root user. Disposable and quick to rebuild.
-#   runtime  -- the default, and what deploy-api.yml pushes to GHCR. tsc-emitted JS,
+#   runtime  -- the default, and what container.yml pushes to GHCR. tsc-emitted JS,
 #               production-only dependencies, non-root.
 #
 # Both end at the same entrypoint, so both compose files say `command: serve` and

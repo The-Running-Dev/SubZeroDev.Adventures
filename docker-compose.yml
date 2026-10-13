@@ -1,4 +1,4 @@
-# The deployment artifact. Pulls the image `deploy-api.yml` already built and pushed to
+# The deployment artifact. Pulls the image `container.yml` already built and pushed to
 # GHCR -- it never builds. The same workflow publishes the frontend image. `server/docker-compose.yml` is the local-development
 # counterpart; it has `build:` and a deliberately different image name so that
 # `up --build` there can never tag something as the deployable image.
@@ -30,13 +30,13 @@
 #   - The adventures-api.subzerodev.com DNS record.
 
 # Pinned rather than derived from the directory name, which is what names the
-# `adventures-db` volume. `deploy-api.yml` deploys into `~/subzerodev-adventures`, so this
+# `adventures-db` volume. `container.yml` deploys into `~/subzerodev-adventures`, so this
 # is the name the existing deployment already has -- changing it would orphan the volume.
 name: subzerodev-adventures
 
 x-adventures-api-common: &adventures-api-common
   # Overridable so a rollback can pin a specific SHA tag without editing this file --
-  # `deploy-api.yml` pushes both `:latest` and `:${{ github.sha }}`.
+  # `container.yml` pushes both `:latest` and `:${{ github.sha }}`.
   image: "${ADVENTURES_API_IMAGE:-ghcr.io/the-running-dev/adventures-api:latest}"
   # `:latest` is a moving tag: without this, a redeploy would reuse whatever layer cache
   # the host happens to hold and silently run the previous build.

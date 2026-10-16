@@ -40,7 +40,8 @@ function campaignSaveIndexKey(campaignId: string): string {
   return `subzerodev.play.save.v1.index.${campaignId}`;
 }
 
-function localPersistence(): SessionPersistence {
+/** Exported for its race regression test (`composition.test.ts`); nothing else imports it. */
+export function localPersistence(): SessionPersistence {
   const sessions = new Map();
   return {
     sessions: {
@@ -72,14 +73,20 @@ function localPersistence(): SessionPersistence {
         if (supersededId && supersededId !== record.saveId)
           localStorage.removeItem(saveKey(supersededId));
       },
-      async delete(id) {
-        const raw = await this.get(id);
+      // Conditional, per the contract (`SaveRecordStore.delete`, 04-core §7.4): a record whose
+      // `savedAt` no longer matches was rewritten since the caller read it, and stays. The read
+      // and the removal run with no await between them (#74) -- `await this.get(id)` used to
+      // yield first, so a put() for the same saveId could land in the gap and have its fresh
+      // record and index entry erased when delete() resumed. localStorage is synchronous, so a
+      // body with no await cannot interleave with put(), which has none either.
+      async delete(id, expectedSavedAt) {
+        const raw = localStorage.getItem(saveKey(id));
+        if (!raw) return;
+        const { campaignId, savedAt } = JSON.parse(raw) as StoredSaveRecord;
+        if (savedAt !== expectedSavedAt) return;
         localStorage.removeItem(saveKey(id));
-        if (
-          raw &&
-          localStorage.getItem(campaignSaveIndexKey(raw.campaignId)) === id
-        )
-          localStorage.removeItem(campaignSaveIndexKey(raw.campaignId));
+        if (localStorage.getItem(campaignSaveIndexKey(campaignId)) === id)
+          localStorage.removeItem(campaignSaveIndexKey(campaignId));
       },
       // Local mode has no profile concept -- every record here is unprofiled (`put` is
       // always called with whatever `createLocalBrowserDemo`'s anonymous sessions produce,

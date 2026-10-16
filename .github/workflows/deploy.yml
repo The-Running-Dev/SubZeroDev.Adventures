@@ -22,8 +22,8 @@ jobs:
       id-token: write
     uses: The-Running-Dev/GitHub-ActionTemplates/.github/workflows/pages.yml@v0
     with:
-      node-version: '24'
-      submodules: 'true'
+      node-version: "24"
+      submodules: "true"
       setup: setup
       # Repo variables, not secrets -- Supabase's anon key is meant to be public, it ends up
       # embedded in this static bundle either way. Unset resolves to "", and

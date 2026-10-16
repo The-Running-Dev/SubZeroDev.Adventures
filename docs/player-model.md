@@ -129,9 +129,10 @@ later. Like `GET /api/profile/:slug`, it reads only `profile_slug`, never `playe
 `player_id` stays opaque outside `/api/me` on this route too.
 
 One term of the index — rejected moves, `sum(greatest(attempt_counter - step_count, 0))`
-— reuses `attempt_counter`, which is dual-purposed as `sessions`' optimistic-lock version
-(bumped on every write, not just a rejected move) rather than a true rejected-move
-counter. Every badge that reads it (`server/src/badges.ts`) uses a deliberately loose
+— reuses `attempt_counter`, the engine's per-submission telemetry counter (it counts
+accepted and rejected submissions alike, and restarts at `0` on a loaded or branched
+session), rather than a true rejected-move counter. It is no longer `sessions`' optimistic-lock
+version; that is `revision` (`017_session_revision.sql`). Every badge that reads it (`server/src/badges.ts`) uses a deliberately loose
 threshold to absorb that noise; a ranking has no threshold to loosen, so two players can
 end up ordered partly by how often they saved and loaded, not just by what they did in
 the story. Weighted below badge count in the formula, shown as its own column rather than

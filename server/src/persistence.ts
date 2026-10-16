@@ -5,11 +5,12 @@
  * as a write-through cache, reading on miss) needs no changes to run against this.
  */
 import type { Pool } from "pg";
-import type {
-  KindRegistry,
-  SessionPersistence,
-  StoredSaveRecord,
-  StoredSessionRecord,
+import {
+  SESSION_PERSISTENCE_CONFLICT,
+  type KindRegistry,
+  type SessionPersistence,
+  type StoredSaveRecord,
+  type StoredSessionRecord,
 } from "@the-running-dev/game-engine";
 
 /**
@@ -69,6 +70,7 @@ function toSessionRecord(row: {
   blob: string;
   audience: string;
   attempt_counter: number;
+  revision: number;
   replay_compatible: boolean;
   profile_id: string | null;
   created_at: string;
@@ -79,6 +81,7 @@ function toSessionRecord(row: {
     blob: row.blob,
     audience: row.audience as StoredSessionRecord["audience"],
     attemptCounter: row.attempt_counter,
+    revision: row.revision,
     replayCompatible: row.replay_compatible,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -114,42 +117,36 @@ export function createPostgresPersistence(
     sessions: {
       async get(sessionId) {
         const { rows } = await pool.query(
-          `select session_id, blob, audience, attempt_counter, replay_compatible, profile_id, created_at, updated_at
+          `select session_id, blob, audience, attempt_counter, revision, replay_compatible, profile_id, created_at, updated_at
            from sessions where session_id = $1`,
           [sessionId],
         );
         return rows[0] ? toSessionRecord(rows[0]) : undefined;
       },
       /**
-       * Compare-and-swap on `attempt_counter`, not a new column -- `submitAction`
-       * (`engine/…/core/session/store.ts`) already increments it by exactly 1 on every
-       * write to an *existing* row (`createSession`/`loadGame` only ever `put` a brand
-       * new `sessionId`, never a conflicting one), so it's already the version number
-       * this needs. `on conflict … do update … where` is the standard optimistic-lock
-       * shape: a real insert (new id) is unaffected by the `where`, a legitimate
-       * sequential update matches it and applies, and a write that lost the race --
-       * two tabs, or two store instances behind a future second replica, both starting
-       * from the same `attempt_counter` -- fails to match and is silently *not* applied
-       * (0 rows affected), which the check below turns into a thrown rejection rather
-       * than a merge. That rejection crosses `writeSession`'s `catch { throw
-       * SessionStoreError("session","storage_failure") }` in the engine (out of this
-       * repo's control), so it surfaces to the client as a 503 -- indistinguishable from
-       * a genuine storage outage, but still the one signal that means "re-read and
-       * retry" rather than a silently applied lost update.
+       * Compare-and-swap on `revision` (engine `StoredSessionRecord.revision`, 04-core §7.2):
+       * `0` when first written, `+1` on every accepted write, never moved by a rejection or a
+       * preview. `attempt_counter` is not a version -- a rejected submission advances it
+       * without a write, so comparing it refused the next valid action after any rejection.
+       * `on conflict … do update … where` is the optimistic-lock shape: a real insert (new
+       * id) is unaffected by the `where`, a sequential update matches it and applies, and a
+       * write that lost the race -- two tabs, or two store instances behind a second replica,
+       * both starting from the same revision -- matches nothing (0 rows affected).
        *
-       * No backfill risk: `attempt_counter` is an existing, already-populated, `not
-       * null` column, so this enforces from the moment it deploys -- there is no new
-       * column that could be null on rows written before this change.
+       * That loss throws an error branded `SESSION_PERSISTENCE_CONFLICT`, the one failure the
+       * engine lets a host classify: it reports `concurrent_modification` (409) instead of
+       * `storage_failure`, and evicts its stale cached record so a retry re-reads this row.
        */
       async put(record) {
         const progress = deriveProgressColumns(kinds, record.blob);
         const { rowCount } = await pool.query(
-          `insert into sessions (session_id, blob, audience, attempt_counter, replay_compatible, profile_id, created_at, updated_at, campaign_id, status, ending_id, step_count)
-           values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+          `insert into sessions (session_id, blob, audience, attempt_counter, revision, replay_compatible, profile_id, created_at, updated_at, campaign_id, status, ending_id, step_count)
+           values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
            on conflict (session_id) do update set
              blob = excluded.blob,
              audience = excluded.audience,
              attempt_counter = excluded.attempt_counter,
+             revision = excluded.revision,
              replay_compatible = excluded.replay_compatible,
              profile_id = excluded.profile_id,
              updated_at = excluded.updated_at,
@@ -157,12 +154,13 @@ export function createPostgresPersistence(
              status = excluded.status,
              ending_id = excluded.ending_id,
              step_count = excluded.step_count
-           where sessions.attempt_counter = excluded.attempt_counter - 1`,
+           where sessions.revision = excluded.revision - 1`,
           [
             record.sessionId,
             record.blob,
             record.audience,
             record.attemptCounter,
+            record.revision,
             record.replayCompatible,
             record.profileId ?? null,
             record.createdAt,
@@ -174,9 +172,11 @@ export function createPostgresPersistence(
           ],
         );
         if (rowCount === 0) {
-          throw new Error(
-            `session store: concurrent write conflict for session "${record.sessionId}" at attempt ${record.attemptCounter}`,
+          const conflict = new Error(
+            `session store: concurrent write conflict for session "${record.sessionId}" at revision ${record.revision}`,
           );
+          conflict.name = SESSION_PERSISTENCE_CONFLICT;
+          throw conflict;
         }
       },
     },
@@ -212,7 +212,7 @@ export function createPostgresPersistence(
         );
       },
       /** §7.4: conditional -- only when `saved_at` still matches what the caller last read,
-       *  the same optimistic-lock shape `sessions.put`'s `attempt_counter` compare-and-swap
+       *  the same optimistic-lock shape `sessions.put`'s `revision` compare-and-swap
        *  uses. 0 rows affected (already deleted, or raced by another write) is silent here,
        *  same as it always was for this method -- the engine's own `deleteSave` is what
        *  turns that into `concurrent_modification` for the caller, by re-reading the save

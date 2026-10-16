@@ -287,8 +287,10 @@ describeIfDb("server API", () => {
 
       const statuses = [resultA.statusCode, resultB.statusCode].sort();
       // Exactly one success, one explicit refusal -- never two 200s (the lost update
-      // this guards against) and never a request that just hangs or times out.
-      expect(statuses).toEqual([200, 503]);
+      // this guards against) and never a request that just hangs or times out. The
+      // refusal is `concurrent_modification` (409), not a `storage_failure` (503): the
+      // adapter's conflict carries the engine's `SESSION_PERSISTENCE_CONFLICT` brand.
+      expect(statuses).toEqual([200, 409]);
     } finally {
       await tabA.close();
       await tabB.close();

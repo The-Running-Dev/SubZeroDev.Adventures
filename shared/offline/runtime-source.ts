@@ -66,7 +66,9 @@ export function replay(
   if (!created.ok || !created.value) throw Error("invalid_initialization");
   let state = created.value;
   for (const [index, action] of actions.entries()) {
-    if (action.seq !== index) throw Error("invalid_actions");
+    // This runtime replays player actions only; an epoch entry is not something it can play.
+    if (action.seq !== index || !("actionId" in action))
+      throw Error("invalid_actions");
     const result = engine.submitAction(state, action.actionId, action.params);
     if (!result.ok || !result.value) throw Error("invalid_actions");
     state = result.value;

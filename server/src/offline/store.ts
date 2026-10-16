@@ -2,6 +2,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
 import type { Pool } from "pg";
+import type { LoggedAction } from "@the-running-dev/game-engine";
 import type { ServerDemo } from "../composition.js";
 import { assertSessionOwned, OwnershipError } from "../store/ownedStore.js";
 import { validateBundle } from "../../../shared/offline/runtime.js";
@@ -40,7 +41,10 @@ function validateRequest(value: unknown): asserts value is SyncRequest {
     r.actions.length > 5000
   )
     throw new OfflineError("invalid_actions", 400);
-  for (const [index, action] of r.actions.entries()) {
+  // Untrusted input: read each entry as an action and reject anything that is not one.
+  for (const [index, action] of (
+    r.actions as Partial<LoggedAction>[]
+  ).entries()) {
     if (
       !action ||
       action.seq !== index ||

@@ -2,6 +2,7 @@ import { Pool } from "pg";
 import { buildApp } from "./app.js";
 import { deploymentConfig } from "./deployment.js";
 import { loadDiscussionForum } from "./discussions/registry.js";
+import { migrateOnStart } from "./migrate-on-start.js";
 
 const port = Number(process.env.PORT ?? 8787);
 const siteUrl = process.env.SITE_URL ?? "http://localhost:5173";
@@ -19,6 +20,14 @@ const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error("DATABASE_URL is required");
 
 const pool = new Pool({ connectionString: databaseUrl });
+
+// Off unless asked for: the deployment stack still migrates through its one-shot `migrate`
+// container, which runs the maintenance sweep too. `true` brings the schema up here, under
+// an advisory lock, before anything binds a port (migrate-on-start.ts). `migrations` is
+// relative to the working directory, the same as the CLI's default.
+if (process.env.MIGRATE_ON_START === "true") {
+  await migrateOnStart(pool, { dir: "migrations" });
+}
 
 // Reads DISCUSSIONS_REPO/DISCUSSIONS_TOKEN/DISCUSSIONS_CATEGORY -- unset (any of the
 // three) means the feature is off, not a startup failure (discussions/registry.ts).

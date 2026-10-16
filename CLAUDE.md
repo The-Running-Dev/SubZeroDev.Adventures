@@ -124,6 +124,15 @@ Both files say `command: serve` and `command: migrate`. Those are
 `tsx` from source and `runtime` via emitted JS in `dist/`, and neither compose file knows
 which. Set `ADVENTURES_DB_PORT` if 5432 is already taken locally.
 
+`MIGRATE_ON_START=true` makes `serve` apply pending migrations itself before it binds a port,
+under a waiting Postgres advisory lock so concurrent starts take turns
+(`server/src/migrate-on-start.ts`, issue #9 stage 3). Neither compose file sets it: the
+`migrate` one-shot still owns migrations there, and also runs the maintenance sweep, so
+retiring it is a deployment change of its own. The API's probes are `/livez` (no
+dependency, never touches Postgres), `/readyz` (Postgres answers within 2 seconds) and the
+original `/healthz` (readiness plus the content status). `/readyz` is the one Platform's
+edge probes.
+
 ### What the Dockerfile's layout is actually protecting
 
 `server/Dockerfile` reproduces the repository's directory structure inside the image rather

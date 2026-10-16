@@ -9,9 +9,7 @@
  * `GameState.actionLog` (04-core.md's "replay spine") -- no new schema, no new upstream
  * export.
  */
-import type { Engine, GameState, Scene } from "@the-running-dev/game-engine";
-
-type LoggedAction = GameState["actionLog"][number];
+import type { Engine, Scene } from "@the-running-dev/game-engine";
 
 export interface ReplayStep {
   seq: number;
@@ -58,10 +56,16 @@ export function replay(
 
   const steps: ReplayStep[] = [];
   let state = created.value;
-  const log: readonly LoggedAction[] =
-    upTo === undefined ? actionLog : actionLog.slice(0, upTo);
+  const log = upTo === undefined ? actionLog : actionLog.slice(0, upTo);
 
   for (const logged of log) {
+    // A content-epoch entry (engine 16-content-epochs.md §3.1) is not a player action, and
+    // this server never adopts content, so a log carrying one is not one this loop can play.
+    if (!("actionId" in logged)) {
+      throw new Error(
+        `replay: seq ${logged.seq} is a content-epoch entry -- this replay plays player actions only`,
+      );
+    }
     const result = engine.submitAction(state, logged.actionId, logged.params);
     if (!result.ok || !result.value) {
       throw new Error(

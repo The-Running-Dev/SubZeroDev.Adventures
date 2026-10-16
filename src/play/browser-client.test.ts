@@ -122,6 +122,7 @@ function observeSerializations(engine: Engine): {
   function wrap(current: Engine): Engine {
     return {
       kinds: current.kinds,
+      content: current.content,
       createGame: (config) => current.createGame(config),
       scene: (state) => current.scene(state),
       view: (state, audience) => current.view(state, audience),
@@ -136,6 +137,8 @@ function observeSerializations(engine: Engine): {
       },
       deserialize: (data) => current.deserialize(data),
       migrate: (data) => current.migrate(data),
+      adoptContent: (state, campaignVersion) =>
+        current.adoptContent(state, campaignVersion),
       withEmitter: (emitter) => wrap(current.withEmitter(emitter)),
     };
   }

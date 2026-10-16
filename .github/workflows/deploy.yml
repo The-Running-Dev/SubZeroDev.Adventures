@@ -1,64 +1,35 @@
 name: Deploy
 
+# Builds the frontend and deploys dist/ to GitHub Pages from main through the shared pages
+# workflow. Pull requests only build. Skipped entirely once FRONTEND_HOST is `vps`, when
+# container.yml serves the frontend instead. public/404.html carries its own client-side
+# routing redirect, so the workflow's single-page-app 404 is left off.
+
 on:
   push:
     branches: [main]
+  pull_request:
   workflow_dispatch:
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: github-pages
-  cancel-in-progress: false
+permissions: {}
 
 jobs:
-  deploy:
+  pages:
     if: vars.FRONTEND_HOST != 'vps'
-    name: deploy
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Checkout (with submodules)
-        uses: actions/checkout@v5
-        with:
-          submodules: true
-
-      - name: Setup Node
-        uses: actions/setup-node@v5
-        with:
-          node-version: 24
-
-      - name: Build engine submodule
-        run: npm run setup
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build
-        env:
-          VITE_API_URL: https://adventures-api.subzerodev.com
-          # Repo variables (Settings > Secrets and variables > Actions > Variables), not
-          # secrets -- Supabase's anon key is meant to be public, it ends up embedded in
-          # this static bundle either way. Unset resolves to "", and supabaseClient.ts's
-          # truthy check treats that the same as unconfigured (OAuthConsent.tsx renders a
-          # "not configured" state) rather than crashing the build.
-          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
-        run: npm run build
-
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
-
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v5
-        with:
-          path: dist
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v5
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: The-Running-Dev/GitHub-ActionTemplates/.github/workflows/pages.yml@v0
+    with:
+      node-version: "24"
+      submodules: "true"
+      setup: setup
+      # Repo variables, not secrets -- Supabase's anon key is meant to be public, it ends up
+      # embedded in this static bundle either way. Unset resolves to "", and
+      # supabaseClient.ts's truthy check treats that the same as unconfigured
+      # (OAuthConsent.tsx renders a "not configured" state) rather than crashing the build.
+      env: |
+        VITE_API_URL=https://adventures-api.subzerodev.com
+        VITE_SUPABASE_URL=${{ vars.VITE_SUPABASE_URL }}
+        VITE_SUPABASE_ANON_KEY=${{ vars.VITE_SUPABASE_ANON_KEY }}

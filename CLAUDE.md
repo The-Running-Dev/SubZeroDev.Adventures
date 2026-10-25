@@ -308,6 +308,21 @@ Every admin after the first is granted from the admin page itself
 
 ### Why it is installed this way
 
+#### 2026-10-25 — The session store is bounded by `SESSION_CACHE_LIMIT`, sized from adapter counters
+
+Context: the engine's `createInMemorySessionStore` is unbounded unless the host passes
+`sessionCacheLimit`, and this server never did, so every session a process had touched stayed
+in memory until restart. Postgres is the source of truth, so an evicted session costs one read.
+Chosen: `SESSION_CACHE_LIMIT`, validated at startup by `server/src/deployment.ts`, with a
+provisional default of 1000 until production numbers exist. The Postgres adapter counts cache
+misses, writes and blob bytes (last, max, total); `buildApp` owns one set per process, shared
+across content refreshes, and the admin status response reports it with the limit.
+Rejected: staying unbounded behind the container memory limit (the failure is an OOM kill,
+not a slower read); publishing the counters on `/healthz` (they track live traffic, which an
+anonymous caller has no reason to poll); engine-side gauges such as the cached-session count,
+which would change the engine's event-channel contract and are that repository's decision.
+Reversibility: cheap — unset the variable for the default; the counters are additive fields.
+
 #### 2026-09-21 — Dropped the local "Agent Working Agreement" restatement; rely on the live kit pointer alone
 
 Context: `/sync` brought the machine-wide kit checkout from commit `5095a55c` to `e4e99557`

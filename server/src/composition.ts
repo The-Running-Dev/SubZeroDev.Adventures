@@ -18,7 +18,10 @@ import {
   KINDS,
   type CatalogEntry,
 } from "../../shared/campaign-registry.js";
-import { createPostgresPersistence } from "./persistence.js";
+import {
+  createPostgresPersistence,
+  type SessionPersistenceCounters,
+} from "./persistence.js";
 import { createPostgresProfileStore } from "./profile-store.js";
 import {
   createDiskCampaignSource,
@@ -131,9 +134,24 @@ function digestOf(portables: readonly unknown[]): string {
   return createHash("sha256").update(JSON.stringify(portables)).digest("hex");
 }
 
+/** How the session store is bounded and observed. Both fields outlive any one `ServerDemo`:
+ *  `app.ts` passes the same values to every build, so a content refresh neither resets the
+ *  counters nor changes the limit. */
+export interface SessionCacheOptions {
+  /** The engine store's `sessionCacheLimit` -- at most this many sessions held in memory,
+   *  least recently used evicted first, an evicted one re-read from Postgres on its next
+   *  request. Undefined is unbounded, which is what a test wants and what every deployment
+   *  had before `SESSION_CACHE_LIMIT`; the deployed process always passes a number
+   *  (`deployment.ts`'s `parseSessionCacheLimit`). */
+  readonly sessionCacheLimit?: number;
+  /** Shared with the admin status route; a fresh set when omitted. */
+  readonly counters?: SessionPersistenceCounters;
+}
+
 export async function createServerDemo(
   pool: Pool,
   campaignSource: CampaignSource = createDiskCampaignSource(),
+  { sessionCacheLimit, counters }: SessionCacheOptions = {},
 ): Promise<ServerDemo> {
   const { campaigns: trustedPortables, extensions: trustedExtensions } =
     await campaignSource.load();
@@ -264,9 +282,10 @@ export async function createServerDemo(
     store: createInMemorySessionStore({
       engine,
       registry,
-      persistence: createPostgresPersistence(pool, KINDS),
+      persistence: createPostgresPersistence(pool, KINDS, counters),
       profiles: createPostgresProfileStore(pool),
       recordIds,
+      ...(sessionCacheLimit === undefined ? {} : { sessionCacheLimit }),
     }),
   };
 }

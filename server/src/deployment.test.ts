@@ -17,7 +17,9 @@ import type { Pool } from "pg";
 import { buildCatalog } from "../../shared/campaign-registry.js";
 import {
   createBootstrapCampaignSource,
+  DEFAULT_SESSION_CACHE_LIMIT,
   deploymentConfig,
+  parseSessionCacheLimit,
 } from "./deployment.js";
 
 // `createMultiSourceCampaignSource` only stores the pool for a later query; nothing in
@@ -31,11 +33,44 @@ describe("deploymentConfig", () => {
       apiUrl: "https://api.example.invalid",
       previewOrigins: [],
       discussionForum: undefined,
+      sessionCacheLimit: DEFAULT_SESSION_CACHE_LIMIT,
     });
 
     expect(config.bootstrapSource).toBeDefined();
     expect(config.campaignSource).toBeDefined();
   });
+
+  it("passes the session cache limit through, so the deployed store is bounded", () => {
+    const config = deploymentConfig(noPool, {
+      siteUrl: "https://example.invalid",
+      apiUrl: "https://api.example.invalid",
+      previewOrigins: [],
+      discussionForum: undefined,
+      sessionCacheLimit: 250,
+    });
+
+    expect(config.sessionCacheLimit).toBe(250);
+  });
+});
+
+describe("parseSessionCacheLimit", () => {
+  it("defaults when unset or blank", () => {
+    expect(parseSessionCacheLimit(undefined)).toBe(DEFAULT_SESSION_CACHE_LIMIT);
+    expect(parseSessionCacheLimit("")).toBe(DEFAULT_SESSION_CACHE_LIMIT);
+    expect(parseSessionCacheLimit("  ")).toBe(DEFAULT_SESSION_CACHE_LIMIT);
+  });
+
+  it("accepts a positive whole number", () => {
+    expect(parseSessionCacheLimit("1")).toBe(1);
+    expect(parseSessionCacheLimit(" 250 ")).toBe(250);
+  });
+
+  it.each(["0", "-1", "1.5", "1e3", "abc", "0x10", "9007199254740992"])(
+    "refuses %s at startup",
+    (raw) => {
+      expect(() => parseSessionCacheLimit(raw)).toThrow(/SESSION_CACHE_LIMIT/);
+    },
+  );
 });
 
 describe("createBootstrapCampaignSource", () => {

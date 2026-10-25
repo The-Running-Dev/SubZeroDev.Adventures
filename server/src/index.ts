@@ -1,6 +1,6 @@
 import { Pool } from "pg";
 import { buildApp } from "./app.js";
-import { deploymentConfig } from "./deployment.js";
+import { deploymentConfig, parseSessionCacheLimit } from "./deployment.js";
 import { loadDiscussionForum } from "./discussions/registry.js";
 import { migrateOnStart } from "./migrate-on-start.js";
 
@@ -16,6 +16,12 @@ const previewOrigins = (process.env.PREVIEW_ORIGINS ?? "")
   .split(",")
   .map((entry) => entry.trim())
   .filter((entry) => entry !== "");
+// How many sessions the engine store keeps in memory before evicting the least recently used
+// (`deployment.ts`'s `parseSessionCacheLimit`). Read before anything connects, so a malformed
+// value fails the start rather than the first content build.
+const sessionCacheLimit = parseSessionCacheLimit(
+  process.env.SESSION_CACHE_LIMIT,
+);
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error("DATABASE_URL is required");
 
@@ -43,6 +49,7 @@ const app = await buildApp(
     apiUrl,
     previewOrigins,
     discussionForum,
+    sessionCacheLimit,
   }),
 );
 

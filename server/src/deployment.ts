@@ -59,6 +59,34 @@ export function createBootstrapCampaignSource(): CampaignSource {
   return createDiskCampaignSource();
 }
 
+/**
+ * What a deployment holds in memory when `SESSION_CACHE_LIMIT` is unset. Provisional: no
+ * deployment has measured it. Sized against the counters the admin status page now reports --
+ * `sessionCache.readBlobBytes.max` times this is the worst case the cache can reach, and a
+ * `cacheMisses` count climbing under steady play means it is too small.
+ */
+export const DEFAULT_SESSION_CACHE_LIMIT = 1000;
+
+/**
+ * `SESSION_CACHE_LIMIT` as `index.ts` read it. Unset or blank is the default; anything else
+ * must be a positive whole number, and is otherwise a startup failure rather than a silent
+ * fallback -- an operator who set `SESSION_CACHE_LIMIT=1e3` or `=0` meant something, and
+ * serving with a bound they did not choose is worse than not starting. The engine refuses a
+ * non-positive or unsafe integer on its own (`createInMemorySessionStore` throws a
+ * `RangeError`), but only once the first build runs, and with a message that names its
+ * option rather than this variable.
+ */
+export function parseSessionCacheLimit(raw: string | undefined): number {
+  const value = raw?.trim() ?? "";
+  if (value === "") return DEFAULT_SESSION_CACHE_LIMIT;
+  const limit = /^\d+$/.test(value) ? Number(value) : Number.NaN;
+  if (!Number.isSafeInteger(limit) || limit < 1)
+    throw new Error(
+      `SESSION_CACHE_LIMIT must be a positive whole number, got "${raw}"`,
+    );
+  return limit;
+}
+
 /** The full `AppConfig` the deployed process hands `buildApp`. `env` is what `index.ts`
  *  read out of the environment; everything else is a property of the deployment. */
 export function deploymentConfig(
@@ -68,6 +96,7 @@ export function deploymentConfig(
     readonly apiUrl: string;
     readonly previewOrigins: readonly string[];
     readonly discussionForum: DiscussionForum | undefined;
+    readonly sessionCacheLimit: number;
   },
 ): AppConfig {
   return {
@@ -77,5 +106,6 @@ export function deploymentConfig(
     campaignSource: createPublishedCampaignSource(pool),
     bootstrapSource: createBootstrapCampaignSource(),
     discussionForum: env.discussionForum,
+    sessionCacheLimit: env.sessionCacheLimit,
   };
 }

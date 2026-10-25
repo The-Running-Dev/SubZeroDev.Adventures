@@ -9,6 +9,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Pool } from "pg";
 import { SessionStoreError } from "@the-running-dev/game-engine";
 import { createServerDemo } from "./composition.js";
+import { createSessionPersistenceCounters } from "./persistence.js";
 
 const databaseUrl = process.env.DATABASE_URL;
 const describeIfDb = databaseUrl ? describe : describe.skip;
@@ -129,5 +130,92 @@ describeIfDb("session compare-and-swap", () => {
       await firstAvailable(loser, sessionId),
     );
     expect(retried.ok).toBe(true);
+  });
+});
+
+/**
+ * `sessionCacheLimit` reaches the engine store, and the adapter's counters are what an
+ * operator sizes it from: a miss is a Postgres read, so an evicted session costs exactly one.
+ */
+describeIfDb("sessionCacheLimit", () => {
+  let pool: Pool;
+
+  beforeAll(() => {
+    pool = new Pool({ connectionString: databaseUrl });
+  });
+
+  afterAll(async () => {
+    await pool.end();
+  });
+
+  beforeEach(async () => {
+    await pool.query(
+      "truncate badges, achievements, auth_sessions, saves, sessions, players restart identity cascade",
+    );
+  });
+
+  async function storedBlobBytes(sessionId: string): Promise<number> {
+    const { rows } = await pool.query<{ bytes: number }>(
+      "select octet_length(blob)::int as bytes from sessions where session_id = $1",
+      [sessionId],
+    );
+    return rows[0]!.bytes;
+  }
+
+  it("evicts past the limit, reloads from Postgres, and counts the miss", async () => {
+    const counters = createSessionPersistenceCounters();
+    const demo = await createServerDemo(pool, undefined, {
+      sessionCacheLimit: 1,
+      counters,
+    });
+
+    const { sessionId: first } = await demo.store.createSession({
+      campaignId: "what-would-lucifer-do",
+      audience: "player",
+    });
+    const opening = await demo.store.getScene(first);
+    const action = opening.actions.find((a) => a.available);
+    expect(action).toBeDefined();
+    expect((await demo.store.submitAction(first, action!.id)).ok).toBe(true);
+    const scene = await demo.store.getScene(first);
+    const view = await demo.store.getView(first);
+    expect(counters).toMatchObject({ cacheMisses: 0, writes: 2 });
+
+    // A second session takes the only slot, so `first` is evicted.
+    await demo.store.createSession({
+      campaignId: "what-would-lucifer-do",
+      audience: "player",
+    });
+    expect(counters).toMatchObject({ cacheMisses: 0, writes: 3 });
+
+    expect(await demo.store.getScene(first)).toEqual(scene);
+    expect(counters.cacheMisses).toBe(1);
+    expect(counters.readBlobBytes.last).toBe(await storedBlobBytes(first));
+
+    // Reloaded into the cache, so the next read does not go back to Postgres.
+    expect(await demo.store.getView(first)).toEqual(view);
+    expect(counters.cacheMisses).toBe(1);
+
+    const next = scene.actions.find((a) => a.available);
+    expect(next).toBeDefined();
+    expect((await demo.store.submitAction(first, next!.id)).ok).toBe(true);
+    expect(counters.writes).toBe(4);
+    expect(counters.writtenBlobBytes.last).toBe(await storedBlobBytes(first));
+    expect(counters.writtenBlobBytes.max).toBeGreaterThanOrEqual(
+      counters.writtenBlobBytes.last,
+    );
+  });
+
+  it("counts a miss for an unknown session without inventing blob bytes", async () => {
+    const counters = createSessionPersistenceCounters();
+    const demo = await createServerDemo(pool, undefined, { counters });
+
+    await expect(demo.store.getScene("no-such-session")).rejects.toBeInstanceOf(
+      SessionStoreError,
+    );
+    expect(counters).toMatchObject({
+      cacheMisses: 1,
+      readBlobBytes: { last: 0, max: 0, total: 0 },
+    });
   });
 });

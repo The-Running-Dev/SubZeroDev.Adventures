@@ -222,6 +222,49 @@ describeIfDb("/api/admin/content", () => {
     expect(adminBody.status.campaignCount).toBe(adminBody.campaigns.length);
   });
 
+  it("reports the session cache to an admin, counted across a refresh", async () => {
+    const admin = await adminCookie();
+    type SessionCache = {
+      limit: number | null;
+      writes: number;
+      writtenBlobBytes: { last: number; max: number; total: number };
+    };
+    const sessionCache = async () => {
+      const response = await app.inject({
+        method: "GET",
+        url: "/api/admin/content/status",
+        headers: { cookie: admin },
+      });
+      return (response.json() as { sessionCache: SessionCache }).sessionCache;
+    };
+
+    const before = await sessionCache();
+    // `buildApp` without `sessionCacheLimit` is unbounded, and says so.
+    expect(before.limit).toBeNull();
+    expect(before.writes).toBeGreaterThan(0);
+    expect(before.writtenBlobBytes.max).toBeGreaterThan(0);
+
+    // A refresh builds a new store and a new adapter; the counts must not start over.
+    const refresh = await app.inject({
+      method: "POST",
+      url: "/api/admin/content/refresh",
+      headers: { cookie: admin },
+    });
+    expect(refresh.statusCode).toBe(200);
+    await app.inject({
+      method: "POST",
+      url: "/api/sessions",
+      headers: { cookie: admin },
+      payload: { campaignId: "what-would-lucifer-do" },
+    });
+
+    const after = await sessionCache();
+    expect(after.writes).toBe(before.writes + 1);
+    expect(after.writtenBlobBytes.total).toBeGreaterThan(
+      before.writtenBlobBytes.total,
+    );
+  });
+
   it("grants and revokes the admin role by identity, and a revoked admin loses access", async () => {
     const admin = await adminCookie();
     const target = await guestCookie();

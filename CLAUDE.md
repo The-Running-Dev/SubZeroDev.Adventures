@@ -308,6 +308,27 @@ Every admin after the first is granted from the admin page itself
 
 ### Why it is installed this way
 
+#### 2026-10-27 — Persist recorded initialization outside the game-state blob
+
+Context: GameEngine #602 makes branching replay the session's recorded initialization,
+including the profile data used at creation. Adventures' PostgreSQL adapter must retain
+that host-owned input across a restart and through saves, rather than consulting the
+player's current profile.
+
+Chosen: pin the merged engine contract and add nullable `initialization jsonb` columns to
+`sessions` and `saves`. SQL NULL remains an absent wrapper for legacy records; JSON `{}`
+records a known initialization without profile data. Reads, writes and save listings
+preserve this distinction. No backfill or empty-object default can recover unknown inputs.
+Game-state blobs, save formats and replay goldens stay unchanged.
+
+Rejected: putting initialization into the serialized game state, or treating old records as
+known-empty. Both lose the engine's distinction between reproducible input and ambiguous
+legacy history. The latter would bypass its fail-closed branch guard for profiled kinds.
+
+Reversibility: the additive columns can remain unused by an older application, but writes
+from that application cannot preserve recorded initialization. Deploy migration 018 before
+this adapter; do not claim old writers preserve the new replay guarantee.
+
 #### 2026-09-21 — Dropped the local "Agent Working Agreement" restatement; rely on the live kit pointer alone
 
 Context: `/sync` brought the machine-wide kit checkout from commit `5095a55c` to `e4e99557`

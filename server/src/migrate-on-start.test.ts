@@ -51,6 +51,17 @@ describeIfDb("migrateOnStart", () => {
 
   afterEach(async () => {
     await scratch.end();
+    // pg-pool's end() resolves once its clients leave the pool, not once their backends
+    // exit; dropping with (force) while one is still closing terminates it, and the
+    // 57P01 surfaces as an unhandled error. Wait for the backends to go first.
+    for (let attempt = 0; attempt < 50; attempt++) {
+      const { rows } = await admin.query<{ count: string }>(
+        "select count(*) from pg_stat_activity where datname = $1",
+        [scratchName],
+      );
+      if (Number(rows[0]!.count) === 0) break;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
     await admin.query(`drop database if exists ${scratchName} with (force)`);
     await admin.end();
   });

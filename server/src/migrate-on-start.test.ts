@@ -9,6 +9,7 @@ import { dirname, join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Pool } from "pg";
+import { runner } from "node-pg-migrate";
 import { MIGRATION_LOCK_KEY, migrateOnStart } from "./migrate-on-start.js";
 
 const databaseUrl = process.env.DATABASE_URL;
@@ -72,6 +73,62 @@ describeIfDb("migrateOnStart", () => {
     await migrateOnStart(scratch, { dir: migrationsDir, log: quiet });
 
     expect(await applied()).toBe(migrationCount);
+  });
+
+  it("upgrades pre-initialization sessions and saves without inventing recorded input", async () => {
+    const client = await scratch.connect();
+    try {
+      await runner({
+        dbClient: client,
+        dir: migrationsDir,
+        direction: "up",
+        count: 17,
+        migrationsTable: "pgmigrations",
+        log: quiet,
+      });
+    } finally {
+      client.release();
+    }
+    expect(await applied()).toBe(17);
+    const sessionId = randomUUID();
+    const saveId = randomUUID();
+    const blob = '{"campaignId":"test","status":"active","actionLog":[]}';
+    await scratch.query(
+      `insert into sessions (session_id, blob, audience, attempt_counter, replay_compatible,
+        created_at, updated_at, campaign_id, status, step_count)
+       values ($1, $2, 'player', 0, true, 'original-created', 'original-updated', 'test', 'active', 0)`,
+      [sessionId, blob],
+    );
+    await scratch.query(
+      `insert into saves (save_id, campaign_id, blob, saved_at_seq, audience, saved_at)
+       values ($1, 'test', $2, 0, 'player', 'original-saved')`,
+      [saveId, blob],
+    );
+    const sessionsBefore = (await scratch.query("select * from sessions")).rows;
+    const savesBefore = (await scratch.query("select * from saves")).rows;
+
+    // Run the real startup migration entry point over the already-populated schema.
+    await migrateOnStart(scratch, { dir: migrationsDir, log: quiet });
+    expect(await applied()).toBe(migrationCount);
+    expect((await scratch.query("select * from sessions")).rows).toStrictEqual(
+      sessionsBefore.map((row) => ({ ...row, initialization: null })),
+    );
+    expect((await scratch.query("select * from saves")).rows).toStrictEqual(
+      savesBefore.map((row) => ({ ...row, initialization: null })),
+    );
+    const columns = await scratch.query(
+      `select table_name, data_type, is_nullable, column_default from information_schema.columns
+       where table_schema = 'public' and table_name in ('sessions', 'saves')
+         and column_name = 'initialization' order by table_name`,
+    );
+    expect(columns.rows).toStrictEqual(
+      ["saves", "sessions"].map((table_name) => ({
+        table_name,
+        data_type: "jsonb",
+        is_nullable: "YES",
+        column_default: null,
+      })),
+    );
   });
 
   it("lets concurrent starts through one at a time, and every one succeeds", async () => {

@@ -8,6 +8,7 @@ import type { Pool } from "pg";
 import {
   SESSION_PERSISTENCE_CONFLICT,
   type KindRegistry,
+  type SessionInitialization,
   type SessionPersistence,
   type StoredSaveRecord,
   type StoredSessionRecord,
@@ -73,6 +74,7 @@ function toSessionRecord(row: {
   revision: number;
   replay_compatible: boolean;
   profile_id: string | null;
+  initialization: SessionInitialization | null;
   created_at: string;
   updated_at: string;
 }): StoredSessionRecord {
@@ -86,6 +88,9 @@ function toSessionRecord(row: {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     ...(row.profile_id ? { profileId: row.profile_id } : {}),
+    ...(row.initialization === null
+      ? {}
+      : { initialization: row.initialization }),
   };
 }
 
@@ -97,6 +102,7 @@ function toSaveRecord(row: {
   saved_at_seq: number;
   audience: string;
   profile_id: string | null;
+  initialization: SessionInitialization | null;
 }): StoredSaveRecord {
   return {
     saveId: row.save_id,
@@ -106,6 +112,9 @@ function toSaveRecord(row: {
     savedAtSeq: row.saved_at_seq,
     audience: row.audience as StoredSaveRecord["audience"],
     ...(row.profile_id ? { profileId: row.profile_id } : {}),
+    ...(row.initialization === null
+      ? {}
+      : { initialization: row.initialization }),
   };
 }
 
@@ -117,7 +126,7 @@ export function createPostgresPersistence(
     sessions: {
       async get(sessionId) {
         const { rows } = await pool.query(
-          `select session_id, blob, audience, attempt_counter, revision, replay_compatible, profile_id, created_at, updated_at
+          `select session_id, blob, audience, attempt_counter, revision, replay_compatible, profile_id, initialization, created_at, updated_at
            from sessions where session_id = $1`,
           [sessionId],
         );
@@ -140,8 +149,8 @@ export function createPostgresPersistence(
       async put(record) {
         const progress = deriveProgressColumns(kinds, record.blob);
         const { rowCount } = await pool.query(
-          `insert into sessions (session_id, blob, audience, attempt_counter, revision, replay_compatible, profile_id, created_at, updated_at, campaign_id, status, ending_id, step_count)
-           values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+          `insert into sessions (session_id, blob, audience, attempt_counter, revision, replay_compatible, profile_id, created_at, updated_at, campaign_id, status, ending_id, step_count, initialization)
+           values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
            on conflict (session_id) do update set
              blob = excluded.blob,
              audience = excluded.audience,
@@ -149,6 +158,7 @@ export function createPostgresPersistence(
              revision = excluded.revision,
              replay_compatible = excluded.replay_compatible,
              profile_id = excluded.profile_id,
+             initialization = excluded.initialization,
              updated_at = excluded.updated_at,
              campaign_id = excluded.campaign_id,
              status = excluded.status,
@@ -169,6 +179,9 @@ export function createPostgresPersistence(
             progress.status,
             progress.endingId,
             progress.stepCount,
+            record.initialization === undefined
+              ? null
+              : JSON.stringify(record.initialization),
           ],
         );
         if (rowCount === 0) {
@@ -183,7 +196,7 @@ export function createPostgresPersistence(
     saves: {
       async get(saveId) {
         const { rows } = await pool.query(
-          `select save_id, campaign_id, blob, saved_at, saved_at_seq, audience, profile_id
+          `select save_id, campaign_id, blob, saved_at, saved_at_seq, audience, profile_id, initialization
            from saves where save_id = $1`,
           [saveId],
         );
@@ -191,15 +204,16 @@ export function createPostgresPersistence(
       },
       async put(record) {
         await pool.query(
-          `insert into saves (save_id, campaign_id, blob, saved_at, saved_at_seq, audience, profile_id)
-           values ($1, $2, $3, $4, $5, $6, $7)
+          `insert into saves (save_id, campaign_id, blob, saved_at, saved_at_seq, audience, profile_id, initialization)
+           values ($1, $2, $3, $4, $5, $6, $7, $8)
            on conflict (save_id) do update set
              campaign_id = excluded.campaign_id,
              blob = excluded.blob,
              saved_at = excluded.saved_at,
              saved_at_seq = excluded.saved_at_seq,
              audience = excluded.audience,
-             profile_id = excluded.profile_id`,
+             profile_id = excluded.profile_id,
+             initialization = excluded.initialization`,
           [
             record.saveId,
             record.campaignId,
@@ -208,6 +222,9 @@ export function createPostgresPersistence(
             record.savedAtSeq,
             record.audience,
             record.profileId ?? null,
+            record.initialization === undefined
+              ? null
+              : JSON.stringify(record.initialization),
           ],
         );
       },
@@ -228,7 +245,7 @@ export function createPostgresPersistence(
        *  returns rows in any order. */
       async listByProfile(profileId) {
         const { rows } = await pool.query(
-          `select save_id, campaign_id, blob, saved_at, saved_at_seq, audience, profile_id
+          `select save_id, campaign_id, blob, saved_at, saved_at_seq, audience, profile_id, initialization
            from saves where profile_id = $1`,
           [profileId],
         );

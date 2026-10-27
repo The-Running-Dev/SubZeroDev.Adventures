@@ -5,6 +5,7 @@ import cors from "@fastify/cors";
 import type { Pool } from "pg";
 import { createServerDemo } from "./composition.js";
 import { createContentCell } from "./content-cell.js";
+import { createSessionPersistenceCounters } from "./persistence.js";
 import {
   createDiskCampaignSource,
   type CampaignSource,
@@ -60,6 +61,10 @@ export interface AppConfig {
    *  same posture identity's `oauth_not_configured` has. `index.ts` is the only caller
    *  that passes one, built by `discussions/registry.ts` from the environment. */
   readonly discussionForum?: DiscussionForum;
+  /** The session store's in-memory bound (`composition.ts`'s `SessionCacheOptions`), fed
+   *  from `SESSION_CACHE_LIMIT` by `index.ts` through `deployment.ts`. Undefined is
+   *  unbounded -- what a test wants, and never what the deployed process passes. */
+  readonly sessionCacheLimit?: number;
 }
 
 /** Builds the wired Fastify instance without binding a port -- shared by `index.ts`
@@ -73,6 +78,7 @@ export async function buildApp(
     campaignSource = createDiskCampaignSource(),
     bootstrapSource,
     discussionForum,
+    sessionCacheLimit,
   }: AppConfig,
 ): Promise<FastifyInstance> {
   const app = Fastify({ logger: process.env.NODE_ENV !== "test" });
@@ -141,14 +147,23 @@ export async function buildApp(
   // The cell owns the swap: `refresh()` builds a complete `ServerDemo` and only publishes
   // it on success, so a bad rebuild leaves the previous one serving (#22). Every route below
   // takes `cell`, not a `ServerDemo` snapshot, and re-reads `cell.current()` per request.
+  //
+  // Every build gets the same counters, so the admin status page reports the process, not
+  // whichever build happens to be serving.
+  const sessionCache = {
+    sessionCacheLimit,
+    counters: createSessionPersistenceCounters(),
+  };
   const { cell, ready } = createContentCell(() =>
-    createServerDemo(pool, campaignSource),
+    createServerDemo(pool, campaignSource, sessionCache),
   );
   // The fallback covers the *first* build only, and it exists so unusable content an
   // operator added cannot keep the server from starting -- the admin routes below are the
   // only way to remove that content, so they have to come up. See `ready`.
   await ready(
-    bootstrapSource ? () => createServerDemo(pool, bootstrapSource) : undefined,
+    bootstrapSource
+      ? () => createServerDemo(pool, bootstrapSource, sessionCache)
+      : undefined,
   );
   registerHealthRoute(app, pool, cell);
   const identityProviders = await loadIdentityProviders();
@@ -162,7 +177,7 @@ export async function buildApp(
   registerStatsRoutes(app, pool);
   registerProfileRoutes(app, pool, cell);
   registerRankingRoutes(app, pool, cell);
-  registerAdminRoutes(app, pool, cell, campaignSource);
+  registerAdminRoutes(app, pool, cell, campaignSource, sessionCache);
   registerContentRoutes(app, pool, cell);
   registerDiscussionRoutes(app, pool, discussionForum);
 

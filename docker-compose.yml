@@ -82,6 +82,10 @@ x-adventures-api-common: &adventures-api-common
     # tunnelled dev build talk to this API. Every origin listed can act as the player, so
     # it belongs to hosts you control, not to anything you merely want to allow to read.
     PREVIEW_ORIGINS: "${PREVIEW_ORIGINS:-}"
+    # How many sessions the API keeps in memory; the least recently used is evicted and
+    # re-read from Postgres on its next request. Unset or blank is the provisional default,
+    # 1000 (server/src/deployment.ts); anything but a positive whole number fails the start.
+    SESSION_CACHE_LIMIT: "${SESSION_CACHE_LIMIT:-}"
     # Optional, unlike DB_PASSWORD above: server/src/identity/registry.ts treats an unset
     # credential pair as "this provider isn't configured" (503 oauth_not_configured on its
     # routes), not a startup precondition, so deployment must not be blocked on the

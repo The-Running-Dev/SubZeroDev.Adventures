@@ -118,19 +118,69 @@ function toSaveRecord(row: {
   };
 }
 
+/** Last, largest and summed UTF-8 size of the session blobs one direction has carried. */
+export interface BlobBytes {
+  last: number;
+  max: number;
+  total: number;
+}
+
+/**
+ * What the session half of this adapter has done since the process started -- the only view
+ * an operator has of the engine store's in-process cache, which reports nothing about itself
+ * (engine `design/90-decisions.md`'s register, "The session store reports nothing about its
+ * own memory").
+ *
+ * `cacheMisses` is every `sessions.get`: `createInMemorySessionStore` reads persistence only
+ * when a session is not cached, so a rising count under steady traffic means
+ * `sessionCacheLimit` is evicting sessions that are still being played. A miss for an id that
+ * does not exist counts too -- the store asked. `writes` is accepted `sessions.put` calls; a
+ * lost compare-and-swap is not one.
+ *
+ * Process-wide, not per adapter: `app.ts` creates one and hands it to every
+ * `createServerDemo`, because a content refresh builds a new adapter each time and the
+ * counts would otherwise reset with it.
+ */
+export interface SessionPersistenceCounters {
+  cacheMisses: number;
+  writes: number;
+  readBlobBytes: BlobBytes;
+  writtenBlobBytes: BlobBytes;
+}
+
+export function createSessionPersistenceCounters(): SessionPersistenceCounters {
+  return {
+    cacheMisses: 0,
+    writes: 0,
+    readBlobBytes: { last: 0, max: 0, total: 0 },
+    writtenBlobBytes: { last: 0, max: 0, total: 0 },
+  };
+}
+
+function recordBlob(bytes: BlobBytes, blob: string): void {
+  const size = Buffer.byteLength(blob, "utf8");
+  bytes.last = size;
+  bytes.max = Math.max(bytes.max, size);
+  bytes.total += size;
+}
+
 export function createPostgresPersistence(
   pool: Pool,
   kinds: KindRegistry,
+  counters: SessionPersistenceCounters = createSessionPersistenceCounters(),
 ): SessionPersistence {
   return {
     sessions: {
       async get(sessionId) {
+        counters.cacheMisses += 1;
         const { rows } = await pool.query(
           `select session_id, blob, audience, attempt_counter, revision, replay_compatible, profile_id, initialization, created_at, updated_at
            from sessions where session_id = $1`,
           [sessionId],
         );
-        return rows[0] ? toSessionRecord(rows[0]) : undefined;
+        if (!rows[0]) return undefined;
+        recordBlob(counters.readBlobBytes, rows[0].blob as string);
+        return toSessionRecord(rows[0]);
       },
       /**
        * Compare-and-swap on `revision` (engine `StoredSessionRecord.revision`, 04-core §7.2):
@@ -191,6 +241,8 @@ export function createPostgresPersistence(
           conflict.name = SESSION_PERSISTENCE_CONFLICT;
           throw conflict;
         }
+        counters.writes += 1;
+        recordBlob(counters.writtenBlobBytes, record.blob);
       },
     },
     saves: {

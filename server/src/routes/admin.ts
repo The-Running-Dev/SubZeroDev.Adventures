@@ -12,6 +12,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { Pool } from "pg";
 import type { ContentCell } from "../content-cell.js";
 import type { CampaignSource } from "../campaigns/source.js";
+import type { SessionPersistenceCounters } from "../persistence.js";
 import {
   classifyPastedPayload,
   isMultiCampaignSource,
@@ -133,17 +134,28 @@ export function registerAdminRoutes(
   pool: Pool,
   cell: ContentCell,
   campaignSource: CampaignSource,
+  sessionCache: {
+    readonly sessionCacheLimit: number | undefined;
+    readonly counters: SessionPersistenceCounters;
+  },
 ): void {
   const admin = requireAdmin(pool);
   const readAdmin = resolveAdmin(pool);
 
   // This response contains source URLs and refresh errors as well as the catalog, so the
   // read itself is guarded rather than relying on the browser to hide the page.
+  //
+  // `sessionCache` is here and not on `/healthz` for a similar reason: blob sizes and the
+  // miss rate track live traffic, which an anonymous request has no business polling.
   app.get("/api/admin/content/status", { preHandler: readAdmin }, async () => {
     const demo = cell.current();
     return {
       isAdmin: true,
       status: cell.status(),
+      sessionCache: {
+        limit: sessionCache.sessionCacheLimit ?? null,
+        ...sessionCache.counters,
+      },
       campaigns: demo.all.map((campaign) => ({
         campaignId: campaign.campaignId,
         title: campaign.title,

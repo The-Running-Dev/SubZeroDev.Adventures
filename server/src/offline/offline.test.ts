@@ -1,4 +1,12 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+} from "vitest";
 import { randomUUID, createHash } from "node:crypto";
 import { Pool } from "pg";
 import type { FastifyInstance } from "fastify";
@@ -19,20 +27,23 @@ const campaign = "what-would-lucifer-do";
   let cookie: string;
   beforeAll(async () => {
     pool = new Pool({ connectionString: databaseUrl });
-    app = await buildApp(pool, {
-      siteUrl: "http://localhost:5173",
-      apiUrl: "http://localhost:8787",
-    });
   });
   afterAll(async () => {
-    await app.close();
     await pool.end();
   });
+  afterEach(async () => {
+    await app?.close();
+  });
+
   beforeEach(async () => {
     await pool.query(
       "truncate content_sources, badges, achievements, auth_sessions, saves, sessions, players restart identity cascade",
     );
     await resetContentEpochs(pool);
+    app = await buildApp(pool, {
+      siteUrl: "http://localhost:5173",
+      apiUrl: "http://localhost:8787",
+    });
     const identity = await member();
     owner = identity.id;
     cookie = identity.cookie;
@@ -320,6 +331,128 @@ const campaign = "what-would-lucifer-do";
       await nextApp.close();
     }
   });
+  it.each(["updated", "withdrawn"] as const)(
+    "downloads a checkpoint's recorded epoch after its campaign is %s, including after restart",
+    async (change) => {
+      const created = await app.inject({
+        method: "POST",
+        url: "/api/sessions",
+        headers: { cookie },
+        payload: { campaignId: campaign, seed: "retained-checkpoint" },
+      });
+      expect(created.statusCode, created.body).toBe(200);
+      const { sessionId } = created.json() as { sessionId: string };
+      const stored = (
+        await pool.query(
+          "select blob, campaign_version from sessions where session_id=$1",
+          [sessionId],
+        )
+      ).rows[0];
+      const content = await createDiskCampaignSource().load();
+      const campaigns = content.campaigns
+        .filter((c) => change !== "withdrawn" || c.campaign.id !== campaign)
+        .map((c) =>
+          c.campaign.id === campaign
+            ? {
+                ...c,
+                catalog: { ...c.catalog, title: "Updated campaign" },
+                campaign: { ...c.campaign, version: "2.0.0" },
+              }
+            : c,
+        );
+      const nextApp = await buildApp(pool, {
+        siteUrl: "http://localhost:5173",
+        apiUrl: "http://localhost:8787",
+        campaignSource: {
+          load: async () => ({
+            campaigns,
+            extensions: content.extensions.filter(
+              (e) => change !== "withdrawn" || e.extends !== campaign,
+            ),
+          }),
+        },
+      });
+      // A separate pool has a fresh runtime/archive. With sources unavailable it must use
+      // the durable publication, including the epoch no longer offered for new starts.
+      const restartedPool = new Pool({ connectionString: databaseUrl, max: 1 });
+      let restartedApp: FastifyInstance | undefined;
+      try {
+        restartedApp = await buildApp(restartedPool, {
+          siteUrl: "http://localhost:5173",
+          apiUrl: "http://localhost:8787",
+          campaignSource: {
+            load: async () => {
+              throw new Error("source unavailable during restart");
+            },
+          },
+        });
+        const other = await member();
+        for (const target of [nextApp, restartedApp]) {
+          // Do not warm the old epoch's bundle cache before the update/withdrawal.
+          const checkpoint = await target.inject({
+            method: "POST",
+            url: `/api/offline/download/${campaign}`,
+            headers: { cookie },
+            payload: { sessionId },
+          });
+          expect(checkpoint.statusCode, checkpoint.body).toBe(200);
+          const d = checkpoint.json() as Download;
+          expect(d.bundle.portable.campaign.version).toBe(
+            stored.campaign_version,
+          );
+          expect(d.bundle.portable.catalog.title).not.toBe("Updated campaign");
+          expect(d.checkpoint?.blob).toBe(stored.blob);
+          expect(
+            validateBundle(d.bundle).replay(
+              d.bundle.portable,
+              d.checkpoint!.inputs,
+              d.checkpoint!.actions,
+            ).blob,
+          ).toBe(stored.blob);
+
+          const fresh = await target.inject({
+            method: "POST",
+            url: `/api/offline/download/${campaign}`,
+            headers: { cookie },
+            payload: {},
+          });
+          if (change === "updated") {
+            expect(fresh.statusCode, fresh.body).toBe(200);
+            expect(fresh.json().bundle.portable.campaign.version).toBe("2.0.0");
+          } else {
+            expect(fresh.statusCode, fresh.body).toBe(404);
+            expect(fresh.json().error.code).toBe("unknown_campaign");
+          }
+          const grantsBefore = (
+            await pool.query("select count(*)::int n from offline_grants")
+          ).rows[0].n;
+          const denied = await target.inject({
+            method: "POST",
+            url: `/api/offline/download/${campaign}`,
+            headers: { cookie: other.cookie },
+            payload: { sessionId },
+          });
+          expect(denied.statusCode, denied.body).toBe(403);
+          expect(
+            (await pool.query("select count(*)::int n from offline_grants"))
+              .rows[0].n,
+          ).toBe(grantsBefore);
+        }
+        expect(
+          (
+            await pool.query("select blob from sessions where session_id=$1", [
+              sessionId,
+            ])
+          ).rows[0].blob,
+        ).toBe(stored.blob);
+      } finally {
+        await restartedApp?.close();
+        await restartedPool.end();
+        await nextApp.close();
+      }
+    },
+  );
+
   it("rolls back the replay when receipt persistence fails", async () => {
     const r = body(await download());
     await pool.query(`create function reject_offline_receipt() returns trigger language plpgsql as $$ begin raise exception 'simulated write failure'; end $$;

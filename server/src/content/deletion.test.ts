@@ -394,6 +394,25 @@ describeIfDb("deletion against Postgres", () => {
     expect(await ledger.since(0)).toHaveLength(1);
   });
 
+  it("reconciles on a one-connection pool, where the lock holds the only connection", async () => {
+    const ledger = createMemoryLedger();
+    await startMine(await published());
+    expect(await deleteSource(pool, ledger, sourceId, actor())).toBe("done");
+    await resetContentEpochs(pool);
+    const restored = await startMine(await published());
+
+    // Reinstating, appending and purging all need a connection while the lock holds one.
+    const single = new Pool({ connectionString: databaseUrl, max: 1 });
+    try {
+      expect(await reconcileDeletions(single, ledger)).toBe("done");
+      expect(await count("sessions where session_id = $1", [restored])).toBe(0);
+      // The session lock was released, so the next pass takes it again.
+      expect(await reconcileDeletions(single, ledger)).toBe("done");
+    } finally {
+      await single.end();
+    }
+  });
+
   it("answers a purged session 410 to its owner, 403 to anyone else, and 404 otherwise", async () => {
     const demo = await published();
     const sessionId = await startMine(demo);

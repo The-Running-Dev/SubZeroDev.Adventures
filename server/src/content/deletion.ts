@@ -194,11 +194,17 @@ function distinct(keys: readonly Key[]): Key[] {
   return [...seen.values()];
 }
 
+/** A pool, or a client already checked out of one -- the reconciler's, which holds the
+ *  reconcile lock and so must do its work on that connection: on a one-connection pool a
+ *  second checkout would wait for it forever. */
+type Db = Pool | PoolClient;
+
 async function inTransaction<T>(
-  pool: Pool,
+  db: Db,
   fn: (client: PoolClient) => Promise<T>,
 ): Promise<T> {
-  const client = await pool.connect();
+  const held = "release" in db;
+  const client = held ? db : await db.connect();
   try {
     await client.query("begin");
     const result = await fn(client);
@@ -208,7 +214,7 @@ async function inTransaction<T>(
     await client.query("rollback").catch(() => {});
     throw error;
   } finally {
-    client.release();
+    if (!held) client.release();
   }
 }
 
@@ -258,7 +264,7 @@ export async function recordDeletion(
 
 /** Step 2. A no-op once the row has its external sequence. */
 export async function appendDeletion(
-  pool: Pool,
+  pool: Db,
   ledger: ExternalLedger,
   deletionId: string,
 ): Promise<void> {
@@ -302,7 +308,7 @@ const AFFECTED = `(select * from unnest($1::text[], $2::text[]) as k(campaign_id
 
 /** Step 3. A no-op once the row is purged; a purge of rows already gone deletes nothing. */
 export async function purgeDeletion(
-  pool: Pool,
+  pool: Db,
   deletionId: string,
 ): Promise<void> {
   await inTransaction(pool, async (client) => {
@@ -553,7 +559,7 @@ export async function deleteSource(
 /** Inserts an entry the database does not hold -- a backup restored to before it -- as
  *  `pending`, under the same locks recording takes. */
 async function reinstate(
-  pool: Pool,
+  pool: Db,
   entry: Awaited<ReturnType<ExternalLedger["since"]>>[number],
 ): Promise<void> {
   await inTransaction(pool, async (client) => {
@@ -604,16 +610,17 @@ export async function reconcileDeletions(
       [RECONCILE_LOCK],
     );
     if (!taken.rows[0]!.taken) return "busy";
+    // Everything below runs on `lock`, the connection holding the session lock.
     try {
       let ok = true;
-      const { rows } = await pool.query<{ applied_external_seq: string }>(
+      const { rows } = await lock.query<{ applied_external_seq: string }>(
         "select applied_external_seq from content_current",
       );
       const applied = Number(rows[0]!.applied_external_seq);
       let highWater = applied;
       try {
         for (const entry of await ledger.since(applied)) {
-          await reinstate(pool, entry);
+          await reinstate(lock, entry);
           highWater = Math.max(highWater, entry.seq);
         }
       } catch (error) {
@@ -621,7 +628,7 @@ export async function reconcileDeletions(
         return "failed";
       }
 
-      const incomplete = await pool.query<{
+      const incomplete = await lock.query<{
         deletion_id: string;
         external_seq: string | null;
         state: string;
@@ -632,7 +639,7 @@ export async function reconcileDeletions(
       for (const row of incomplete.rows) {
         if (row.external_seq === null)
           try {
-            await appendDeletion(pool, ledger, row.deletion_id);
+            await appendDeletion(lock, ledger, row.deletion_id);
           } catch (error) {
             ok = false;
             warn(
@@ -642,14 +649,14 @@ export async function reconcileDeletions(
           }
         if (row.state !== "purged")
           try {
-            await purgeDeletion(pool, row.deletion_id);
+            await purgeDeletion(lock, row.deletion_id);
           } catch (error) {
             ok = false;
             warn(`deletion ${row.deletion_id}: purge failed`, error);
           }
       }
       if (highWater !== applied)
-        await pool.query(
+        await lock.query(
           `update content_current set applied_external_seq = greatest(applied_external_seq, $1)`,
           [highWater],
         );

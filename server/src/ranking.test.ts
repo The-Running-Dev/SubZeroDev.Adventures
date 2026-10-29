@@ -18,6 +18,7 @@ import {
   rankProfiles,
 } from "./ranking.js";
 import type { PublicProfileTotal } from "./platform-baselines.js";
+import { resetContentEpochs } from "./content/reset.js";
 
 const databaseUrl = process.env.DATABASE_URL;
 const describeIfDb = databaseUrl ? describe : describe.skip;
@@ -210,6 +211,7 @@ describeIfDb("ranking against a live database", () => {
     await pool.query(
       "truncate badges, achievements, auth_sessions, saves, sessions, players restart identity cascade",
     );
+    await resetContentEpochs(pool);
   });
 
   async function createPlayer(

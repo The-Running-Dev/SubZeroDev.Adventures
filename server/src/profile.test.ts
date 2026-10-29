@@ -8,6 +8,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Pool } from "pg";
 import type { FastifyInstance } from "fastify";
 import { buildApp } from "./app.js";
+import { resetContentEpochs } from "./content/reset.js";
 
 const databaseUrl = process.env.DATABASE_URL;
 const describeIfDb = databaseUrl ? describe : describe.skip;
@@ -41,6 +42,7 @@ describeIfDb("public/private profiles", () => {
     await pool.query(
       "truncate badges, achievements, auth_sessions, saves, sessions, players restart identity cascade",
     );
+    await resetContentEpochs(pool);
   });
 
   async function guestCookie(): Promise<string> {

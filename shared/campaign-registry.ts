@@ -13,8 +13,10 @@ import {
   simulationKind,
   storyGraphKind,
   worldGraphKind,
+  type Campaign,
   type ContentRegistry,
   type PortableCampaign,
+  type PortableCatalog,
   type ValidationError,
   type ValidationWarning,
 } from "@the-running-dev/game-engine";
@@ -136,6 +138,31 @@ export function endingCountOf(content: unknown): number {
   return endingIds.size;
 }
 
+/** One campaign's dossier entry, from the hydrated campaign, a string table holding its title,
+ *  and its portable catalog block. Shared by `hydrateCatalog` and the server's epoch view
+ *  (server/src/content/runtime.ts), which rebuilds entries from stored epochs without
+ *  re-reading any source. */
+export function catalogEntryOf(
+  campaign: Campaign,
+  strings: ReadonlyMap<string, string>,
+  catalog: PortableCatalog,
+): CatalogEntry {
+  return {
+    campaignId: campaign.id,
+    kindId: campaign.kindId,
+    version: campaign.version,
+    title: strings.get(campaign.titleKey) ?? catalog.title,
+    description: catalog.description,
+    duration: catalog.duration,
+    contentNotice: catalog.contentNotice,
+    featured: catalog.featured,
+    ...(catalog.hidden ? { hidden: true } : {}),
+    ...(catalog.sources ? { sources: catalog.sources } : {}),
+    statBounds: Object.freeze(statBoundsOf(campaign.content)),
+    endingCount: endingCountOf(campaign.content),
+  };
+}
+
 export interface BuiltCatalog {
   readonly portables: readonly PortableCampaign[];
   readonly registry: ContentRegistry;
@@ -209,21 +236,9 @@ export function hydrateCatalog(
       warnings: registry.warnings,
     };
 
-  const all = hydrated.map(({ built, catalog }) => ({
-    campaignId: built.campaign.id,
-    kindId: built.campaign.kindId,
-    version: built.campaign.version,
-    title:
-      registry.value!.strings.get(built.campaign.titleKey) ?? catalog.title,
-    description: catalog.description,
-    duration: catalog.duration,
-    contentNotice: catalog.contentNotice,
-    featured: catalog.featured,
-    ...(catalog.hidden ? { hidden: true } : {}),
-    ...(catalog.sources ? { sources: catalog.sources } : {}),
-    statBounds: Object.freeze(statBoundsOf(built.campaign.content)),
-    endingCount: endingCountOf(built.campaign.content),
-  }));
+  const all = hydrated.map(({ built, catalog }) =>
+    catalogEntryOf(built.campaign, registry.value!.strings, catalog),
+  );
 
   const campaignStringKeys = new Map<string, ReadonlySet<string>>(
     hydrated.map(({ built }) => [

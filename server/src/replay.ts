@@ -46,10 +46,19 @@ export function replay(
       "replay: stored blob failed to deserialize against this engine",
     );
   }
-  const { campaignId, seed, actionLog, gameId } = deserialized.value;
+  const { campaignId, campaignVersion, seed, actionLog, gameId } =
+    deserialized.value;
   const engine = makeReplayEngine(gameId);
 
-  const created = engine.createGame({ campaignId, seed });
+  // The epoch the game started on (engine 16-content-epochs.md §3.1): the first logged
+  // adoption's `from`, or -- a session that never adopted -- the version it is on now. Never
+  // the engine's default, which is whatever the current publication offers.
+  const firstAdoption = actionLog.find((logged) => !("actionId" in logged));
+  const startVersion =
+    firstAdoption && "from" in firstAdoption
+      ? firstAdoption.from
+      : campaignVersion;
+  const created = engine.createGame({ campaignId, seed }, startVersion);
   if (!created.ok || !created.value) {
     throw new Error(`replay: createGame rejected for campaign "${campaignId}"`);
   }
@@ -59,12 +68,21 @@ export function replay(
   const log = upTo === undefined ? actionLog : actionLog.slice(0, upTo);
 
   for (const logged of log) {
-    // A content-epoch entry (engine 16-content-epochs.md §3.1) is not a player action, and
-    // this server never adopts content, so a log carrying one is not one this loop can play.
+    // A content-epoch entry is not a player action: it replays as the adoption it records
+    // and adds no step. A migration entry is never replayed (04 §10.2); a lineage carrying
+    // one is not replay-compatible, so reaching one here is a stored log this loop cannot play.
     if (!("actionId" in logged)) {
-      throw new Error(
-        `replay: seq ${logged.seq} is a content-epoch entry -- this replay plays player actions only`,
-      );
+      if (logged.system !== "content")
+        throw new Error(
+          `replay: seq ${logged.seq} is a ${logged.system} entry -- a migrated lineage does not replay`,
+        );
+      const adopted = engine.adoptContent(state, logged.to);
+      if (!adopted.adopted)
+        throw new Error(
+          `replay: the adoption at seq ${logged.seq} ("${logged.from}" to "${logged.to}") was refused: ${adopted.reason}`,
+        );
+      state = adopted.state;
+      continue;
     }
     const result = engine.submitAction(state, logged.actionId, logged.params);
     if (!result.ok || !result.value) {

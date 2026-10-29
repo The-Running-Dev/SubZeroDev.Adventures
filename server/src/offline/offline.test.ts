@@ -9,6 +9,7 @@ import type {
   Download,
   SyncRequest,
 } from "../../../shared/offline/protocol.js";
+import { resetContentEpochs } from "../content/reset.js";
 const databaseUrl = process.env.DATABASE_URL;
 const campaign = "what-would-lucifer-do";
 (databaseUrl ? describe : describe.skip)("authoritative offline replay", () => {
@@ -31,6 +32,7 @@ const campaign = "what-would-lucifer-do";
     await pool.query(
       "truncate content_sources, badges, achievements, auth_sessions, saves, sessions, players restart identity cascade",
     );
+    await resetContentEpochs(pool);
     const identity = await member();
     owner = identity.id;
     cookie = identity.cookie;

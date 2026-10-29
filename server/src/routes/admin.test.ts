@@ -14,6 +14,7 @@ import {
 } from "@the-running-dev/game-engine";
 import { buildApp } from "../app.js";
 import { createMultiSourceCampaignSource } from "../campaigns/multi-source.js";
+import { resetContentEpochs } from "../content/reset.js";
 
 const databaseUrl = process.env.DATABASE_URL;
 const describeIfDb = databaseUrl ? describe : describe.skip;
@@ -137,6 +138,7 @@ describeIfDb("/api/admin/content", () => {
     await pool.query(
       "truncate badges, achievements, identities, auth_sessions, saves, sessions, players restart identity cascade",
     );
+    await resetContentEpochs(pool);
   });
 
   async function guestCookie(): Promise<string> {
@@ -380,6 +382,7 @@ describeIfDb("/api/admin/content/sources", () => {
     await pool.query(
       "truncate content_sources, badges, achievements, identities, auth_sessions, saves, sessions, players restart identity cascade",
     );
+    await resetContentEpochs(pool);
   });
 
   // No campaign this app's builtin source serves is a valid `POST /api/sessions`
@@ -696,6 +699,7 @@ describeIfDb("/api/admin/content/sources with an unreachable builtin", () => {
     await pool.query(
       "truncate content_sources, badges, achievements, identities, auth_sessions, saves, sessions, players restart identity cascade",
     );
+    await resetContentEpochs(pool);
   });
 
   async function adminCookie(): Promise<string> {
@@ -765,6 +769,7 @@ describeIfDb("a stored source that cannot be merged", () => {
     await pool.query(
       "truncate content_sources, badges, achievements, identities, auth_sessions, saves, sessions, players restart identity cascade",
     );
+    await resetContentEpochs(pool);
     // `end` is already a node on every `minimalPortableCampaign`, so applying this throws
     // inside `buildValidatedContentRegistry` rather than failing any source's load. An
     // admin-added row, same as `addPastedSource` (content-sources.ts) actually inserts --

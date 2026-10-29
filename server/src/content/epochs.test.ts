@@ -13,7 +13,7 @@ import {
 } from "../composition.js";
 import type { CampaignSource } from "../campaigns/source.js";
 import { buildCandidate } from "./candidate.js";
-import { resetContentEpochs } from "./reset.js";
+import { createAdmitted, resetContentEpochs } from "./reset.js";
 import { createContentRuntime, forgetContentRuntime } from "./runtime.js";
 
 const databaseUrl = process.env.DATABASE_URL;
@@ -203,7 +203,7 @@ describeIfDb("content epochs", () => {
 
   it("boots on what is current with no source read, and keeps a session on a superseded epoch playable", async () => {
     const before = await createServerDemo(pool, sourceOf(campaign("a")));
-    const { sessionId } = await before.store.createSession({
+    const { sessionId } = await createAdmitted(before, {
       campaignId: "a",
       audience: "player",
     });
@@ -220,7 +220,7 @@ describeIfDb("content epochs", () => {
     expect(scene).toBeDefined();
     expect((await after.store.getView(sessionId)).status).toBe("active");
 
-    const created = await after.store.createSession({
+    const created = await createAdmitted(after, {
       campaignId: "a",
       audience: "player",
     });

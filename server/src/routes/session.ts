@@ -11,6 +11,14 @@ import {
   type ActionParams,
 } from "@the-running-dev/game-engine";
 import type { ContentCell } from "../content-cell.js";
+import { ContentRefusal } from "../content/admission.js";
+import { accessibleIn } from "../content/runtime.js";
+import type { EntryRow } from "../content/epoch-store.js";
+import {
+  catalogEntryOf,
+  type CatalogEntry,
+} from "../../../shared/campaign-registry.js";
+import type { Campaign } from "@the-running-dev/game-engine";
 import { requirePrincipal, resolvePrincipal, logout } from "../principal.js";
 import { OwnershipError, ownedStore } from "../store/ownedStore.js";
 import type { IdentityProvider } from "../identity/provider.js";
@@ -26,6 +34,10 @@ const ERROR_STATUS: Record<string, number> = {
   migration_failed: 409,
   concurrent_modification: 409,
   invalid_fork_point: 409,
+  forbidden: 403,
+  campaign_access_revoked: 403,
+  campaign_version_unsupported: 409,
+  campaign_version_unavailable: 409,
 };
 
 function statusFor(code: string): number {
@@ -74,6 +86,12 @@ export function registerSessionRoutes(
         error: { operation: error.operation, code: "forbidden" },
       });
     }
+    if (error instanceof ContentRefusal) {
+      reply.code(error.status);
+      return reply.send({
+        error: { operation: error.operation, code: error.code },
+      });
+    }
     if (error instanceof SessionStoreError) {
       reply.code(statusFor(error.code));
       return reply.send({
@@ -106,29 +124,79 @@ export function registerSessionRoutes(
   // GET stays anonymous rather than growing the `players` table), and the response now
   // varies by who's asking, so `Vary: Cookie` -- this was a plain public, cacheable GET
   // before and any intermediary caching it needs to know that changed.
+  //
+  // Built from the current publication after the request gate (engine plan 54, D4 §1): a
+  // closed gate withholds everything but core, and an entry on an epoch this server cannot
+  // run is listed as unavailable rather than dropped.
   app.get("/api/campaigns", { preHandler: resolve }, async (request, reply) => {
     const demo = cell.current();
     const playerId = request.principalOrNull?.playerId ?? null;
-    const accessible = demo.accessibleCampaignIds(playerId);
+    const open = await demo.runtime.check();
+    const view = demo.runtime.view();
+    const listed = (entry: EntryRow) =>
+      (open || entry.provenance === null) &&
+      accessibleIn([entry], playerId).has(entry.campaignId);
+    const entries = (view?.entries ?? []).filter(listed);
+    const withheld = (view?.withheld ?? []).filter(listed);
+    const owned = (entry: EntryRow, campaign: CatalogEntry): CatalogEntry =>
+      entry.provenance === null
+        ? campaign
+        : {
+            ...campaign,
+            mine: entry.provenance.ownerPlayerId === playerId,
+            visibility: entry.provenance.visibility,
+          };
+    const available = await Promise.all(
+      entries.map(async (entry) =>
+        owned(entry, {
+          ...catalogEntryOf(
+            entry.registry.campaigns.get(entry.campaignId)!,
+            entry.registry.strings,
+            entry.catalog,
+          ),
+          offline:
+            (await demo.bundleForEpoch(
+              entry.campaignId,
+              entry.campaignVersion,
+            )) !== undefined,
+        }),
+      ),
+    );
+    const unavailable = withheld.map((entry) => {
+      const { campaign, strings } = entry.epoch.stored.form;
+      let listing: CatalogEntry;
+      try {
+        listing = catalogEntryOf(
+          campaign as Campaign,
+          new Map(Object.entries(strings)),
+          entry.catalog,
+        );
+      } catch {
+        // Content this server's kind cannot read: the catalog's own fields are all it has.
+        listing = {
+          campaignId: entry.campaignId,
+          kindId: campaign.kindId,
+          version: entry.campaignVersion,
+          ...entry.catalog,
+          statBounds: {},
+          endingCount: 0,
+        };
+      }
+      return owned(entry, {
+        ...listing,
+        offline: false,
+        available: false,
+        code: "campaign_version_unsupported",
+      });
+    });
+    const startable = new Set(entries.map((entry) => entry.campaignId));
     const catalog = await demo.store.listCampaigns();
     reply.header("Vary", "Cookie");
     reply.header("Cache-Control", "private, no-cache");
     return {
-      campaigns: demo.all
-        .filter((campaign) => accessible.has(campaign.campaignId))
-        .map((campaign) => {
-          const entry = demo.provenance.get(campaign.campaignId);
-          const offline = demo.offlineBundles.has(campaign.campaignId);
-          if (!entry) return { ...campaign, offline };
-          return {
-            ...campaign,
-            offline,
-            mine: entry.ownerPlayerId === playerId,
-            visibility: entry.visibility,
-          };
-        }),
+      campaigns: [...available, ...unavailable],
       summaries: catalog.campaigns.filter((summary) =>
-        accessible.has(summary.campaignId),
+        startable.has(summary.campaignId),
       ),
     };
   });

@@ -10,7 +10,7 @@ import { Pool } from "pg";
 import { SessionStoreError } from "@the-running-dev/game-engine";
 import { createServerDemo } from "./composition.js";
 import { createSessionPersistenceCounters } from "./persistence.js";
-import { resetContentEpochs } from "./content/reset.js";
+import { createAdmitted, resetContentEpochs } from "./content/reset.js";
 
 const databaseUrl = process.env.DATABASE_URL;
 const describeIfDb = databaseUrl ? describe : describe.skip;
@@ -35,7 +35,7 @@ describeIfDb("createServerDemo rebuild", () => {
 
   it("keeps a session playable across an independent rebuild", async () => {
     const before = await createServerDemo(pool);
-    const { sessionId } = await before.store.createSession({
+    const { sessionId } = await createAdmitted(before, {
       campaignId: "what-would-lucifer-do",
       audience: "player",
     });
@@ -91,7 +91,7 @@ describeIfDb("session compare-and-swap", () => {
 
   it("accepts a valid action after a rejected one", async () => {
     const demo = await createServerDemo(pool);
-    const { sessionId } = await demo.store.createSession({
+    const { sessionId } = await createAdmitted(demo, {
       campaignId: "what-would-lucifer-do",
       audience: "player",
     });
@@ -108,7 +108,7 @@ describeIfDb("session compare-and-swap", () => {
 
   it("reports a lost race as concurrent_modification and lets the loser retry", async () => {
     const winner = await createServerDemo(pool);
-    const { sessionId } = await winner.store.createSession({
+    const { sessionId } = await createAdmitted(winner, {
       campaignId: "what-would-lucifer-do",
       audience: "player",
     });
@@ -173,7 +173,7 @@ describeIfDb("sessionCacheLimit", () => {
       counters,
     });
 
-    const { sessionId: first } = await demo.store.createSession({
+    const { sessionId: first } = await createAdmitted(demo, {
       campaignId: "what-would-lucifer-do",
       audience: "player",
     });
@@ -186,7 +186,7 @@ describeIfDb("sessionCacheLimit", () => {
     expect(counters).toMatchObject({ cacheMisses: 0, writes: 2 });
 
     // A second session takes the only slot, so `first` is evicted.
-    await demo.store.createSession({
+    await createAdmitted(demo, {
       campaignId: "what-would-lucifer-do",
       audience: "player",
     });

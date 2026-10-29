@@ -14,9 +14,19 @@
  * error handler (registered on the one Fastify instance both route modules share).
  */
 import type { Pool } from "pg";
-import type { SessionStore } from "@the-running-dev/game-engine";
-import { saveOwner, sessionOwner } from "../persistence.js";
+import {
+  SessionStoreError,
+  type SessionStore,
+} from "@the-running-dev/game-engine";
+import { saveOwner, sessionOwner, storedContentRow } from "../persistence.js";
 import type { ServerDemo } from "../composition.js";
+import {
+  gateExisting,
+  gateNewStart,
+  lineageOf,
+  runAdmitted,
+  type Admission,
+} from "../content/admission.js";
 
 export class OwnershipError extends Error {
   readonly operation: string;
@@ -63,15 +73,21 @@ export async function assertSaveOwned(
 
 /**
  * Every id-keyed `SessionStore` operation checked against `playerId` before it reaches
- * the underlying store. `listCampaigns` passes straight through -- there is no existing id
- * to own yet. `createSession` is the one operation this decorator does more than check
- * ownership for:
+ * the underlying store, and then against the content it would serve (engine plan 54, D4):
  *
- * - `createSession` checks `demo.accessibleCampaignIds(playerId)` before minting a session on
- *   a campaign this player cannot reach -- someone else's private or pending submission,
- *   specifically. A `campaignId` this player *can* reach, or one that isn't registered at all,
- *   passes straight through to the underlying store's own `unknown_campaign` -- same
- *   "don't preempt a real 404 with a 403" posture as `assertSessionOwned` below.
+ * - `createSession` is a new start. The gate (`content/admission.ts`'s `gateNewStart`) picks
+ *   the version from the current publication -- 404 when the campaign is not in it, 403 when
+ *   this player cannot reach it, 409 when its epoch cannot run here -- and the store runs
+ *   under that admission, so the session is written on exactly that version or not at all.
+ * - `branchSession` and `loadGame` derive a new session from an existing one, so they are
+ *   gated as existing content and admitted on the versions the source names.
+ * - Every other session operation serves an existing session's epoch: gated as existing
+ *   content, so a revoked campaign answers `campaign_access_revoked` and an epoch this
+ *   process cannot run answers 409. A withdrawn campaign's sessions continue (D4 §4).
+ *
+ * A write the current publication no longer admits by the time it commits -- a publication
+ * or revocation landed between the gate and the write -- comes back as
+ * `concurrent_modification`; the operation catches up, is gated again, and retried once.
  *
  * `getStrings` used to narrow the engine's whole-registry answer to the session's campaign.
  * It no longer needs to: every epoch the content archive holds is one campaign's registry
@@ -85,66 +101,151 @@ export function ownedStore(
   playerId: string,
   demo: ServerDemo,
 ): SessionStore {
+  const { runtime } = demo;
+
+  /** Ownership, then the content gate, for an operation serving an existing session. A row
+   *  that does not exist passes through to the store's own 404. */
+  async function existingSession(
+    sessionId: string,
+    operation: string,
+  ): Promise<void> {
+    const row = await storedContentRow(pool, "sessions", sessionId);
+    if (row === undefined) return;
+    if (row.profileId !== playerId) throw new OwnershipError(operation);
+    if (row.campaignVersion === null) return;
+    await gateExisting(
+      runtime,
+      operation,
+      { campaignId: row.campaignId, campaignVersion: row.campaignVersion },
+      playerId,
+      await runtime.check(),
+    );
+  }
+
+  /** `run` under the admission `admit` decides, gated again and retried once if the fence
+   *  refused it. `admit` is the gate: it throws the refusal, or returns the admission. */
+  async function admitted<T>(
+    admit: () => Promise<Admission>,
+    run: () => Promise<T>,
+  ): Promise<T> {
+    for (let attempt = 0; ; attempt++) {
+      const admission = await admit();
+      try {
+        return await runAdmitted(admission, run);
+      } catch (error) {
+        if (attempt > 0 || !isConflict(error)) throw error;
+        await runtime.catchUp();
+      }
+    }
+  }
+
+  /** A session derived from an existing session or save: `branchSession`, `loadGame`. */
+  function derived<T>(
+    table: "sessions" | "saves",
+    id: string,
+    operation: string,
+    run: () => Promise<T>,
+  ): Promise<T> {
+    return admitted(async () => {
+      const row = await storedContentRow(pool, table, id, true);
+      // No such row: the store's own 404, under an admission that admits nothing.
+      if (row === undefined)
+        return {
+          kind: "derived",
+          campaignId: "",
+          versions: new Set(),
+          playerId,
+        };
+      if (row.profileId !== playerId) throw new OwnershipError(operation);
+      const lineage = lineageOf(row.blob!);
+      await gateExisting(
+        runtime,
+        operation,
+        lineage,
+        playerId,
+        await runtime.check(),
+      );
+      return {
+        kind: "derived",
+        campaignId: lineage.campaignId,
+        versions: lineage.versions,
+        playerId,
+      };
+    }, run);
+  }
+
   return {
     listCampaigns: () => store.listCampaigns(),
     // No id to own yet -- `profileId` here is always `request.principal.playerId`, never
     // client-supplied, so there is nothing for a caller to forge their way past.
     listSaves: (profileId) => store.listSaves(profileId),
+    // Deleting serves no content, so a revoked or unsupported campaign's save can still go.
     async deleteSave(profileId, saveId, expectedSavedAt) {
       await assertSaveOwned(pool, saveId, playerId, "deleteSave");
       return store.deleteSave(profileId, saveId, expectedSavedAt);
     },
-    async branchSession(sessionId, atActionCount) {
-      await assertSessionOwned(pool, sessionId, playerId, "branchSession");
-      return store.branchSession(sessionId, atActionCount);
-    },
-    async createSession(config) {
-      const accessible = demo.accessibleCampaignIds(playerId);
-      const registered = demo.all.some(
-        (campaign) => campaign.campaignId === config.campaignId,
-      );
-      if (registered && !accessible.has(config.campaignId)) {
-        throw new OwnershipError("createSession");
-      }
-      return store.createSession(config);
-    },
+    branchSession: (sessionId, atActionCount) =>
+      derived("sessions", sessionId, "branchSession", () =>
+        store.branchSession(sessionId, atActionCount),
+      ),
+    createSession: (config) =>
+      admitted(
+        async () => ({
+          kind: "new",
+          campaignId: config.campaignId,
+          campaignVersion: gateNewStart(
+            runtime,
+            "createSession",
+            config.campaignId,
+            playerId,
+            await runtime.check(),
+          ),
+          playerId,
+        }),
+        () => store.createSession(config),
+      ),
 
     async getScene(sessionId) {
-      await assertSessionOwned(pool, sessionId, playerId, "getScene");
+      await existingSession(sessionId, "getScene");
       return store.getScene(sessionId);
     },
     async getView(sessionId) {
-      await assertSessionOwned(pool, sessionId, playerId, "getView");
+      await existingSession(sessionId, "getView");
       return store.getView(sessionId);
     },
     async getStrings(sessionId) {
-      await assertSessionOwned(pool, sessionId, playerId, "getStrings");
+      await existingSession(sessionId, "getStrings");
       // The engine store answers from the session's own epochs -- core and kind messages plus
       // those epochs' authored strings -- which is right for a session pinned to an epoch the
       // current publication no longer offers, too.
       return store.getStrings(sessionId);
     },
     async previewAction(sessionId, actionId, params) {
-      await assertSessionOwned(pool, sessionId, playerId, "previewAction");
+      await existingSession(sessionId, "previewAction");
       return store.previewAction(sessionId, actionId, params);
     },
     async resumeSession(sessionId) {
-      await assertSessionOwned(pool, sessionId, playerId, "resumeSession");
+      await existingSession(sessionId, "resumeSession");
       return store.resumeSession(sessionId);
     },
     async submitAction(sessionId, actionId, params) {
-      await assertSessionOwned(pool, sessionId, playerId, "submitAction");
+      await existingSession(sessionId, "submitAction");
       return store.submitAction(sessionId, actionId, params);
     },
     async saveGame(sessionId) {
-      await assertSessionOwned(pool, sessionId, playerId, "saveGame");
+      await existingSession(sessionId, "saveGame");
       return store.saveGame(sessionId);
     },
-    async loadGame(saveId) {
-      await assertSaveOwned(pool, saveId, playerId, "loadGame");
-      return store.loadGame(saveId);
-    },
+    loadGame: (saveId) =>
+      derived("saves", saveId, "loadGame", () => store.loadGame(saveId)),
   };
+}
+
+function isConflict(error: unknown): boolean {
+  return (
+    error instanceof SessionStoreError &&
+    error.code === "concurrent_modification"
+  );
 }
 
 declare module "fastify" {

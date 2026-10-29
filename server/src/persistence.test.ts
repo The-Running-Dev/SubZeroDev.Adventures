@@ -17,6 +17,11 @@ import {
 } from "@the-running-dev/game-engine";
 import { createPostgresPersistence } from "./persistence.js";
 
+/** These suites store a fixture campaign no publication holds, so the content fence -- which
+ *  refuses a revision-0 write the current publication does not admit -- is off. Its own
+ *  behaviour is `content/admission.test.ts`'s. */
+const UNFENCED = { fence: false } as const;
+
 const databaseUrl = process.env.DATABASE_URL;
 const describeIfDb = databaseUrl ? describe : describe.skip;
 const timestamp = "2026-10-27T00:00:00.000Z";
@@ -134,7 +139,12 @@ describeIfDb("Postgres initialization persistence", () => {
   ] as const)(
     "round-trips %s through sessions, saves and save listing",
     async (_label, initialization) => {
-      const persistence = createPostgresPersistence(pool, kinds);
+      const persistence = createPostgresPersistence(
+        pool,
+        kinds,
+        undefined,
+        UNFENCED,
+      );
       const session = sessionRecord(initialization);
       const save: StoredSaveRecord = {
         saveId: randomUUID(),
@@ -148,7 +158,7 @@ describeIfDb("Postgres initialization persistence", () => {
       };
       await persistence.sessions.put(session);
       await persistence.saves.put(save);
-      const cold = createPostgresPersistence(pool, kinds);
+      const cold = createPostgresPersistence(pool, kinds, undefined, UNFENCED);
       expect(await cold.sessions.get(session.sessionId)).toStrictEqual(session);
       expect(await cold.saves.get(save.saveId)).toStrictEqual(save);
       expect(await cold.saves.listByProfile(profileId)).toStrictEqual([save]);
@@ -164,7 +174,12 @@ describeIfDb("Postgres initialization persistence", () => {
   );
 
   it("updates initialization in both upserts, preserves CAS, and can clear back to legacy", async () => {
-    const persistence = createPostgresPersistence(pool, kinds);
+    const persistence = createPostgresPersistence(
+      pool,
+      kinds,
+      undefined,
+      UNFENCED,
+    );
     let session = sessionRecord();
     let save: StoredSaveRecord = {
       saveId: randomUUID(),
@@ -219,7 +234,12 @@ describeIfDb("Postgres initialization persistence", () => {
       engine: createEngine({ kinds: hostKinds, registry }),
       registry,
       profiles,
-      persistence: createPostgresPersistence(pool, hostKinds),
+      persistence: createPostgresPersistence(
+        pool,
+        hostKinds,
+        undefined,
+        UNFENCED,
+      ),
       clock: { now: () => timestamp },
     });
   }
@@ -242,7 +262,12 @@ describeIfDb("Postgres initialization persistence", () => {
       profileId,
       seed: "fixed-seed",
     });
-    const persistence = createPostgresPersistence(pool, kinds);
+    const persistence = createPostgresPersistence(
+      pool,
+      kinds,
+      undefined,
+      UNFENCED,
+    );
     const blobs: string[] = [];
     const scenes = [];
     for (let n = 0; n <= 2; n++) {
@@ -313,7 +338,12 @@ describeIfDb("Postgres initialization persistence", () => {
       [saved.saveId],
     );
     const loaded = await host().loadGame(saved.saveId);
-    const persistence = createPostgresPersistence(pool, kinds);
+    const persistence = createPostgresPersistence(
+      pool,
+      kinds,
+      undefined,
+      UNFENCED,
+    );
     expect(await persistence.sessions.get(loaded.sessionId)).not.toHaveProperty(
       "initialization",
     );
@@ -349,7 +379,12 @@ describeIfDb("Postgres initialization persistence", () => {
       campaignId: "test",
       ...(safeCase === "anonymous legacy" ? {} : { profileId }),
     });
-    const persistence = createPostgresPersistence(pool, hostKinds);
+    const persistence = createPostgresPersistence(
+      pool,
+      hostKinds,
+      undefined,
+      UNFENCED,
+    );
     const blob = (await persistence.sessions.get(source.sessionId))!.blob;
     if (safeCase !== "recorded empty wrapper") {
       await pool.query(

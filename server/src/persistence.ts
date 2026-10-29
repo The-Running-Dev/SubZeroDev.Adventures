@@ -4,7 +4,7 @@
  * (`src/play/composition.ts`), so `createInMemorySessionStore` (which treats persistence
  * as a write-through cache, reading on miss) needs no changes to run against this.
  */
-import type { Pool } from "pg";
+import type { Pool, PoolClient } from "pg";
 import {
   SESSION_PERSISTENCE_CONFLICT,
   type KindRegistry,
@@ -13,6 +13,7 @@ import {
   type StoredSaveRecord,
   type StoredSessionRecord,
 } from "@the-running-dev/game-engine";
+import { admits, lineageOf } from "./content/admission.js";
 
 /**
  * Reads the four columns `/api/progress` (routes/progress.ts) queries across every
@@ -164,11 +165,53 @@ function recordBlob(bytes: BlobBytes, blob: string): void {
   bytes.total += size;
 }
 
+export interface PostgresPersistenceOptions {
+  /**
+   * Fence every revision-0 session write against the current publication (engine plan 54,
+   * D4 §2): refused, as `SESSION_PERSISTENCE_CONFLICT`, unless a gate admitted it and the
+   * publication still does. On by default; off only for tests writing fixture rows directly.
+   */
+  readonly fence?: boolean;
+}
+
+function conflictError(message: string): Error {
+  const conflict = new Error(message);
+  conflict.name = SESSION_PERSISTENCE_CONFLICT;
+  return conflict;
+}
+
 export function createPostgresPersistence(
   pool: Pool,
   kinds: KindRegistry,
   counters: SessionPersistenceCounters = createSessionPersistenceCounters(),
+  options: PostgresPersistenceOptions = {},
 ): SessionPersistence {
+  const fence = options.fence ?? true;
+
+  /** Runs `write` on its own transaction, fenced first: a new session is the one write that
+   *  names an epoch it did not already hold. */
+  async function fenced(
+    blob: string,
+    write: (client: PoolClient) => Promise<number | null>,
+  ): Promise<number | null> {
+    const client = await pool.connect();
+    try {
+      await client.query("begin");
+      if (!(await admits(client, lineageOf(blob))))
+        throw conflictError(
+          "session store: the current content publication does not admit this session",
+        );
+      const rowCount = await write(client);
+      await client.query("commit");
+      return rowCount;
+    } catch (error) {
+      await client.query("rollback").catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   return {
     sessions: {
       async get(sessionId) {
@@ -198,8 +241,9 @@ export function createPostgresPersistence(
        */
       async put(record) {
         const progress = deriveProgressColumns(kinds, record.blob);
-        const { rowCount } = await pool.query(
-          `insert into sessions (session_id, blob, audience, attempt_counter, revision, replay_compatible, profile_id, created_at, updated_at, campaign_id, status, ending_id, step_count, initialization)
+        const query = (db: Pool | PoolClient) =>
+          db.query(
+            `insert into sessions (session_id, blob, audience, attempt_counter, revision, replay_compatible, profile_id, created_at, updated_at, campaign_id, status, ending_id, step_count, initialization)
            values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
            on conflict (session_id) do update set
              blob = excluded.blob,
@@ -215,32 +259,36 @@ export function createPostgresPersistence(
              ending_id = excluded.ending_id,
              step_count = excluded.step_count
            where sessions.revision = excluded.revision - 1`,
-          [
-            record.sessionId,
-            record.blob,
-            record.audience,
-            record.attemptCounter,
-            record.revision,
-            record.replayCompatible,
-            record.profileId ?? null,
-            record.createdAt,
-            record.updatedAt,
-            progress.campaignId,
-            progress.status,
-            progress.endingId,
-            progress.stepCount,
-            record.initialization === undefined
-              ? null
-              : JSON.stringify(record.initialization),
-          ],
-        );
-        if (rowCount === 0) {
-          const conflict = new Error(
+            [
+              record.sessionId,
+              record.blob,
+              record.audience,
+              record.attemptCounter,
+              record.revision,
+              record.replayCompatible,
+              record.profileId ?? null,
+              record.createdAt,
+              record.updatedAt,
+              progress.campaignId,
+              progress.status,
+              progress.endingId,
+              progress.stepCount,
+              record.initialization === undefined
+                ? null
+                : JSON.stringify(record.initialization),
+            ],
+          );
+        const rowCount =
+          fence && record.revision === 0
+            ? await fenced(
+                record.blob,
+                async (client) => (await query(client)).rowCount,
+              )
+            : (await query(pool)).rowCount;
+        if (rowCount === 0)
+          throw conflictError(
             `session store: concurrent write conflict for session "${record.sessionId}" at revision ${record.revision}`,
           );
-          conflict.name = SESSION_PERSISTENCE_CONFLICT;
-          throw conflict;
-        }
         counters.writes += 1;
         recordBlob(counters.writtenBlobBytes, record.blob);
       },
@@ -363,6 +411,39 @@ export async function sessionCampaignId(
     [sessionId],
   );
   return rows[0]?.campaign_id as string | undefined;
+}
+
+/** What a stored session or save is on, for the content gate: owner, campaign, the version it
+ *  is on now, and -- only when asked, since it can be large -- the blob, whose log names every
+ *  version it has been on. `undefined` when no such row exists. */
+export async function storedContentRow(
+  pool: Pool,
+  table: "sessions" | "saves",
+  id: string,
+  withBlob = false,
+): Promise<
+  | {
+      profileId: string | null;
+      campaignId: string;
+      campaignVersion: string | null;
+      blob?: string;
+    }
+  | undefined
+> {
+  const key = table === "sessions" ? "session_id" : "save_id";
+  const { rows } = await pool.query(
+    `select profile_id, campaign_id, campaign_version${withBlob ? ", blob" : ""}
+       from ${table} where ${key} = $1`,
+    [id],
+  );
+  const row = rows[0];
+  if (!row) return undefined;
+  return {
+    profileId: (row.profile_id as string | null) ?? null,
+    campaignId: row.campaign_id as string,
+    campaignVersion: (row.campaign_version as string | null) ?? null,
+    ...(withBlob ? { blob: row.blob as string } : {}),
+  };
 }
 
 export async function saveOwner(

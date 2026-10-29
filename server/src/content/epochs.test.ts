@@ -18,6 +18,8 @@ import { createContentRuntime, forgetContentRuntime } from "./runtime.js";
 
 const databaseUrl = process.env.DATABASE_URL;
 const describeIfDb = databaseUrl ? describe : describe.skip;
+// `content_epoch_sources.source_id` is a uuid (migration 020), as every real `source_id` is.
+const SOURCE_ID = "00000000-0000-4000-8000-000000000001";
 
 function campaign(id: string, version = "1.0.0", endText = "The end.") {
   return {
@@ -184,7 +186,7 @@ describeIfDb("content epochs", () => {
       buildCandidate(
         [campaign("core-a")],
         [],
-        [{ sourceId: "s1", portable: campaign("mine") }],
+        [{ sourceId: SOURCE_ID, portable: campaign("mine") }],
         () => ({ ownerPlayerId: "owner", visibility: "private" }),
       ),
     );

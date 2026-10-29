@@ -21,12 +21,14 @@ import {
 import { saveOwner, sessionOwner, storedContentRow } from "../persistence.js";
 import type { ServerDemo } from "../composition.js";
 import {
+  ContentRefusal,
   gateExisting,
   gateNewStart,
   lineageOf,
   runAdmitted,
   type Admission,
 } from "../content/admission.js";
+import { TOMBSTONE_LIVE } from "../content/deletion.js";
 
 export class OwnershipError extends Error {
   readonly operation: string;
@@ -56,8 +58,9 @@ export async function assertSessionOwned(
   operation: string,
 ): Promise<void> {
   const owner = await sessionOwner(pool, sessionId);
-  if (owner !== undefined && owner !== playerId)
-    throw new OwnershipError(operation);
+  if (owner === undefined)
+    await answerTombstone(pool, "sessions", sessionId, playerId, operation);
+  else if (owner !== playerId) throw new OwnershipError(operation);
 }
 
 export async function assertSaveOwned(
@@ -67,8 +70,35 @@ export async function assertSaveOwned(
   operation: string,
 ): Promise<void> {
   const owner = await saveOwner(pool, saveId);
-  if (owner !== undefined && owner !== playerId)
-    throw new OwnershipError(operation);
+  if (owner === undefined)
+    await answerTombstone(pool, "saves", saveId, playerId, operation);
+  else if (owner !== playerId) throw new OwnershipError(operation);
+}
+
+/**
+ * A row that is gone may have been purged with its content (engine plan 54, D3 §6). For the
+ * tombstone's window its owner -- which follows an account merge -- is told so, `410
+ * campaign_deleted`; everyone else gets the `403` the live row gave them, so the deletion
+ * discloses nothing new. No live tombstone: the store's own 404, as for an id never issued.
+ */
+async function answerTombstone(
+  pool: Pool,
+  table: "sessions" | "saves",
+  id: string,
+  playerId: string,
+  operation: string,
+): Promise<void> {
+  const { rows } = await pool.query(
+    table === "sessions"
+      ? `select profile_id from session_tombstones where session_id = $1 and ${TOMBSTONE_LIVE}`
+      : `select profile_id from save_tombstones where save_id = $1 and ${TOMBSTONE_LIVE}`,
+    [id],
+  );
+  const tombstone = rows[0];
+  if (!tombstone) return;
+  if (tombstone.profile_id === playerId)
+    throw new ContentRefusal(operation, "campaign_deleted");
+  throw new OwnershipError(operation);
 }
 
 /**
@@ -110,7 +140,8 @@ export function ownedStore(
     operation: string,
   ): Promise<void> {
     const row = await storedContentRow(pool, "sessions", sessionId);
-    if (row === undefined) return;
+    if (row === undefined)
+      return answerTombstone(pool, "sessions", sessionId, playerId, operation);
     if (row.profileId !== playerId) throw new OwnershipError(operation);
     if (row.campaignVersion === null) return;
     await gateExisting(
@@ -148,14 +179,17 @@ export function ownedStore(
   ): Promise<T> {
     return admitted(async () => {
       const row = await storedContentRow(pool, table, id, true);
-      // No such row: the store's own 404, under an admission that admits nothing.
-      if (row === undefined)
+      // No such row: a tombstone's answer, else the store's own 404, under an admission that
+      // admits nothing.
+      if (row === undefined) {
+        await answerTombstone(pool, table, id, playerId, operation);
         return {
           kind: "derived",
           campaignId: "",
           versions: new Set(),
           playerId,
         };
+      }
       if (row.profileId !== playerId) throw new OwnershipError(operation);
       const lineage = lineageOf(row.blob!);
       await gateExisting(

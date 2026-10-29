@@ -308,6 +308,29 @@ Every admin after the first is granted from the admin page itself
 
 ### Why it is installed this way
 
+#### 2026-10-29 — The external deletion ledger is a second Postgres, `ledger-db`
+
+Context: engine plan 54 (D3 §5.4) requires every permanent content deletion to be copied to a
+ledger that a restore of the main database cannot roll back. The reconciler re-applies it at
+boot and after a restore, and nothing but core content is served until it has. Without a
+ledger, restoring a backup taken before a deletion would quietly bring the content back.
+Chosen: a second Postgres service, `ledger-db`, on its own volume (`adventures-ledger`), on
+`adventures-internal` only. It is reached through the `pg` client the server already
+depends on, so it adds no dependency (`server/src/content/ledger.ts`, `LEDGER_DATABASE_URL`).
+It holds one append-only, contentless table, which the API creates on first use. An unset
+URL gives a ledger that cannot be reached, so the server serves core content only. The
+in-memory ledger exists for tests alone.
+Rejected:
+
+- A table in the main database: a restore would roll it back along with the deletion, which
+  defeats the point.
+- An object store: it adds a dependency, credentials and a provider this stack does not use yet.
+- A file on a volume: no idempotent append, and too easily backed up or restored together with
+  the database.
+  Reversibility: moderate. `ExternalLedger` has three methods, so another store is a new
+  implementation plus a one-off copy of the entries. Never restore `adventures-ledger` together
+  with `adventures-db`.
+
 #### 2026-10-25 — The session store is bounded by `SESSION_CACHE_LIMIT`, sized from adapter counters
 
 Context: the engine's `createInMemorySessionStore` is unbounded unless the host passes

@@ -46,6 +46,7 @@ import {
   type ContentRuntime,
   type ContentView,
   type ViewEntry,
+  SourceDeletedError,
 } from "./content/runtime.js";
 
 /** Where a submission-tier campaign came from and who may currently reach it. Absent from
@@ -170,6 +171,30 @@ export async function createServerDemo(
   await runtime.ready();
   const { campaigns: trustedPortables, extensions: trustedExtensions } =
     await campaignSource.load();
+  // A source deleted between this read and the commit refuses the publication under its lock
+  // (D3 §5.2); one rebuild reads the submissions again without it.
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await publishFrom(
+        pool,
+        runtime,
+        trustedPortables,
+        trustedExtensions,
+        options,
+      );
+    } catch (error) {
+      if (!(error instanceof SourceDeletedError) || attempt > 0) throw error;
+    }
+  }
+}
+
+async function publishFrom(
+  pool: Pool,
+  runtime: ContentRuntime,
+  trustedPortables: Parameters<typeof buildCandidate>[0],
+  trustedExtensions: Parameters<typeof buildCandidate>[1],
+  options: SessionCacheOptions,
+): Promise<ServerDemo> {
   const { candidates, rowsById } = await loadSubmissionCandidates(pool);
   const held = await loadEpochDigests(pool);
   const candidate = buildCandidate(
@@ -185,6 +210,7 @@ export async function createServerDemo(
     },
     (campaignId, campaignVersion) =>
       held.get(epochKey(campaignId, campaignVersion)),
+    runtime.isBlocked,
   );
 
   // Bookkeeping for the submission tier's own outcome -- a candidate is either quarantined

@@ -40,6 +40,10 @@ export interface CandidateEpoch {
   readonly catalog: PortableCatalog;
   /** Null for core. */
   readonly provenance: CampaignProvenance | null;
+  /** The submission sources this epoch was composed from: its base campaign's, if a
+   *  submission, and each applied submission extension's (D3 §5.5). Trusted sources are never
+   *  deleted, so they are not listed. */
+  readonly sourceIds: readonly string[];
 }
 
 export interface Candidate {
@@ -91,6 +95,10 @@ export function buildCandidate(
   ) =>
     | { readonly digest: string; readonly extensionsDigest: string | undefined }
     | undefined = () => undefined,
+  /** Whether a key was permanently deleted (D3 §5.4). It is never published again: the
+   *  submission naming it is quarantined until its author bumps the version. */
+  deleted: (campaignId: string, campaignVersion: string) => boolean = () =>
+    false,
 ): Candidate {
   let tiered;
   try {
@@ -191,6 +199,13 @@ export function buildCandidate(
       }
       const stored = scratch.stored(id, version)!;
       const { extensionsDigest } = derived.get(id)!;
+      if (deleted(id, version)) {
+        refuse(
+          id,
+          `campaign_version_deleted: campaign "${id}" version "${version}" was permanently deleted`,
+        );
+        continue;
+      }
       const existing = held(id, version);
       if (existing && existing.digest !== stored.digest) {
         // D2: the same 12-digit suffix over a different full digest is a collision between two
@@ -220,6 +235,12 @@ export function buildCandidate(
         extensions: applied.map((e) => ({ id: e.id, extends: e.extends })),
         catalog: portable.catalog,
         provenance: submission ? provenanceOf(submission.sourceId) : null,
+        sourceIds: [
+          ...(submission ? [submission.sourceId] : []),
+          ...live
+            .filter((c) => c.extension && applied.includes(c.extension))
+            .map((c) => c.sourceId),
+        ],
       });
     }
     if (out.size !== before) continue;

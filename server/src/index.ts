@@ -1,6 +1,10 @@
 import { Pool } from "pg";
 import { buildApp } from "./app.js";
-import { deploymentConfig, parseSessionCacheLimit } from "./deployment.js";
+import {
+  deploymentConfig,
+  parseBackupRetentionDays,
+  parseSessionCacheLimit,
+} from "./deployment.js";
 import { loadDiscussionForum } from "./discussions/registry.js";
 import { migrateOnStart } from "./migrate-on-start.js";
 
@@ -22,6 +26,15 @@ const previewOrigins = (process.env.PREVIEW_ORIGINS ?? "")
 const sessionCacheLimit = parseSessionCacheLimit(
   process.env.SESSION_CACHE_LIMIT,
 );
+// The operator's attested backup retention (`deployment.ts`'s `parseBackupRetentionDays`),
+// which a deletion's confirmation states. Required, and at most 30: read before anything
+// connects, so a deployment without one never starts.
+const backupRetentionDays = parseBackupRetentionDays(
+  process.env.BACKUP_RETENTION_DAYS,
+);
+// The external deletion ledger, a database a restore of DATABASE_URL does not roll back
+// (`content/ledger.ts`). Unset serves core content only.
+const ledgerDatabaseUrl = process.env.LEDGER_DATABASE_URL;
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error("DATABASE_URL is required");
 
@@ -50,6 +63,8 @@ const app = await buildApp(
     previewOrigins,
     discussionForum,
     sessionCacheLimit,
+    backupRetentionDays,
+    ledgerDatabaseUrl,
   }),
 );
 

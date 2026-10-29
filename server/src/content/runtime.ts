@@ -26,7 +26,9 @@ import { CoreContentError, type Candidate } from "./candidate.js";
 import {
   commitPublication,
   epochKey,
+  epochKeyHash,
   loadCurrent,
+  loadDeletedKeyHashes,
   loadEpochs,
   type EntryRow,
   type EpochRow,
@@ -71,9 +73,19 @@ export interface ContentRuntime {
    * The request gate (D3 §5.2): may this request serve non-core content? It reads
    * `content_current.state_seq` -- the same as what this process applied continues; higher
    * catches up first; lower means the database went backwards under this process (a restore),
-   * which latches the gate closed until a restart; unreadable is closed for this request.
+   * which holds the gate closed until the deletion reconciler has re-applied the external
+   * ledger and released it; unreadable is closed for this request. Closed while held.
    */
   check(): Promise<boolean>;
+  /** Closes the gate until `release` (D3 §5.3): at boot, before the first reconcile. */
+  hold(): void;
+  /** After a successful reconcile: re-hydrates from whatever the database now holds, lower
+   *  `state_seq` included, and reopens the gate. */
+  release(): Promise<void>;
+  /** Called when `check` finds the database behind this process. */
+  onRestore(listener: () => void): void;
+  /** A permanently deleted key (D3 §5.4): never offered, admitted or written again. */
+  isBlocked(campaignId: string, campaignVersion: string): boolean;
   /** A held epoch's stored row, current or not. */
   epoch(campaignId: string, campaignVersion: string): EpochRow | undefined;
   /** Held aside at hydration: the running kind refuses it (§3.3, §3.6). */
@@ -160,7 +172,13 @@ export function createContentRuntime(pool: Pool): ContentRuntime {
   // The highest `state_seq` this process has applied. Never moves backwards: a hydration that
   // reads an older head than one already applied leaves `current` as it was.
   let appliedSeq = 0;
-  let latched = false;
+  let held = false;
+  const restoreListeners: (() => void)[] = [];
+  // Every deleted key's hash, read with the head on every hydration. A deletion moves
+  // `state_seq`, so every process re-reads it before its next request serves anything.
+  let blocked: ReadonlySet<string> = new Set();
+  const isBlocked = (campaignId: string, campaignVersion: string) =>
+    blocked.has(epochKeyHash(campaignId, campaignVersion));
   // §3.2 step 4: a commit this process could not activate means the database names content the
   // archive does not hold. Nothing after it can be trusted until a restart re-hydrates.
   let activationFailed: string | undefined;
@@ -173,6 +191,7 @@ export function createContentRuntime(pool: Pool): ContentRuntime {
     const out: ViewEntry[] = [];
     const withheld: WithheldEntry[] = [];
     for (const entry of entries) {
+      if (isBlocked(entry.campaignId, entry.campaignVersion)) continue;
       const key = epochKey(entry.campaignId, entry.campaignVersion);
       const registry = archive.resolve(entry.campaignId, entry.campaignVersion);
       const epoch = epochs.get(key);
@@ -196,6 +215,7 @@ export function createContentRuntime(pool: Pool): ContentRuntime {
   }
 
   async function hydrate(): Promise<void> {
+    blocked = await loadDeletedKeyHashes(pool);
     for (const row of await loadEpochs(pool)) {
       const { campaign } = row.stored.form;
       const key = epochKey(campaign.id, campaign.version);
@@ -259,6 +279,13 @@ export function createContentRuntime(pool: Pool): ContentRuntime {
     async publish(candidate) {
       await this.ready();
       if (activationFailed) throw new Error(activationFailed);
+      for (const epoch of candidate.epochs) {
+        const { id, version } = epoch.stored.form.campaign;
+        if (isBlocked(id, version))
+          throw new CoreContentError(
+            `campaign_version_deleted: campaign "${id}" version "${version}" was permanently deleted`,
+          );
+      }
       // A key is forever (§3.1). Refused here, before the no-op check below, which compares
       // entries rather than content: an epoch edited in place under a held version would pass
       // it and then fail to activate, which would strand this process until a restart.
@@ -312,16 +339,22 @@ export function createContentRuntime(pool: Pool): ContentRuntime {
           await hydrate();
           continue;
         }
+        if (result.reason === "source_deleted")
+          throw new SourceDeletedError(result.sourceId);
         throw new CoreContentError(
           result.reason === "stale_parent"
             ? "content publication refused: another publication landed twice while this one was being committed"
-            : `content_version_conflict: campaign "${result.campaignId}" version "${result.campaignVersion}" was published concurrently with different content`,
+            : result.reason === "campaign_version_deleted"
+              ? `campaign_version_deleted: campaign "${result.campaignId}" version "${result.campaignVersion}" was permanently deleted`
+              : `content_version_conflict: campaign "${result.campaignId}" version "${result.campaignVersion}" was published concurrently with different content`,
         );
       }
     },
     view: () => current,
     epoch: (campaignId, campaignVersion) =>
-      epochs.get(epochKey(campaignId, campaignVersion)),
+      isBlocked(campaignId, campaignVersion)
+        ? undefined
+        : epochs.get(epochKey(campaignId, campaignVersion)),
     async catchUp() {
       await this.ready();
       catching ??= hydrate().finally(() => {
@@ -335,7 +368,7 @@ export function createContentRuntime(pool: Pool): ContentRuntime {
       } catch {
         return false;
       }
-      if (latched) return false;
+      if (held) return false;
       let seq: number;
       try {
         const { rows } = await pool.query<{ state_seq: string }>(
@@ -347,7 +380,10 @@ export function createContentRuntime(pool: Pool): ContentRuntime {
       }
       if (seq === appliedSeq) return true;
       if (seq < appliedSeq) {
-        latched = true;
+        if (!held) {
+          held = true;
+          for (const listener of restoreListeners) listener();
+        }
         return false;
       }
       try {
@@ -359,7 +395,35 @@ export function createContentRuntime(pool: Pool): ContentRuntime {
     },
     unsupported: (campaignId, campaignVersion) =>
       unsupported.get(epochKey(campaignId, campaignVersion)),
+    hold() {
+      held = true;
+    },
+    async release() {
+      await this.ready();
+      // A restore leaves the head below what this process applied; what the database holds now
+      // is the truth, so the next head is applied whatever its sequence.
+      appliedSeq = 0;
+      await hydrate();
+      held = false;
+    },
+    onRestore(listener) {
+      restoreListeners.push(listener);
+    },
+    isBlocked,
   };
+}
+
+/** A publication composed from a source deleted since it was read: rebuild and try again. */
+export class SourceDeletedError extends Error {
+  readonly sourceId: string;
+
+  constructor(sourceId: string) {
+    super(
+      `content source "${sourceId}" was deleted while the publication was being built`,
+    );
+    this.name = "SourceDeletedError";
+    this.sourceId = sourceId;
+  }
 }
 
 const runtimes = new WeakMap<Pool, ContentRuntime>();

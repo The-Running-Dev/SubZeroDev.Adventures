@@ -13,7 +13,13 @@ import {
   type StoredSaveRecord,
   type StoredSessionRecord,
 } from "@the-running-dev/game-engine";
-import { admits, lineageOf } from "./content/admission.js";
+import {
+  admits,
+  dependenciesOf,
+  lineageOf,
+  recordDependencies,
+  undeleted,
+} from "./content/admission.js";
 
 /**
  * Reads the four columns `/api/progress` (routes/progress.ts) queries across every
@@ -167,9 +173,12 @@ function recordBlob(bytes: BlobBytes, blob: string): void {
 
 export interface PostgresPersistenceOptions {
   /**
-   * Fence every revision-0 session write against the current publication (engine plan 54,
-   * D4 §2): refused, as `SESSION_PERSISTENCE_CONFLICT`, unless a gate admitted it and the
-   * publication still does. On by default; off only for tests writing fixture rows directly.
+   * Fence every session and save write (engine plan 54): a revision-0 session against the
+   * current publication (D4 §2), refused unless a gate admitted it and the publication still
+   * does; every write against deletion (D3 §5.2), refused when an epoch it depends on, or the
+   * holder itself, was deleted. Refusals are `SESSION_PERSISTENCE_CONFLICT`. Each fenced write
+   * also replaces the holder's dependency rows. On by default; off only for tests writing
+   * fixture rows directly, which then record no dependencies either.
    */
   readonly fence?: boolean;
 }
@@ -188,20 +197,46 @@ export function createPostgresPersistence(
 ): SessionPersistence {
   const fence = options.fence ?? true;
 
-  /** Runs `write` on its own transaction, fenced first: a new session is the one write that
-   *  names an epoch it did not already hold. */
+  /** Runs `write` on its own transaction, fenced first. A new session is the one write that
+   *  names an epoch it did not already hold, so only it is checked against the publication;
+   *  every write is checked against deletion, and records what it depends on if it landed. */
   async function fenced(
+    holder:
+      | { readonly table: "session_epochs"; readonly sessionId: string }
+      | { readonly table: "save_epochs"; readonly saveId: string },
     blob: string,
+    fresh: boolean,
     write: (client: PoolClient) => Promise<number | null>,
   ): Promise<number | null> {
     const client = await pool.connect();
     try {
       await client.query("begin");
-      if (!(await admits(client, lineageOf(blob))))
+      const dependencies = dependenciesOf(blob);
+      if (fresh && !(await admits(client, lineageOf(blob))))
         throw conflictError(
           "session store: the current content publication does not admit this session",
         );
+      if (!(await undeleted(client, dependencies)))
+        throw conflictError(
+          "session store: a campaign version this write depends on was permanently deleted",
+        );
+      const tombstone =
+        holder.table === "session_epochs"
+          ? await client.query(
+              "select 1 from session_tombstones where session_id = $1",
+              [holder.sessionId],
+            )
+          : await client.query(
+              "select 1 from save_tombstones where save_id = $1",
+              [holder.saveId],
+            );
+      if (tombstone.rowCount !== 0)
+        throw conflictError(
+          "session store: this record was permanently deleted with its content",
+        );
       const rowCount = await write(client);
+      if (rowCount !== 0)
+        await recordDependencies(client, holder, dependencies);
       await client.query("commit");
       return rowCount;
     } catch (error) {
@@ -278,13 +313,14 @@ export function createPostgresPersistence(
                 : JSON.stringify(record.initialization),
             ],
           );
-        const rowCount =
-          fence && record.revision === 0
-            ? await fenced(
-                record.blob,
-                async (client) => (await query(client)).rowCount,
-              )
-            : (await query(pool)).rowCount;
+        const rowCount = fence
+          ? await fenced(
+              { table: "session_epochs", sessionId: record.sessionId },
+              record.blob,
+              record.revision === 0,
+              async (client) => (await query(client)).rowCount,
+            )
+          : (await query(pool)).rowCount;
         if (rowCount === 0)
           throw conflictError(
             `session store: concurrent write conflict for session "${record.sessionId}" at revision ${record.revision}`,
@@ -303,8 +339,9 @@ export function createPostgresPersistence(
         return rows[0] ? toSaveRecord(rows[0]) : undefined;
       },
       async put(record) {
-        await pool.query(
-          `insert into saves (save_id, campaign_id, blob, saved_at, saved_at_seq, audience, profile_id, initialization)
+        const query = (db: Pool | PoolClient) =>
+          db.query(
+            `insert into saves (save_id, campaign_id, blob, saved_at, saved_at_seq, audience, profile_id, initialization)
            values ($1, $2, $3, $4, $5, $6, $7, $8)
            on conflict (save_id) do update set
              campaign_id = excluded.campaign_id,
@@ -314,19 +351,27 @@ export function createPostgresPersistence(
              audience = excluded.audience,
              profile_id = excluded.profile_id,
              initialization = excluded.initialization`,
-          [
-            record.saveId,
-            record.campaignId,
+            [
+              record.saveId,
+              record.campaignId,
+              record.blob,
+              record.savedAt,
+              record.savedAtSeq,
+              record.audience,
+              record.profileId ?? null,
+              record.initialization === undefined
+                ? null
+                : JSON.stringify(record.initialization),
+            ],
+          );
+        if (fence)
+          await fenced(
+            { table: "save_epochs", saveId: record.saveId },
             record.blob,
-            record.savedAt,
-            record.savedAtSeq,
-            record.audience,
-            record.profileId ?? null,
-            record.initialization === undefined
-              ? null
-              : JSON.stringify(record.initialization),
-          ],
-        );
+            false,
+            async (client) => (await query(client)).rowCount,
+          );
+        else await query(pool);
       },
       /** §7.4: conditional -- only when `saved_at` still matches what the caller last read,
        *  the same optimistic-lock shape `sessions.put`'s `revision` compare-and-swap

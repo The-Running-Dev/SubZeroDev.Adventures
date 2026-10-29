@@ -27,6 +27,15 @@
 #     though it works from a manual `docker compose` invocation. Running this file by
 #     hand instead, copy `.env.example` to a git-ignored `.env` next to it; Compose loads
 #     that automatically for the same interpolation, no `env_file:` needed either way.
+#   - `BACKUP_RETENTION_DAYS`: how many days a backup of the `adventures-db` volume (and any
+#     WAL archive) survives, at most 30. It is the operator's attestation -- nothing here can
+#     inspect a backup -- and a permanent content deletion's confirmation states it: active
+#     copies are purged at once, backup copies only expire. The API refuses to start
+#     without it, or above 30 (server/src/deployment.ts).
+#   - `LEDGER_DB_PASSWORD`, for `ledger-db`: the external deletion ledger. It lives outside
+#     `adventures-db` so that restoring that database cannot roll a deletion back -- the API
+#     re-applies the ledger before it serves anything but core content. Never back the two
+#     volumes up as one unit or restore `adventures-ledger` alongside `adventures-db`.
 #   - The adventures-api.subzerodev.com DNS record.
 
 # Pinned rather than derived from the directory name, which is what names the
@@ -42,6 +51,14 @@ x-adventures-api-common: &adventures-api-common
   # the host happens to hold and silently run the previous build.
   pull_policy: always
   restart: unless-stopped
+  # Bounded, because a log is a copy nothing purges: request lines carry route patterns, not
+  # ids (server/src/app.ts), but an unexpected error's message may quote one. 50 MB per
+  # container, discarded when the container is recreated (engine plan 54, D3 §7).
+  logging: &bounded-logs
+    driver: json-file
+    options:
+      max-size: 10m
+      max-file: "5"
   # Explicit public resolvers, rather than inheriting the host's.
   #
   # Docker's embedded DNS (127.0.0.11) forwards external names to whatever nameservers the
@@ -86,6 +103,11 @@ x-adventures-api-common: &adventures-api-common
     # re-read from Postgres on its next request. Unset or blank is the provisional default,
     # 1000 (server/src/deployment.ts); anything but a positive whole number fails the start.
     SESSION_CACHE_LIMIT: "${SESSION_CACHE_LIMIT:-}"
+    # Required, at most 30 -- see the operator prerequisites above.
+    BACKUP_RETENTION_DAYS: "${BACKUP_RETENTION_DAYS:?Set BACKUP_RETENTION_DAYS in .env}"
+    # `ledger-db` below. Unset would serve core content only, so it is assembled here and the
+    # password is required like DB_PASSWORD.
+    LEDGER_DATABASE_URL: "postgres://ledger:${LEDGER_DB_PASSWORD:?Set LEDGER_DB_PASSWORD in .env}@ledger-db:5432/ledger"
     # Optional, unlike DB_PASSWORD above: server/src/identity/registry.ts treats an unset
     # credential pair as "this provider isn't configured" (503 oauth_not_configured on its
     # routes), not a startup precondition, so deployment must not be blocked on the
@@ -109,6 +131,7 @@ services:
     container_name: adventures-web
     pull_policy: always
     restart: unless-stopped
+    logging: *bounded-logs
     # Static assets only. TLS terminates at the existing reverse proxy.
     # No host ports, database network, API credentials or writable content mounts.
     read_only: true
@@ -136,6 +159,7 @@ services:
     image: postgres:17
     container_name: adventures-db
     restart: unless-stopped
+    logging: *bounded-logs
     environment:
       POSTGRES_USER: adventures
       POSTGRES_PASSWORD: "${DB_PASSWORD:?Set DB_PASSWORD in .env}"
@@ -150,6 +174,29 @@ services:
     # Only adventures-internal, deliberately. Nothing publishes a port for it either, so
     # Postgres is reachable from `api`/`migrate` and nothing else -- putting it on the
     # shared proxy-net would expose it to every unrelated container on that network.
+    networks:
+      - adventures-internal
+
+  # The external deletion ledger (server/src/content/ledger.ts): deletions only, appended and
+  # never updated, so that a restore of `adventures-db` cannot bring deleted content back.
+  # A database of its own on a volume of its own, on adventures-internal only like `db`.
+  # The API creates its one table on first use; `migrate` does not touch it.
+  ledger-db:
+    image: postgres:17
+    container_name: adventures-ledger-db
+    restart: unless-stopped
+    logging: *bounded-logs
+    environment:
+      POSTGRES_USER: ledger
+      POSTGRES_PASSWORD: "${LEDGER_DB_PASSWORD:?Set LEDGER_DB_PASSWORD in .env}"
+      POSTGRES_DB: ledger
+    volumes:
+      - adventures-ledger:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ledger"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
     networks:
       - adventures-internal
 
@@ -181,11 +228,14 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      ledger-db:
+        condition: service_healthy
       migrate:
         condition: service_completed_successfully
 
 volumes:
   adventures-db:
+  adventures-ledger:
 
 networks:
   # Not created here -- see the operator prerequisites above.

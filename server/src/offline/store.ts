@@ -12,9 +12,12 @@ import {
   gateExisting,
   gateNewStart,
   lineageOf,
+  recordDependencies,
   runAdmitted,
+  undeleted,
   type Admission,
 } from "../content/admission.js";
+import { grantTokenHash, TOMBSTONE_LIVE } from "../content/deletion.js";
 import { validateBundle } from "../../../shared/offline/runtime.js";
 import type {
   Bundle,
@@ -197,6 +200,11 @@ export function ownedOfflineStore(
                 revision,
               ],
             );
+            await recordDependencies(
+              db,
+              { table: "grant_epochs", token: base },
+              { campaignId, versions: new Set([campaignVersion]) },
+            );
             await db.query("commit");
             return true;
           } catch (error) {
@@ -264,11 +272,29 @@ export function ownedOfflineStore(
         }
         const grant = (
           await db.query(
-            "select * from offline_grants where token=$1 and owner_id=$2",
+            "select *, bundle->'portable'->'campaign'->>'id' as campaign_id, bundle->'portable'->'campaign'->>'version' as campaign_version from offline_grants where token=$1 and owner_id=$2",
             [r.grant, owner],
           )
         ).rows[0];
-        if (!grant) throw new OwnershipError("offline_sync");
+        if (!grant) {
+          // A grant purged with its content answers its owner 410 for the tombstone's window
+          // (D3 §6); anyone else, and the owner afterwards, gets today's 403.
+          const tombstone = await db.query(
+            `select 1 from grant_tombstones where token_hash=$1 and owner_id=$2 and ${TOMBSTONE_LIVE}`,
+            [grantTokenHash(r.grant), owner],
+          );
+          if (tombstone.rowCount !== 0)
+            throw new ContentRefusal("offline_sync", "campaign_deleted");
+          throw new OwnershipError("offline_sync");
+        }
+        const dependencies = {
+          campaignId: grant.campaign_id as string,
+          versions: new Set([grant.campaign_version as string]),
+        };
+        // The deletion fence: a sync that passes commits before the deletion is recorded, and
+        // its run is purged with the grant; one that waited finds the key deleted.
+        if (!(await undeleted(db, dependencies)))
+          throw new ContentRefusal("offline_sync", "campaign_deleted");
         const bundle = grant.bundle as Bundle;
         if (
           r.bundleId !== bundle.id ||
@@ -351,6 +377,11 @@ export function ownedOfflineStore(
             frame.blob,
             receipt.base,
           ],
+        );
+        await recordDependencies(
+          db,
+          { table: "run_epochs", ownerId: owner, localRunId: r.localRunId },
+          dependencies,
         );
         await db.query(
           "insert into offline_receipts(owner_id,idempotency_key,request_hash,receipt) values($1,$2,$3,$4)",

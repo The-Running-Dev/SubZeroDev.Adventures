@@ -9,6 +9,8 @@
  * since that guard already is.
  */
 import type { Pool } from "pg";
+import { campaignLockKey } from "./content/deletion.js";
+import { campaignHash } from "./content/epoch-store.js";
 import type {
   PlayerProfile,
   ProfileLoadResult,
@@ -55,7 +57,28 @@ export function createPostgresProfileStore(pool: Pool): ProfileStore {
       const client = await pool.connect();
       try {
         await client.query("begin");
+        // The deletion fence (engine plan 54, D3 §5.2): a campaign whose last epoch was purged
+        // takes no achievement again until it is published anew. Shared campaign locks, in
+        // sorted order, against the purge's exclusive ones; a campaign never published here
+        // (a fixture) has no marker and is written as before.
+        const deleted = new Set<string>();
+        for (const campaignId of [
+          ...new Set(profile.achievements.map((a) => a.campaignId)),
+        ].sort()) {
+          await client.query(
+            "select pg_advisory_xact_lock_shared(hashtextextended($1, 0))",
+            [campaignLockKey(campaignId)],
+          );
+          const { rowCount } = await client.query(
+            `select 1 from content_deleted_campaigns
+              where campaign_hash = $1
+                and not exists (select 1 from content_epochs where campaign_id = $2)`,
+            [campaignHash(campaignId), campaignId],
+          );
+          if (rowCount !== 0) deleted.add(campaignId);
+        }
         for (const achievement of profile.achievements) {
+          if (deleted.has(achievement.campaignId)) continue;
           await client.query(
             `insert into achievements (player_id, campaign_id, achievement_id)
              values ($1, $2, $3)

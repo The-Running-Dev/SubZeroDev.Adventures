@@ -199,6 +199,23 @@ export async function mergePlayers(
   toPlayerId: string,
 ): Promise<void> {
   if (fromPlayerId === toPlayerId) return;
+  // A purge committing between the repoint and the guest delete below leaves a tombstone naming
+  // the guest, and the delete fails on its `on delete restrict` (engine plan 54, D3 §5.6). The
+  // whole merge is idempotent, so it runs again and repoints that tombstone too.
+  for (let attempt = 1; ; attempt++)
+    try {
+      return await mergeOnce(pool, fromPlayerId, toPlayerId);
+    } catch (error) {
+      if ((error as { code?: string }).code !== "23503" || attempt >= 3)
+        throw error;
+    }
+}
+
+async function mergeOnce(
+  pool: Pool,
+  fromPlayerId: string,
+  toPlayerId: string,
+): Promise<void> {
   const client = await pool.connect();
   try {
     await client.query("begin");
@@ -221,6 +238,21 @@ export async function mergePlayers(
       `update discussion_posts set player_id = $1 where player_id = $2`,
       [toPlayerId, fromPlayerId],
     );
+    // What a content deletion left naming the guest follows the surviving account (engine plan
+    // 54, D3 §5.6), and all of it references `players` `on delete restrict`, so none of it can
+    // be lost with the guest's row. Submissions are kept, where a merge used to cascade them
+    // away. Tombstones keep answering their owner `410` under the new id. A deletion's actor is
+    // repointed whatever its state: a purged deletion naming the guest would block the guest
+    // delete as surely as a pending one.
+    for (const statement of [
+      `update content_sources set owner_player_id = $1 where owner_player_id = $2`,
+      `update content_deletions set actor_player_id = $1 where actor_player_id = $2`,
+      `update session_tombstones set profile_id = $1 where profile_id = $2`,
+      `update save_tombstones set profile_id = $1 where profile_id = $2`,
+      `update grant_tombstones set owner_id = $1 where owner_id = $2`,
+      `update run_tombstones set owner_id = $1 where owner_id = $2`,
+    ])
+      await client.query(statement, [toPlayerId, fromPlayerId]);
     // Copied, not repointed with an `update` like sessions/saves above -- the primary key
     // is `(player_id, campaign_id, achievement_id)`, so a straight repoint would collide
     // wherever both players had already unlocked the same achievement. `on conflict do

@@ -106,11 +106,16 @@ const SELECT_COLUMNS = `source_id, kind, label, url, payload, last_synced_at, la
   campaign_count, extension_count, owner_player_id, status, visibility, review_note,
   reviewed_at, reviewed_by, quarantine_reason, quarantined_at`;
 
+/** A source whose deletion is recorded is gone from every read at once, purged or not
+ *  (engine plan 54, D3 §5.3): the row only lingers until the purge removes it. */
+const LIVE = `not exists (select 1 from content_deletions d
+  where d.source_id = content_sources.source_id)`;
+
 export async function listContentSources(
   pool: Pool,
 ): Promise<readonly ContentSourceRow[]> {
   const { rows } = await pool.query<ContentSourceDbRow>(
-    `select ${SELECT_COLUMNS} from content_sources order by created_at`,
+    `select ${SELECT_COLUMNS} from content_sources where ${LIVE} order by created_at`,
   );
   return rows.map(toRow);
 }
@@ -125,7 +130,7 @@ export async function getContentSource(
   sourceId: string,
 ): Promise<ContentSourceRow | undefined> {
   const { rows } = await pool.query<ContentSourceDbRow>(
-    `select ${SELECT_COLUMNS} from content_sources where source_id = $1`,
+    `select ${SELECT_COLUMNS} from content_sources where source_id = $1 and ${LIVE}`,
     [sourceId],
   );
   const row = rows[0];
@@ -199,7 +204,7 @@ export async function listSubmissionsByOwner(
 ): Promise<readonly ContentSourceRow[]> {
   const { rows } = await pool.query<ContentSourceDbRow>(
     `select ${SELECT_COLUMNS} from content_sources
-      where owner_player_id = $1
+      where owner_player_id = $1 and ${LIVE}
       order by created_at`,
     [ownerPlayerId],
   );
@@ -216,7 +221,7 @@ export async function getOwnedSubmission(
 ): Promise<ContentSourceRow | undefined> {
   const { rows } = await pool.query<ContentSourceDbRow>(
     `select ${SELECT_COLUMNS} from content_sources
-      where source_id = $1 and owner_player_id = $2`,
+      where source_id = $1 and owner_player_id = $2 and ${LIVE}`,
     [sourceId, ownerPlayerId],
   );
   const row = rows[0];
@@ -230,7 +235,7 @@ export async function listPendingSubmissions(
 ): Promise<readonly ContentSourceRow[]> {
   const { rows } = await pool.query<ContentSourceDbRow>(
     `select ${SELECT_COLUMNS} from content_sources
-      where owner_player_id is not null and status = 'pending'
+      where owner_player_id is not null and status = 'pending' and ${LIVE}
       order by created_at`,
   );
   return rows.map(toRow);
@@ -329,27 +334,16 @@ export async function rejectSubmission(
 }
 
 /** `true` if a row was actually removed -- lets the route tell "removed" from "already
- *  gone" without a separate existence check. Used by the admin route (any row) and, scoped by
- *  the caller to `owner_player_id`, by the owner-facing delete. */
+ *  gone" without a separate existence check. An admin-curated row only: removing one is a
+ *  withdrawal, its epochs retained and its sessions playing on (engine plan 54, D3 §1). A
+ *  player's submission is never removed here; it is deleted through `content/deletion.ts`. */
 export async function removeContentSource(
   pool: Pool,
   sourceId: string,
 ): Promise<boolean> {
   const { rowCount } = await pool.query(
-    `delete from content_sources where source_id = $1`,
+    `delete from content_sources where source_id = $1 and owner_player_id is null`,
     [sourceId],
-  );
-  return (rowCount ?? 0) > 0;
-}
-
-export async function removeOwnedSubmission(
-  pool: Pool,
-  sourceId: string,
-  ownerPlayerId: string,
-): Promise<boolean> {
-  const { rowCount } = await pool.query(
-    `delete from content_sources where source_id = $1 and owner_player_id = $2`,
-    [sourceId, ownerPlayerId],
   );
   return (rowCount ?? 0) > 0;
 }

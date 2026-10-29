@@ -5,7 +5,15 @@
  * claim, so that is the only way to become one.
  */
 import { createServer, type Server } from "node:http";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+} from "vitest";
 import { Pool } from "pg";
 import type { FastifyInstance } from "fastify";
 import {
@@ -123,15 +131,14 @@ describeIfDb("/api/admin/content", () => {
 
   beforeAll(async () => {
     pool = new Pool({ connectionString: databaseUrl });
-    app = await buildApp(pool, {
-      siteUrl: "http://localhost:5173",
-      apiUrl: "http://localhost:8787",
-    });
   });
 
   afterAll(async () => {
-    await app.close();
     await pool.end();
+  });
+
+  afterEach(async () => {
+    await app?.close();
   });
 
   beforeEach(async () => {
@@ -139,6 +146,10 @@ describeIfDb("/api/admin/content", () => {
       "truncate badges, achievements, identities, auth_sessions, saves, sessions, players restart identity cascade",
     );
     await resetContentEpochs(pool);
+    app = await buildApp(pool, {
+      siteUrl: "http://localhost:5173",
+      apiUrl: "http://localhost:8787",
+    });
   });
 
   async function guestCookie(): Promise<string> {
@@ -147,6 +158,7 @@ describeIfDb("/api/admin/content", () => {
       url: "/api/sessions",
       payload: { campaignId: "what-would-lucifer-do" },
     });
+    expect(response.statusCode, response.body).toBe(200);
     return cookieFrom(response);
   }
 
@@ -355,27 +367,22 @@ describeIfDb("/api/admin/content/sources", () => {
   let pool: Pool;
   let app: FastifyInstance;
   let builtinServer: Server;
+  let builtinUrl: string;
 
   beforeAll(async () => {
     pool = new Pool({ connectionString: databaseUrl });
     const builtin = await startCampaignServer(["builtin-campaign"]);
     builtinServer = builtin.server;
-    app = await buildApp(pool, {
-      siteUrl: "http://localhost:5173",
-      apiUrl: "http://localhost:8787",
-      campaignSource: createMultiSourceCampaignSource(pool, {
-        id: "builtin-test",
-        label: "builtin test source",
-        kind: "url",
-        url: builtin.url,
-      }),
-    });
+    builtinUrl = builtin.url;
   });
 
   afterAll(async () => {
-    await app.close();
     await pool.end();
     await new Promise((resolve) => builtinServer.close(resolve));
+  });
+
+  afterEach(async () => {
+    await app?.close();
   });
 
   beforeEach(async () => {
@@ -383,6 +390,16 @@ describeIfDb("/api/admin/content/sources", () => {
       "truncate content_sources, badges, achievements, identities, auth_sessions, saves, sessions, players restart identity cascade",
     );
     await resetContentEpochs(pool);
+    app = await buildApp(pool, {
+      siteUrl: "http://localhost:5173",
+      apiUrl: "http://localhost:8787",
+      campaignSource: createMultiSourceCampaignSource(pool, {
+        id: "builtin-test",
+        label: "builtin test source",
+        kind: "url",
+        url: builtinUrl,
+      }),
+    });
   });
 
   // No campaign this app's builtin source serves is a valid `POST /api/sessions`
@@ -668,6 +685,21 @@ describeIfDb("/api/admin/content/sources with an unreachable builtin", () => {
 
   beforeAll(async () => {
     pool = new Pool({ connectionString: databaseUrl });
+  });
+
+  afterAll(async () => {
+    await pool.end();
+  });
+
+  afterEach(async () => {
+    await app?.close();
+  });
+
+  beforeEach(async () => {
+    await pool.query(
+      "truncate content_sources, badges, achievements, identities, auth_sessions, saves, sessions, players restart identity cascade",
+    );
+    await resetContentEpochs(pool);
     app = await buildApp(pool, {
       siteUrl: "http://localhost:5173",
       apiUrl: "http://localhost:8787",
@@ -688,18 +720,6 @@ describeIfDb("/api/admin/content/sources with an unreachable builtin", () => {
         },
       }),
     });
-  });
-
-  afterAll(async () => {
-    await app.close();
-    await pool.end();
-  });
-
-  beforeEach(async () => {
-    await pool.query(
-      "truncate content_sources, badges, achievements, identities, auth_sessions, saves, sessions, players restart identity cascade",
-    );
-    await resetContentEpochs(pool);
   });
 
   async function adminCookie(): Promise<string> {

@@ -1,6 +1,8 @@
 /**
  * Tests only: empty the content-epoch tables and drop this pool's runtime, so a suite starts
- * from no publication. The tables are insert-only in production (engine plan 54, §3.1), so a
+ * from no publication. Close apps and discard demos using this runtime before resetting,
+ * then rebuild them: dropping the lookup cannot replace a runtime they already hold.
+ * The tables are insert-only in production (engine plan 54, §3.1), so a
  * suite that edits a fixture under the same version would otherwise meet the epoch an earlier
  * test published and be refused with `content_version_conflict`.
  */

@@ -7,7 +7,15 @@
  * in-memory cache), replay verify (byte-identical, and a genuine mismatch), and
  * cross-player authorization.
  */
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+} from "vitest";
 import { Pool } from "pg";
 import type { FastifyInstance } from "fastify";
 import { buildApp } from "./app.js";
@@ -46,15 +54,14 @@ describeIfDb("server API", () => {
 
   beforeAll(async () => {
     pool = new Pool({ connectionString: databaseUrl });
-    app = await buildApp(pool, {
-      siteUrl: "http://localhost:5173",
-      apiUrl: "http://localhost:8787",
-    });
   });
 
   afterAll(async () => {
-    await app.close();
     await pool.end();
+  });
+
+  afterEach(async () => {
+    await app?.close();
   });
 
   beforeEach(async () => {
@@ -62,6 +69,10 @@ describeIfDb("server API", () => {
       "truncate content_sources, badges, achievements, auth_sessions, saves, sessions, players restart identity cascade",
     );
     await resetContentEpochs(pool);
+    app = await buildApp(pool, {
+      siteUrl: "http://localhost:5173",
+      apiUrl: "http://localhost:8787",
+    });
   });
 
   // A bare GET no longer mints (see "does not mint a guest on a bare GET" below) --
@@ -73,6 +84,7 @@ describeIfDb("server API", () => {
       url: "/api/sessions",
       payload: { campaignId: "what-would-lucifer-do" },
     });
+    expect(response.statusCode, response.body).toBe(200);
     return cookieFrom(response);
   }
 
@@ -89,6 +101,18 @@ describeIfDb("server API", () => {
       headers: { cookie: cookieFrom(response) },
     });
     expect(me.json()).toMatchObject({ kind: "guest" });
+    // A successful response must be a durable session on the current publication, not
+    // merely a guest cookie minted before admission/fencing refused the session.
+    const { rows } = await pool.query(
+      `select s.campaign_version from sessions s
+         join content_current c on c.singleton
+         join content_publication_entries e on e.publication_id=c.publication_id
+          and e.campaign_id=s.campaign_id and e.campaign_version=s.campaign_version
+        where s.session_id=$1`,
+      [response.json().sessionId],
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].campaign_version).toBeTruthy();
   });
 
   it("does not mint a guest on a bare GET (/api/me, /api/saves)", async () => {

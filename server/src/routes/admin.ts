@@ -13,6 +13,8 @@ import type { Pool } from "pg";
 import type { ContentCell } from "../content-cell.js";
 import type { CampaignSource } from "../campaigns/source.js";
 import type { SessionPersistenceCounters } from "../persistence.js";
+import type { Deletions } from "../content/deletion.js";
+import { answerDeletion } from "./content.js";
 import {
   classifyPastedPayload,
   isMultiCampaignSource,
@@ -138,6 +140,7 @@ export function registerAdminRoutes(
     readonly sessionCacheLimit: number | undefined;
     readonly counters: SessionPersistenceCounters;
   },
+  deletions: Deletions,
 ): void {
   const admin = requireAdmin(pool);
   const readAdmin = resolveAdmin(pool);
@@ -259,8 +262,22 @@ export function registerAdminRoutes(
           error: { operation: "admin", code: "cannot_remove_builtin" },
         };
       }
-      const removed = await removeContentSource(pool, id);
-      if (!removed) {
+      const row = await getContentSource(pool, id);
+      if (!row) {
+        reply.code(404);
+        return { error: { operation: "admin", code: "not_found" } };
+      }
+      // A player's submission is deleted, through the one protocol (engine plan 54, D3 §5.3),
+      // with the admin recorded as the actor. An admin-curated row is withdrawn, as before.
+      if (row.ownerPlayerId !== undefined) {
+        const outcome = await deletions.remove(id, {
+          role: "admin",
+          playerId: request.principal.playerId,
+        });
+        await cell.refresh();
+        return answerDeletion(reply, outcome, deletions.backupRetentionDays);
+      }
+      if (!(await removeContentSource(pool, id))) {
         reply.code(404);
         return { error: { operation: "admin", code: "not_found" } };
       }

@@ -38,6 +38,7 @@ const ERROR_STATUS: Record<string, number> = {
   campaign_access_revoked: 403,
   campaign_version_unsupported: 409,
   campaign_version_unavailable: 409,
+  campaign_deleted: 410,
 };
 
 function statusFor(code: string): number {

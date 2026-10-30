@@ -12,15 +12,15 @@
  * the same `undefined`/`false`, so there is nothing left for this file to leak by choosing
  * the wrong status code.
  */
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyReply } from "fastify";
 import type { Pool } from "pg";
 import type { ContentCell } from "../content-cell.js";
+import type { Deletions } from "../content/deletion.js";
 import { classifyPastedPayload } from "../campaigns/multi-source.js";
 import {
   addSubmission,
   getOwnedSubmission,
   listSubmissionsByOwner,
-  removeOwnedSubmission,
   requestPublish,
   updateOwnedSubmission,
 } from "../content-sources.js";
@@ -67,10 +67,33 @@ function labelFor(body: SubmissionBody): string {
   );
 }
 
+/**
+ * A deletion's answer (engine plan 54, D3 §5.3, §7): `204` when it is finished, `202
+ * deletion_pending` when it is recorded and refused but a later step has not finished. Either
+ * way the content is gone from every answer this server gives. Both carry the configured
+ * backup retention -- a `204` has no body, so it travels as a header -- because the
+ * confirmation states it: active copies are purged, backup copies expire within that many days.
+ */
+export function answerDeletion(
+  reply: FastifyReply,
+  outcome: "done" | "pending",
+  backupRetentionDays: number | undefined,
+) {
+  if (backupRetentionDays !== undefined)
+    reply.header("backup-retention-days", String(backupRetentionDays));
+  if (outcome === "done") return reply.code(204).send();
+  reply.code(202);
+  return {
+    status: "deletion_pending",
+    ...(backupRetentionDays === undefined ? {} : { backupRetentionDays }),
+  };
+}
+
 export function registerContentRoutes(
   app: FastifyInstance,
   pool: Pool,
   cell: ContentCell,
+  deletions: Deletions,
 ): void {
   const auth = requirePrincipal(pool);
   const resolve = resolvePrincipal(pool);
@@ -169,17 +192,14 @@ export function registerContentRoutes(
     { preHandler: auth },
     async (request, reply) => {
       const { id } = request.params as { id: string };
-      const removed = await removeOwnedSubmission(
-        pool,
-        id,
-        request.principal.playerId,
-      );
-      if (!removed) {
+      const playerId = request.principal.playerId;
+      if (!(await getOwnedSubmission(pool, id, playerId))) {
         reply.code(404);
         return { error: { operation: "content", code: "not_found" } };
       }
+      const outcome = await deletions.remove(id, { role: "owner", playerId });
       await cell.refresh();
-      return { ok: true };
+      return answerDeletion(reply, outcome, deletions.backupRetentionDays);
     },
   );
 }

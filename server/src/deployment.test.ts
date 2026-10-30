@@ -19,6 +19,7 @@ import {
   createBootstrapCampaignSource,
   DEFAULT_SESSION_CACHE_LIMIT,
   deploymentConfig,
+  parseBackupRetentionDays,
   parseSessionCacheLimit,
 } from "./deployment.js";
 
@@ -34,6 +35,8 @@ describe("deploymentConfig", () => {
       previewOrigins: [],
       discussionForum: undefined,
       sessionCacheLimit: DEFAULT_SESSION_CACHE_LIMIT,
+      backupRetentionDays: 7,
+      ledgerDatabaseUrl: undefined,
     });
 
     expect(config.bootstrapSource).toBeDefined();
@@ -47,9 +50,50 @@ describe("deploymentConfig", () => {
       previewOrigins: [],
       discussionForum: undefined,
       sessionCacheLimit: 250,
+      backupRetentionDays: 7,
+      ledgerDatabaseUrl: undefined,
     });
 
     expect(config.sessionCacheLimit).toBe(250);
+  });
+
+  it("always passes a ledger and the backup retention, so neither falls to a test default", async () => {
+    const config = deploymentConfig(noPool, {
+      siteUrl: "https://example.invalid",
+      apiUrl: "https://api.example.invalid",
+      previewOrigins: [],
+      discussionForum: undefined,
+      sessionCacheLimit: DEFAULT_SESSION_CACHE_LIMIT,
+      backupRetentionDays: 14,
+      ledgerDatabaseUrl: undefined,
+    });
+
+    expect(config.backupRetentionDays).toBe(14);
+    // Unset is a ledger that cannot be reached -- never the in-memory one `buildApp`
+    // defaults to, which a restart would empty.
+    await expect(config.ledger!.since(0)).rejects.toThrow();
+  });
+});
+
+describe("parseBackupRetentionDays", () => {
+  it("accepts a whole number of days up to 30", () => {
+    expect(parseBackupRetentionDays("0")).toBe(0);
+    expect(parseBackupRetentionDays(" 7 ")).toBe(7);
+    expect(parseBackupRetentionDays("30")).toBe(30);
+  });
+
+  it.each([undefined, "", "  ", "-1", "1.5", "7d", "abc", "1e1"])(
+    "refuses %s at startup",
+    (raw) => {
+      expect(() => parseBackupRetentionDays(raw)).toThrow(
+        /BACKUP_RETENTION_DAYS must be a whole number/,
+      );
+    },
+  );
+
+  it("refuses more than 30, the supported maximum", () => {
+    expect(() => parseBackupRetentionDays("31")).toThrow(/at most 30/);
+    expect(() => parseBackupRetentionDays("365")).toThrow(/at most 30/);
   });
 });
 

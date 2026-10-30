@@ -1,5 +1,9 @@
 import { registerOfflineRoutes } from "./routes/offline.js";
-import Fastify, { type FastifyInstance } from "fastify";
+import Fastify, {
+  type FastifyInstance,
+  type FastifyReply,
+  type FastifyRequest,
+} from "fastify";
 import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
 import type { Pool } from "pg";
@@ -26,6 +30,15 @@ import { registerRankingRoutes } from "./routes/ranking.js";
 import { registerAdminRoutes } from "./routes/admin.js";
 import { registerContentRoutes } from "./routes/content.js";
 import { registerDiscussionRoutes } from "./routes/discussions.js";
+import {
+  backfillDependencies,
+  deleteSource,
+  reconcileDeletions,
+  sweepTombstones,
+  type Deletions,
+} from "./content/deletion.js";
+import { createMemoryLedger, type ExternalLedger } from "./content/ledger.js";
+import { contentRuntimeFor } from "./content/runtime.js";
 import { loadIdentityProviders } from "./identity/registry.js";
 import type { DiscussionForum } from "./discussions/forum.js";
 
@@ -68,7 +81,43 @@ export interface AppConfig {
    *  from `SESSION_CACHE_LIMIT` by `index.ts` through `deployment.ts`. Undefined is
    *  unbounded -- what a test wants, and never what the deployed process passes. */
   readonly sessionCacheLimit?: number;
+  /** The external deletion ledger (engine plan 54, D3 §5.3). Undefined is a ledger in this
+   *  process's memory -- what a test wants, and never what the deployed process passes:
+   *  `deployment.ts` passes the `LEDGER_DATABASE_URL` one, or one that cannot be reached. */
+  readonly ledger?: ExternalLedger;
+  /** The operator's attested backup retention, in days (D3 §7), which a deletion's
+   *  confirmation states. `index.ts` refuses to start without a valid one; undefined only in a
+   *  test, where the confirmation leaves it out. */
+  readonly backupRetentionDays?: number;
 }
+
+/**
+ * What a request log line carries (engine plan 54, D3 §7): the method and the matched route
+ * pattern, never the raw URL. A URL names session, save and source ids, which outlive a
+ * deletion in a log nobody purges; a pattern names nothing. An unmatched request logs no path.
+ */
+export const requestLogSerializers = {
+  req: (request: FastifyRequest) => ({
+    method: request.method,
+    route: request.routeOptions?.url ?? null,
+  }),
+};
+
+/**
+ * Fastify's own 404, without the log line it writes: that line quotes the raw URL, and an
+ * unmatched URL can still name a session or source id. The body is the one Fastify sends --
+ * it goes back to whoever sent the URL, not into a log.
+ */
+export function answerNotFound(request: FastifyRequest, reply: FastifyReply) {
+  return reply.code(404).send({
+    message: `Route ${request.method}:${request.url} not found`,
+    error: "Not Found",
+    statusCode: 404,
+  });
+}
+
+/** How often the reconciler and the tombstone sweep run (D3 §5.3, §6). */
+const RECONCILE_INTERVAL_MS = 60_000;
 
 /** Builds the wired Fastify instance without binding a port -- shared by `index.ts`
  *  (which calls `listen`) and the test suite (which uses `app.inject()`). */
@@ -82,9 +131,16 @@ export async function buildApp(
     bootstrapSource,
     discussionForum,
     sessionCacheLimit,
+    ledger = createMemoryLedger(),
+    backupRetentionDays,
   }: AppConfig,
 ): Promise<FastifyInstance> {
-  const app = Fastify({ logger: process.env.NODE_ENV !== "test" });
+  const app = Fastify({
+    logger: process.env.NODE_ENV !== "test" && {
+      serializers: requestLogSerializers,
+    },
+  });
+  app.setNotFoundHandler(answerNotFound);
 
   // Fastify's built-in JSON parser rejects a declared `application/json` content-type on
   // an empty body outright (FST_ERR_CTP_EMPTY_JSON_BODY) -- several of this API's own
@@ -160,6 +216,11 @@ export async function buildApp(
   const { cell, ready } = createContentCell(() =>
     createServerDemo(pool, campaignSource, sessionCache),
   );
+  // Nothing but core is served until the first reconcile has re-applied the external ledger
+  // (engine plan 54, D3 §5.3): a database restored from before a deletion must not serve what
+  // was deleted, even for the one request before the reconcile notices.
+  const runtime = contentRuntimeFor(pool);
+  runtime.hold();
   // The fallback covers the *first* build only, and it exists so unusable content an
   // operator added cannot keep the server from starting -- the admin routes below are the
   // only way to remove that content, so they have to come up. See `ready`. What is already
@@ -174,6 +235,47 @@ export async function buildApp(
       return createServerDemo(pool, bootstrapSource, sessionCache);
     }
   });
+  const warn = (message: string, error?: unknown) =>
+    app.log.warn({ err: error }, message);
+  // One reconcile at a time in this process; `reconcileDeletions` takes the lock across
+  // processes. Done is what reopens the gate, after a boot or a restore; anything else leaves it
+  // as it was until the next attempt.
+  let reconciling: Promise<void> | undefined;
+  const reconcile = (): Promise<void> =>
+    (reconciling ??= (async () => {
+      try {
+        if ((await reconcileDeletions(pool, ledger, warn)) === "done")
+          await runtime.release();
+      } catch (error) {
+        warn("deletion reconcile failed", error);
+      } finally {
+        reconciling = undefined;
+      }
+    })());
+  runtime.onRestore(() => void reconcile());
+  await backfillDependencies(pool, (message) => warn(message));
+  await reconcile();
+  const timer = setInterval(() => {
+    void reconcile();
+    void sweepTombstones(pool).catch((error: unknown) =>
+      warn("tombstone sweep failed", error),
+    );
+  }, RECONCILE_INTERVAL_MS);
+  timer.unref();
+  app.addHook("onClose", async () => {
+    clearInterval(timer);
+    await reconciling;
+    await ledger.close();
+  });
+  const deletions: Deletions = {
+    async remove(sourceId, actor) {
+      const outcome = await deleteSource(pool, ledger, sourceId, actor, warn);
+      void reconcile();
+      return outcome;
+    },
+    backupRetentionDays,
+  };
+
   registerHealthRoute(app, pool, cell);
   const identityProviders = await loadIdentityProviders();
   registerSessionRoutes(app, pool, cell, identityProviders);
@@ -186,8 +288,8 @@ export async function buildApp(
   registerStatsRoutes(app, pool);
   registerProfileRoutes(app, pool, cell);
   registerRankingRoutes(app, pool, cell);
-  registerAdminRoutes(app, pool, cell, campaignSource, sessionCache);
-  registerContentRoutes(app, pool, cell);
+  registerAdminRoutes(app, pool, cell, campaignSource, sessionCache, deletions);
+  registerContentRoutes(app, pool, cell, deletions);
   registerDiscussionRoutes(app, pool, discussionForum);
 
   return app;

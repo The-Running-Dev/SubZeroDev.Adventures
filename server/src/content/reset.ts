@@ -14,7 +14,10 @@ import { forgetContentRuntime } from "./runtime.js";
 
 export async function resetContentEpochs(pool: Pool): Promise<void> {
   await pool.query(
-    "truncate content_publication_entries, content_epochs, content_current, content_publications restart identity cascade",
+    `truncate content_publication_entries, content_epochs, content_current, content_publications,
+       content_deletions, content_deletion_keys, content_deleted_campaigns,
+       content_publication_entry_markers, session_tombstones, save_tombstones,
+       grant_tombstones, run_tombstones restart identity cascade`,
   );
   await pool.query(
     "insert into content_current (singleton, publication_id) values (true, null)",

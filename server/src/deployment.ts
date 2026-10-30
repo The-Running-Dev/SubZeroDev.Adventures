@@ -17,6 +17,10 @@ import { createMultiSourceCampaignSource } from "./campaigns/multi-source.js";
 import { createDiskCampaignSource } from "./campaigns/source.js";
 import type { CampaignSource } from "./campaigns/source.js";
 import type { DiscussionForum } from "./discussions/forum.js";
+import {
+  createPostgresLedger,
+  createUnreachableLedger,
+} from "./content/ledger.js";
 
 /**
  * The one hardcoded, unremovable content source (issue #27) -- always prepended ahead of
@@ -87,6 +91,31 @@ export function parseSessionCacheLimit(raw: string | undefined): number {
   return limit;
 }
 
+/** The supported maximum for `BACKUP_RETENTION_DAYS` (engine plan 54, D3 §7). */
+export const MAX_BACKUP_RETENTION_DAYS = 30;
+
+/**
+ * `BACKUP_RETENTION_DAYS` as `index.ts` read it: how many days the operator attests a backup of
+ * this deployment's database survives. A deletion purges every active copy at once; a backup
+ * copy expires only with the backup, so the confirmation states this number and the host
+ * cannot honestly start without one. Unlike `SESSION_CACHE_LIMIT` there is no default -- the
+ * host cannot inspect a provider's backups, so the value is the operator's to state -- and
+ * above 30 is unsupported, so it is refused rather than reported.
+ */
+export function parseBackupRetentionDays(raw: string | undefined): number {
+  const value = raw?.trim() ?? "";
+  const days = /^\d+$/.test(value) ? Number(value) : Number.NaN;
+  if (!Number.isSafeInteger(days))
+    throw new Error(
+      `BACKUP_RETENTION_DAYS must be a whole number of days, got ${raw === undefined ? "nothing" : `"${raw}"`}`,
+    );
+  if (days > MAX_BACKUP_RETENTION_DAYS)
+    throw new Error(
+      `BACKUP_RETENTION_DAYS must be at most ${MAX_BACKUP_RETENTION_DAYS}, got ${days}: longer backup retention is unsupported`,
+    );
+  return days;
+}
+
 /** The full `AppConfig` the deployed process hands `buildApp`. `env` is what `index.ts`
  *  read out of the environment; everything else is a property of the deployment. */
 export function deploymentConfig(
@@ -97,6 +126,11 @@ export function deploymentConfig(
     readonly previewOrigins: readonly string[];
     readonly discussionForum: DiscussionForum | undefined;
     readonly sessionCacheLimit: number;
+    readonly backupRetentionDays: number;
+    /** `LEDGER_DATABASE_URL`. Unset is a ledger that cannot be reached: every reconcile fails,
+     *  so the server serves core content and withholds everything else (D3 §5.3) -- the
+     *  deployed process never runs on a ledger that a database restore would roll back. */
+    readonly ledgerDatabaseUrl: string | undefined;
   },
 ): AppConfig {
   return {
@@ -107,5 +141,10 @@ export function deploymentConfig(
     bootstrapSource: createBootstrapCampaignSource(),
     discussionForum: env.discussionForum,
     sessionCacheLimit: env.sessionCacheLimit,
+    backupRetentionDays: env.backupRetentionDays,
+    ledger:
+      env.ledgerDatabaseUrl === undefined || env.ledgerDatabaseUrl === ""
+        ? createUnreachableLedger()
+        : createPostgresLedger(env.ledgerDatabaseUrl),
   };
 }

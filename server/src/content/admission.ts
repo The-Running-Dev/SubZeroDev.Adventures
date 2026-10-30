@@ -5,7 +5,8 @@
  * - **The gate** runs before the store is called. A new start is refused when its campaign is not
  *   in the current publication (404), not reachable by the caller (403), or held on an epoch this
  *   process cannot run (409). An existing session or save is refused when its campaign was revoked
- *   from the caller (403 `campaign_access_revoked`), and when its epoch cannot run here (409).
+ *   from the caller (403 `campaign_access_revoked`), when its epoch cannot run here (409), and
+ *   when an epoch it names was permanently deleted (410 `campaign_deleted`, D3 §5).
  * - **The admission** rides in `AsyncLocalStorage` from the gate to the write, through the engine
  *   store, which has no parameter for it. `createSession`'s `ContentChannel` offer reads the
  *   admitted version from it, so the session starts on exactly what the gate checked.
@@ -18,7 +19,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { PoolClient } from "pg";
 import type { ContentChannel } from "@the-running-dev/game-engine";
-import { loadCurrent } from "./epoch-store.js";
+import { epochKeyHash, loadCurrent } from "./epoch-store.js";
 import { accessibleIn, type ContentRuntime } from "./runtime.js";
 
 export type Admission =
@@ -73,6 +74,7 @@ const REFUSAL_STATUS = {
   campaign_version_unsupported: 409,
   campaign_version_unavailable: 409,
   concurrent_modification: 409,
+  campaign_deleted: 410,
   storage_failure: 503,
 } as const;
 
@@ -121,6 +123,35 @@ export function lineageOf(blob: string): Lineage {
   };
 }
 
+/**
+ * Every epoch a stored blob still depends on (D3 §5.5): the version it is on now, and both ends
+ * of every content adoption logged since its last migration. Replay from before a migration
+ * starts from the migrated state, so nothing earlier is needed to run it. A purge deletes
+ * exactly the holders that depend on a deleted epoch; `lineageOf` is wider, and is what a
+ * replay from the start (a branch, a load) needs.
+ */
+export function dependenciesOf(blob: string): Lineage {
+  const lineage = lineageOf(blob);
+  const parsed = JSON.parse(blob) as { state?: unknown };
+  const log =
+    (
+      (parsed.state ?? parsed) as {
+        actionLog?: readonly { system?: string; from?: string; to?: string }[];
+      }
+    ).actionLog ?? [];
+  let start = 0;
+  log.forEach((entry, index) => {
+    if (entry.system === "migration") start = index + 1;
+  });
+  const versions = new Set<string>([lineage.campaignVersion]);
+  for (const entry of log.slice(start))
+    if (entry.system === "content") {
+      if (typeof entry.from === "string") versions.add(entry.from);
+      if (typeof entry.to === "string") versions.add(entry.to);
+    }
+  return { ...lineage, versions };
+}
+
 /** The version every new start of `campaignId` is admitted on, or the refusal. `open` is the
  *  request gate's answer (`ContentRuntime.check`): closed withholds everything but core. */
 export function gateNewStart(
@@ -157,10 +188,19 @@ export function gateNewStart(
 export async function gateExisting(
   runtime: ContentRuntime,
   operation: string,
-  row: { readonly campaignId: string; readonly campaignVersion: string },
+  row: {
+    readonly campaignId: string;
+    readonly campaignVersion: string;
+    /** Every version the operation replays through; the current one alone when absent. */
+    readonly versions?: ReadonlySet<string>;
+  },
   playerId: string | null,
   open: boolean,
 ): Promise<void> {
+  // Deleted outranks every other answer: the holder is about to be purged, if it is not already.
+  for (const version of row.versions ?? [row.campaignVersion])
+    if (runtime.isBlocked(row.campaignId, version))
+      throw new ContentRefusal(operation, "campaign_deleted");
   const view = runtime.view();
   const entries = [...(view?.entries ?? []), ...(view?.withheld ?? [])];
   const current = entries.find((e) => e.campaignId === row.campaignId);
@@ -206,11 +246,7 @@ export async function admits(
 ): Promise<boolean> {
   const admission = currentAdmission();
   if (!admission || admission.campaignId !== lineage.campaignId) return false;
-  for (const version of [...lineage.versions].sort())
-    await client.query(
-      "select pg_advisory_xact_lock_shared(hashtextextended($1, 0))",
-      [epochLockKey(lineage.campaignId, version)],
-    );
+  if (!(await undeleted(client, lineage))) return false;
   await client.query("select state_seq from content_current for share");
   const head = await loadCurrent(client);
   const entry = head.entries.find((e) => e.campaignId === lineage.campaignId);
@@ -234,6 +270,95 @@ export async function admits(
     )
       return false;
   return true;
+}
+
+/**
+ * The deletion fence (D3 §5.2), inside the caller's open transaction: a shared advisory lock on
+ * every epoch `lineage` names, in sorted order -- the locks a deletion takes exclusively to record
+ * and to purge -- then false when any of them is deleted. A write that passes commits before the
+ * deletion is recorded, and is purged with the rest; one that waited sees the deletion.
+ */
+export async function undeleted(
+  client: PoolClient,
+  lineage: Pick<Lineage, "campaignId" | "versions">,
+): Promise<boolean> {
+  const versions = [...lineage.versions].sort();
+  for (const version of versions)
+    await client.query(
+      "select pg_advisory_xact_lock_shared(hashtextextended($1, 0))",
+      [epochLockKey(lineage.campaignId, version)],
+    );
+  const { rowCount } = await client.query(
+    "select 1 from content_deletion_keys where epoch_key_hash = any($1::text[]) limit 1",
+    [versions.map((v) => epochKeyHash(lineage.campaignId, v))],
+  );
+  return rowCount === 0;
+}
+
+/** Which epochs a holder depends on, kept with the holder (D3 §5.5): replaced in the holder's own
+ *  write transaction, and only for epochs this database holds -- a fixture campaign that was
+ *  never published has none to name. */
+export async function recordDependencies(
+  client: PoolClient,
+  holder:
+    | { readonly table: "session_epochs"; readonly sessionId: string }
+    | { readonly table: "save_epochs"; readonly saveId: string }
+    | { readonly table: "grant_epochs"; readonly token: string }
+    | {
+        readonly table: "run_epochs";
+        readonly ownerId: string;
+        readonly localRunId: string;
+      },
+  dependencies: Pick<Lineage, "campaignId" | "versions">,
+): Promise<void> {
+  const versions = [...dependencies.versions];
+  const ids = versions.map(() => dependencies.campaignId);
+  const existing = `select k.campaign_id, k.campaign_version
+      from unnest($1::text[], $2::text[]) as k(campaign_id, campaign_version)
+      join content_epochs e using (campaign_id, campaign_version)`;
+  switch (holder.table) {
+    case "session_epochs":
+      await client.query("delete from session_epochs where session_id = $1", [
+        holder.sessionId,
+      ]);
+      await client.query(
+        `insert into session_epochs (session_id, campaign_id, campaign_version)
+         select $3, campaign_id, campaign_version from (${existing}) d`,
+        [ids, versions, holder.sessionId],
+      );
+      return;
+    case "save_epochs":
+      await client.query("delete from save_epochs where save_id = $1", [
+        holder.saveId,
+      ]);
+      await client.query(
+        `insert into save_epochs (save_id, campaign_id, campaign_version)
+         select $3, campaign_id, campaign_version from (${existing}) d`,
+        [ids, versions, holder.saveId],
+      );
+      return;
+    case "grant_epochs":
+      await client.query("delete from grant_epochs where token = $1", [
+        holder.token,
+      ]);
+      await client.query(
+        `insert into grant_epochs (token, campaign_id, campaign_version)
+         select $3, campaign_id, campaign_version from (${existing}) d`,
+        [ids, versions, holder.token],
+      );
+      return;
+    case "run_epochs":
+      await client.query(
+        "delete from run_epochs where owner_id = $1 and local_run_id = $2",
+        [holder.ownerId, holder.localRunId],
+      );
+      await client.query(
+        `insert into run_epochs (owner_id, local_run_id, campaign_id, campaign_version)
+         select $3, $4, campaign_id, campaign_version from (${existing}) d`,
+        [ids, versions, holder.ownerId, holder.localRunId],
+      );
+      return;
+  }
 }
 
 /**

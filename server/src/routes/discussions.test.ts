@@ -15,6 +15,7 @@ import {
   type DiscussionThreadDetail,
   type DiscussionThreadPage,
 } from "../discussions/forum.js";
+import { resetContentEpochs } from "../content/reset.js";
 
 const databaseUrl = process.env.DATABASE_URL;
 const describeIfDb = databaseUrl ? describe : describe.skip;
@@ -115,6 +116,7 @@ describeIfDb("discussion routes (configured)", () => {
     await pool.query(
       "truncate discussion_posts, content_sources, badges, achievements, identities, auth_sessions, saves, sessions, players restart identity cascade",
     );
+    await resetContentEpochs(pool);
     fake.calls.list = 0;
     fake.calls.get = 0;
     fake.calls.create = 0;
@@ -553,6 +555,7 @@ describeIfDb("discussion routes (unconfigured)", () => {
     await pool.query(
       "truncate discussion_posts, content_sources, badges, achievements, identities, auth_sessions, saves, sessions, players restart identity cascade",
     );
+    await resetContentEpochs(pool);
   });
 
   it("answers 503 not_configured on both read routes", async () => {

@@ -11,6 +11,7 @@ import { Pool } from "pg";
 import { createServerDemo, type ServerDemo } from "./composition.js";
 import { evaluateBadges } from "./badges.js";
 import { CROWN_BADGE_ID } from "./ranking.js";
+import { resetContentEpochs } from "./content/reset.js";
 
 const databaseUrl = process.env.DATABASE_URL;
 const describeIfDb = databaseUrl ? describe : describe.skip;
@@ -34,6 +35,7 @@ describeIfDb("badge evaluation", () => {
     await pool.query(
       "truncate badges, achievements, auth_sessions, saves, sessions, players restart identity cascade",
     );
+    await resetContentEpochs(pool);
   });
 
   async function createPlayer(mergeCount = 0): Promise<string> {

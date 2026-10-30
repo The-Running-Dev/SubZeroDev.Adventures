@@ -10,6 +10,7 @@ import { Pool } from "pg";
 import { SessionStoreError } from "@the-running-dev/game-engine";
 import { createServerDemo } from "./composition.js";
 import { createSessionPersistenceCounters } from "./persistence.js";
+import { resetContentEpochs } from "./content/reset.js";
 
 const databaseUrl = process.env.DATABASE_URL;
 const describeIfDb = databaseUrl ? describe : describe.skip;
@@ -29,6 +30,7 @@ describeIfDb("createServerDemo rebuild", () => {
     await pool.query(
       "truncate badges, achievements, auth_sessions, saves, sessions, players restart identity cascade",
     );
+    await resetContentEpochs(pool);
   });
 
   it("keeps a session playable across an independent rebuild", async () => {
@@ -74,6 +76,7 @@ describeIfDb("session compare-and-swap", () => {
     await pool.query(
       "truncate badges, achievements, auth_sessions, saves, sessions, players restart identity cascade",
     );
+    await resetContentEpochs(pool);
   });
 
   async function firstAvailable(
@@ -152,6 +155,7 @@ describeIfDb("sessionCacheLimit", () => {
     await pool.query(
       "truncate badges, achievements, auth_sessions, saves, sessions, players restart identity cascade",
     );
+    await resetContentEpochs(pool);
   });
 
   async function storedBlobBytes(sessionId: string): Promise<number> {

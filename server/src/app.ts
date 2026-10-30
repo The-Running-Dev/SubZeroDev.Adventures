@@ -3,7 +3,10 @@ import Fastify, { type FastifyInstance } from "fastify";
 import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
 import type { Pool } from "pg";
-import { createServerDemo } from "./composition.js";
+import {
+  createServerDemo,
+  createServerDemoFromCurrent,
+} from "./composition.js";
 import { createContentCell } from "./content-cell.js";
 import { createSessionPersistenceCounters } from "./persistence.js";
 import {
@@ -159,12 +162,18 @@ export async function buildApp(
   );
   // The fallback covers the *first* build only, and it exists so unusable content an
   // operator added cannot keep the server from starting -- the admin routes below are the
-  // only way to remove that content, so they have to come up. See `ready`.
-  await ready(
-    bootstrapSource
-      ? () => createServerDemo(pool, bootstrapSource, sessionCache)
-      : undefined,
-  );
+  // only way to remove that content, so they have to come up. See `ready`. What is already
+  // current comes first (engine plan 54, §3.3): it needs no source at all, so a boot no longer
+  // depends on one being reachable, and the bootstrap snapshot is only the very first boot's,
+  // before anything has been published.
+  await ready(async () => {
+    try {
+      return await createServerDemoFromCurrent(pool, sessionCache);
+    } catch (error) {
+      if (!bootstrapSource) throw error;
+      return createServerDemo(pool, bootstrapSource, sessionCache);
+    }
+  });
   registerHealthRoute(app, pool, cell);
   const identityProviders = await loadIdentityProviders();
   registerSessionRoutes(app, pool, cell, identityProviders);

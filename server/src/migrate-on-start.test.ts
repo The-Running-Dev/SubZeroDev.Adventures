@@ -122,10 +122,18 @@ describeIfDb("migrateOnStart", () => {
     await migrateOnStart(scratch, { dir: migrationsDir, log: quiet });
     expect(await applied()).toBe(migrationCount);
     expect((await scratch.query("select * from sessions")).rows).toStrictEqual(
-      sessionsBefore.map((row) => ({ ...row, initialization: null })),
+      sessionsBefore.map((row) => ({
+        ...row,
+        initialization: null,
+        campaign_version: null,
+      })),
     );
     expect((await scratch.query("select * from saves")).rows).toStrictEqual(
-      savesBefore.map((row) => ({ ...row, initialization: null })),
+      savesBefore.map((row) => ({
+        ...row,
+        initialization: null,
+        campaign_version: null,
+      })),
     );
     const columns = await scratch.query(
       `select table_name, data_type, is_nullable, column_default from information_schema.columns

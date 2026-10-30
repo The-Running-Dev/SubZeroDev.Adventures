@@ -4,17 +4,20 @@ import { bundleFor } from "../../shared/offline/runtime.js";
  * `createBrowserDemo`, but reading campaign JSON off disk instead of over `fetch`, and
  * handed a Postgres-backed `SessionPersistence` instead of `localPersistence()`.
  */
-import { createHash } from "node:crypto";
 import type { Pool } from "pg";
 import {
+  canonicalDigest,
   createEngine,
   createInMemorySessionStore,
   defaultRecordIdSource,
+  type Campaign,
+  type CampaignProvenance as AuthoredProvenance,
+  type ContentRegistry,
   type Engine,
   type SessionStore,
 } from "@the-running-dev/game-engine";
 import {
-  buildTieredCatalog,
+  catalogEntryOf,
   KINDS,
   type CatalogEntry,
 } from "../../shared/campaign-registry.js";
@@ -29,6 +32,16 @@ import {
 } from "./campaigns/source.js";
 import { loadSubmissionCandidates } from "./campaigns/submissions.js";
 import { recordQuarantine, recordSourceOutcome } from "./content-sources.js";
+import { buildCandidate } from "./content/candidate.js";
+import { epochKey, loadEpochDigests } from "./content/epoch-store.js";
+import {
+  accessibleIn,
+  contentRuntimeFor,
+  portableOf,
+  type ContentRuntime,
+  type ContentView,
+  type ViewEntry,
+} from "./content/runtime.js";
 
 /** Where a submission-tier campaign came from and who may currently reach it. Absent from
  *  `ServerDemo.provenance` means core content -- always public, owned by nobody. */
@@ -76,15 +89,6 @@ export interface ServerDemo {
    *  submissions regardless of visibility, plus every other player's `public` ones.
    *  `playerId: null` is an anonymous or logged-out request -- core and public only. */
   accessibleCampaignIds(playerId: string | null): ReadonlySet<string>;
-  /**
-   * The string-table slice a session touching exactly these campaigns may see -- always
-   * includes the system/kind-level reason messages every campaign shares (they are not any
-   * campaign's own key, so they are never excluded), plus each named campaign's own declared
-   * keys. Never the raw `registry.strings` map: that is one flat table with no per-campaign
-   * partition, and handing it over whole is how a session in one campaign would otherwise read
-   * every other campaign's narrative text, private submissions included.
-   */
-  stringsFor(campaignIds: Iterable<string>): Record<string, string>;
   findCampaign(campaignId: string): CatalogEntry | undefined;
   readonly store: SessionStore;
   /** The raw `Engine`, exposed for `replay.ts` -- it drives `deserialize`/`submitAction`/
@@ -116,22 +120,14 @@ export interface ServerDemo {
   /** Core content only -- what `/healthz` reports. See `contentDigest`'s note on why the two
    *  are not the same field. */
   readonly coreContentDigest: string;
-  /** Every extension actually applied, core and accepted submissions together, in the order
-   *  they were merged -- if an id appears here, `mergeExtensions` (campaign-extension.ts) did
+  /** Every extension actually applied, core and accepted submissions together, grouped by
+   *  base campaign in catalog order and in merge order within one -- if an id appears here, `mergeExtensions` (campaign-extension.ts) did
    *  not throw on it, so it landed. Read only by the admin page to show which extensions
    *  applied to which base campaign; nothing gameplay-facing needs it. */
   readonly appliedExtensions: readonly {
     readonly id: string;
     readonly extends: string;
   }[];
-}
-
-function digestOf(portables: readonly unknown[]): string {
-  // Portable order is manifest order (`Promise.all` preserves input order regardless of
-  // resolution order), so this is stable across two loads of the same content -- it is not
-  // trying to be stable across a *reordering* of an unchanged manifest, which would be a
-  // different content publish anyway.
-  return createHash("sha256").update(JSON.stringify(portables)).digest("hex");
 }
 
 /** How the session store is bounded and observed. Both fields outlive any one `ServerDemo`:
@@ -151,74 +147,145 @@ export interface SessionCacheOptions {
 export async function createServerDemo(
   pool: Pool,
   campaignSource: CampaignSource = createDiskCampaignSource(),
-  { sessionCacheLimit, counters }: SessionCacheOptions = {},
+  options: SessionCacheOptions = {},
 ): Promise<ServerDemo> {
+  const runtime = contentRuntimeFor(pool);
+  await runtime.ready();
   const { campaigns: trustedPortables, extensions: trustedExtensions } =
     await campaignSource.load();
   const { candidates, rowsById } = await loadSubmissionCandidates(pool);
-  const { registry, all, campaignStringKeys, quarantined, trusted, portables } =
-    buildTieredCatalog(trustedPortables, trustedExtensions, candidates);
+  const held = await loadEpochDigests(pool);
+  const candidate = buildCandidate(
+    trustedPortables,
+    trustedExtensions,
+    candidates,
+    (sourceId) => {
+      const row = rowsById.get(sourceId)!;
+      return {
+        ownerPlayerId: row.ownerPlayerId!,
+        visibility: row.visibility === "public" ? "public" : "private",
+      };
+    },
+    (campaignId, campaignVersion) =>
+      held.get(epochKey(campaignId, campaignVersion)),
+  );
 
   // Bookkeeping for the submission tier's own outcome -- a candidate is either quarantined
-  // (loaded fine on its own, excluded for colliding with another candidate) or, having made
-  // it into `all`, recorded the same way a trusted source's successful load is. Both run
-  // before this returns, same posture as `multi-source.ts`'s "persisted before the throw" --
-  // there is no throw here (the submission tier is fail-open by construction), but a status
-  // page reading stale bookkeeping while a fresh demo is already serving would be its own bug.
-  const quarantinedIds = new Set(quarantined.map((q) => q.sourceId));
-  const acceptedCandidates = candidates.filter(
-    (c) => !quarantinedIds.has(c.sourceId),
+  // (loaded fine on its own, excluded for colliding with another candidate, or naming a key
+  // already held under other content) or, having made it into the publication, recorded the
+  // same way a trusted source's successful load is. Quarantines are written before the
+  // publication, so a status page never misses a refusal the serving content reflects;
+  // acceptances after it, so none is recorded for a publication that was refused.
+  await Promise.all(
+    candidate.quarantined.map((q) =>
+      recordQuarantine(pool, q.sourceId, q.reason),
+    ),
   );
-  await Promise.all([
-    ...quarantined.map((q) => recordQuarantine(pool, q.sourceId, q.reason)),
-    ...acceptedCandidates.map((c) =>
+  const view = await runtime.publish(candidate);
+  await Promise.all(
+    candidate.accepted.map((c) =>
       recordSourceOutcome(pool, c.sourceId, {
         ok: true,
         campaignCount: c.portable ? 1 : 0,
         extensionCount: c.extension ? 1 : 0,
       }),
     ),
-  ]);
+  );
+  return demoFrom(pool, runtime, view, options);
+}
+
+/**
+ * What is already current, with no source read at all (engine plan 54, §3.3): the boot path
+ * once anything has been published, so a restart no longer depends on a source being
+ * reachable. Throws when nothing has been published yet -- the first boot needs a source.
+ */
+export async function createServerDemoFromCurrent(
+  pool: Pool,
+  options: SessionCacheOptions = {},
+): Promise<ServerDemo> {
+  const runtime = contentRuntimeFor(pool);
+  await runtime.ready();
+  const view = runtime.view();
+  if (!view) throw new Error("no content publication is current yet");
+  return demoFrom(pool, runtime, view, options);
+}
+
+function contentDigestOf(entries: readonly ViewEntry[]): string {
+  return canonicalDigest(
+    entries.map((entry) => [
+      entry.campaignId,
+      entry.campaignVersion,
+      entry.epoch.stored.digest,
+      entry.catalog,
+      entry.provenance,
+    ]),
+  );
+}
+
+/**
+ * One publication, served. Every engine built here shares the process's one archive, so a
+ * session or save on an epoch this publication no longer offers still resolves; the
+ * construction registry is only this publication's default epoch per campaign.
+ */
+function demoFrom(
+  pool: Pool,
+  runtime: ContentRuntime,
+  view: ContentView,
+  { sessionCacheLimit, counters }: SessionCacheOptions,
+): ServerDemo {
+  const { entries } = view;
+  const campaigns = new Map<string, Campaign>();
+  const strings = new Map<string, string>();
+  const authored = new Map<string, AuthoredProvenance>();
+  for (const entry of entries) {
+    campaigns.set(
+      entry.campaignId,
+      entry.registry.campaigns.get(entry.campaignId)!,
+    );
+    for (const [key, value] of entry.registry.strings) strings.set(key, value);
+    authored.set(
+      entry.campaignId,
+      entry.registry.provenance!.get(entry.campaignId)!,
+    );
+  }
+  const registry: ContentRegistry = {
+    campaigns,
+    strings,
+    provenance: authored,
+  };
+
+  const all = entries.map((entry) =>
+    catalogEntryOf(
+      campaigns.get(entry.campaignId)!,
+      entry.registry.strings,
+      entry.catalog,
+    ),
+  );
+  const isCore = (entry: ViewEntry) => entry.provenance === null;
+  const core = all.filter((_, i) => isCore(entries[i]!));
 
   const provenance = new Map<string, CampaignProvenance>();
-  for (const candidate of acceptedCandidates) {
-    if (!candidate.portable) continue; // an extension has no campaign id of its own; its
-    // base campaign (also a candidate, per the ownership check in submissions.ts) already
-    // carries the provenance that governs the merged content's visibility.
-    const row = rowsById.get(candidate.sourceId)!;
-    provenance.set(candidate.portable.campaign.id, {
-      ownerPlayerId: row.ownerPlayerId!,
-      visibility: row.visibility === "public" ? "public" : "private",
-    });
-  }
+  for (const entry of entries)
+    if (entry.provenance !== null)
+      provenance.set(entry.campaignId, entry.provenance);
 
-  const acceptedExtensions = [
-    ...trustedExtensions,
-    ...acceptedCandidates
-      .filter(
-        (c): c is typeof c & { extension: NonNullable<typeof c.extension> } =>
-          c.extension !== undefined,
-      )
-      .map((c) => c.extension),
-  ];
-
-  // Every campaign's own string keys, unioned, so a system/kind-level reason message (never
-  // any campaign's own key) is told apart from campaign-authored narrative text without this
-  // file needing to know what those messages actually are.
-  const allCampaignStringKeys = new Set<string>();
-  for (const keys of campaignStringKeys.values())
-    for (const key of keys) allCampaignStringKeys.add(key);
-
-  const engine = createEngine({ kinds: KINDS, registry });
+  const engine = createEngine({
+    kinds: KINDS,
+    registry,
+    archive: runtime.archive,
+  });
   const recordIds = defaultRecordIdSource;
 
   const offlineBundles = new Map<
     string,
     import("../../shared/offline/protocol.js").Bundle
   >();
-  for (const portable of portables) {
+  for (const entry of entries) {
     try {
-      offlineBundles.set(portable.campaign.id, bundleFor(portable));
+      offlineBundles.set(
+        entry.campaignId,
+        bundleFor(portableOf(entry.epoch, entry.catalog)),
+      );
     } catch {
       /* Unsupported requirements stay online-only. */
     }
@@ -227,42 +294,13 @@ export async function createServerDemo(
   return {
     offlineBundles,
     all,
-    core: trusted.all,
-    catalog: trusted.all.filter((campaign) => !campaign.hidden),
+    core,
+    catalog: core.filter((campaign) => !campaign.hidden),
     provenance,
-    accessibleCampaignIds(playerId) {
-      const ids = new Set(trusted.all.map((campaign) => campaign.campaignId));
-      for (const [campaignId, entry] of provenance) {
-        if (entry.visibility === "public" || entry.ownerPlayerId === playerId)
-          ids.add(campaignId);
-      }
-      return ids;
-    },
-    stringsFor(campaignIds) {
-      const keys = new Set<string>();
-      for (const [key] of registry.strings)
-        if (!allCampaignStringKeys.has(key)) keys.add(key);
-      for (const campaignId of campaignIds)
-        for (const key of campaignStringKeys.get(campaignId) ?? [])
-          keys.add(key);
-
-      const out: Record<string, string> = {};
-      for (const key of keys) {
-        const value = registry.strings.get(key);
-        if (value !== undefined) out[key] = value;
-      }
-      return out;
-    },
-    contentDigest: digestOf([
-      trustedPortables,
-      trustedExtensions,
-      acceptedCandidates,
-    ]),
-    coreContentDigest: digestOf([trustedPortables, trustedExtensions]),
-    appliedExtensions: acceptedExtensions.map((extension) => ({
-      id: extension.id,
-      extends: extension.extends,
-    })),
+    accessibleCampaignIds: (playerId) => accessibleIn(entries, playerId),
+    contentDigest: contentDigestOf(entries),
+    coreContentDigest: contentDigestOf(entries.filter(isCore)),
+    appliedExtensions: entries.flatMap((entry) => entry.epoch.extensions),
     findCampaign: (campaignId) =>
       all.find((campaign) => campaign.campaignId === campaignId),
     engine,
@@ -270,6 +308,7 @@ export async function createServerDemo(
       createEngine({
         kinds: KINDS,
         registry,
+        archive: runtime.archive,
         ids: {
           newGameId: () => gameId,
           newSeed: () => {
@@ -282,6 +321,7 @@ export async function createServerDemo(
     store: createInMemorySessionStore({
       engine,
       registry,
+      content: runtime.channel,
       persistence: createPostgresPersistence(pool, KINDS, counters),
       profiles: createPostgresProfileStore(pool),
       recordIds,

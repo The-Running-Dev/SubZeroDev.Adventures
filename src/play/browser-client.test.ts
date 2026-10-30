@@ -114,35 +114,27 @@ function recordStoreCalls(store: BrowserDemo["store"]): {
   };
 }
 
+// Patches the engine in place rather than wrapping it: the session store refuses an
+// `Engine` that `createEngine` or `withEmitter` did not return, because only those carry
+// the response-alias link (engine 06 §4). The store derives a per-command engine through
+// `withEmitter`, so each derived engine is patched the same way.
 function observeSerializations(engine: Engine): {
   engine: Engine;
   lastSerialized(): string | undefined;
 } {
   const observer: { value?: string } = {};
-  function wrap(current: Engine): Engine {
-    return {
-      kinds: current.kinds,
-      content: current.content,
-      createGame: (config) => current.createGame(config),
-      scene: (state) => current.scene(state),
-      view: (state, audience) => current.view(state, audience),
-      availableActions: (state) => current.availableActions(state),
-      submitAction: (state, actionId, params) =>
-        current.submitAction(state, actionId, params),
-      previewAction: (state, actionId, params) =>
-        current.previewAction(state, actionId, params),
+  function observe(current: Engine): Engine {
+    const { serialize, withEmitter } = current;
+    const patch: Pick<Engine, "serialize" | "withEmitter"> = {
       serialize: (state) => {
-        observer.value = current.serialize(state);
+        observer.value = serialize(state);
         return observer.value;
       },
-      deserialize: (data) => current.deserialize(data),
-      migrate: (data) => current.migrate(data),
-      adoptContent: (state, campaignVersion) =>
-        current.adoptContent(state, campaignVersion),
-      withEmitter: (emitter) => wrap(current.withEmitter(emitter)),
+      withEmitter: (emitter) => observe(withEmitter(emitter)),
     };
+    return Object.assign(current, patch);
   }
-  return { engine: wrap(engine), lastSerialized: () => observer.value };
+  return { engine: observe(engine), lastSerialized: () => observer.value };
 }
 
 // The removed campaign *builders* (`buildBulgariaBureaucracyCampaign` et al.) moved to
@@ -373,6 +365,7 @@ describe("BrowserClient — story-campaign client parity (09-clients.md §1, W64
       }
 
       expect(browserState.scene.status).toBe("ended");
+      expect(browserFixture.lastSerialized()).toBeDefined();
       expect(browserFixture.lastSerialized()).toBe(
         textFixture.lastSerialized(),
       );

@@ -69,6 +69,12 @@ export interface CatalogEntry {
   readonly mine?: boolean;
   /** Companion to `mine`, same scope -- absent for core content. */
   readonly visibility?: "private" | "public";
+  /** `false` only for a campaign the current publication offers on an epoch this server
+   *  cannot run: listed so it does not silently vanish, never startable, and absent from
+   *  `summaries` (engine plan 54, D4 §1). Absent means available. */
+  readonly available?: false;
+  /** Why `available` is false. */
+  readonly code?: "campaign_version_unsupported";
 }
 
 export const KINDS = {

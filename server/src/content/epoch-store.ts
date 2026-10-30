@@ -208,6 +208,23 @@ export async function loadPublicationEntries(
   }));
 }
 
+/** The catalog an epoch was last published with: an epoch no publication offers any more
+ *  still has one, from the last publication that did. */
+export async function loadEpochCatalog(
+  pool: Pool,
+  campaignId: string,
+  campaignVersion: string,
+): Promise<PortableCatalog | undefined> {
+  const { rows } = await pool.query<{ catalog: PortableCatalog }>(
+    `select pe.catalog from content_publication_entries pe
+       join content_publications p using (publication_id)
+      where pe.campaign_id = $1 and pe.campaign_version = $2
+      order by p.seq desc limit 1`,
+    [campaignId, campaignVersion],
+  );
+  return rows[0]?.catalog;
+}
+
 /**
  * Step 2 of §3.2, in one transaction: insert the new epochs (an identical one already held is
  * left alone; a different one under the same key refuses everything), the publication and its

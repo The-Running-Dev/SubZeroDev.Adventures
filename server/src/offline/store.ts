@@ -4,7 +4,17 @@ import { isDeepStrictEqual } from "node:util";
 import type { Pool } from "pg";
 import type { LoggedAction } from "@the-running-dev/game-engine";
 import type { ServerDemo } from "../composition.js";
-import { assertSessionOwned, OwnershipError } from "../store/ownedStore.js";
+import { storedContentRow } from "../persistence.js";
+import { OwnershipError } from "../store/ownedStore.js";
+import {
+  admits,
+  ContentRefusal,
+  gateExisting,
+  gateNewStart,
+  lineageOf,
+  runAdmitted,
+  type Admission,
+} from "../content/admission.js";
 import { validateBundle } from "../../../shared/offline/runtime.js";
 import type {
   Bundle,
@@ -73,74 +83,166 @@ export function ownedOfflineStore(
   principal: { playerId: string; kind: string } | null,
 ) {
   const owner = principal?.kind === "member" ? principal.playerId : null;
+  /** One epoch's bundle, cached on `demo`; an epoch whose requirements the offline runtime
+   *  cannot meet stays online-only. */
+  async function epochBundle(campaignId: string, campaignVersion: string) {
+    const bundle = await demo.bundleForEpoch(campaignId, campaignVersion);
+    if (!bundle) throw new OfflineError("unsupported_campaign");
+    return bundle;
+  }
   return {
+    /**
+     * A grant is a new start (D4 §3): fresh, it is admitted on the version the current
+     * publication offers this caller; from a checkpoint, on the session's own epoch, gated as
+     * existing content. Either way the bundle is that epoch's, and the grant insert is fenced
+     * like a revision-0 session write -- refused, caught up, gated again and retried once.
+     */
     async download(campaignId: string, sessionId?: string): Promise<Download> {
-      if (
-        !demo.accessibleCampaignIds(principal?.playerId ?? null).has(campaignId)
-      )
-        throw new OwnershipError("offline_download");
-      const bundle = demo.offlineBundles.get(campaignId);
-      if (!bundle) throw new OfflineError("unsupported_campaign");
-      let checkpoint: Checkpoint | undefined;
-      let revision: string | null = null;
-      if (sessionId) {
-        if (!owner) throw new OfflineError("member_required", 403);
-        if (typeof sessionId !== "string" || !uuid.test(sessionId))
-          throw new OfflineError("invalid_checkpoint", 400);
-        await assertSessionOwned(pool, sessionId, owner, "offline_checkpoint");
-        const { rows } = await pool.query(
-          "select blob, offline_revision, replay_compatible from sessions where session_id=$1 and profile_id=$2",
-          [sessionId, owner],
-        );
-        const row = rows[0];
-        if (!row || !row.replay_compatible)
-          throw new OfflineError("invalid_checkpoint");
-        const state = JSON.parse(row.blob);
-        if (state.campaignId !== campaignId)
-          throw new OfflineError("invalid_checkpoint");
-        const inputs = {
-          gameId: state.gameId,
-          seed: state.seed,
-          audience: "player" as const,
-        };
-        let frame;
-        try {
-          frame = validateBundle(bundle).replay(
-            bundle.portable,
-            inputs,
-            state.actionLog,
+      const { runtime } = demo;
+      const playerId = principal?.playerId ?? null;
+      for (let attempt = 0; ; attempt++) {
+        let admission: Admission;
+        let campaignVersion: string;
+        let checkpoint: Checkpoint | undefined;
+        let revision: string | null = null;
+        if (sessionId) {
+          if (!owner) throw new OfflineError("member_required", 403);
+          if (typeof sessionId !== "string" || !uuid.test(sessionId))
+            throw new OfflineError("invalid_checkpoint", 400);
+          const stored = await storedContentRow(pool, "sessions", sessionId);
+          if (stored !== undefined && stored.profileId !== owner)
+            throw new OwnershipError("offline_checkpoint");
+          const { rows } = await pool.query(
+            "select blob, offline_revision, replay_compatible from sessions where session_id=$1 and profile_id=$2",
+            [sessionId, owner],
           );
-        } catch {
-          throw new OfflineError("incompatible_checkpoint");
+          const row = rows[0];
+          if (!row || !row.replay_compatible)
+            throw new OfflineError("invalid_checkpoint");
+          const lineage = lineageOf(row.blob);
+          if (lineage.campaignId !== campaignId)
+            throw new OfflineError("invalid_checkpoint");
+          await gateExisting(
+            runtime,
+            "offline_checkpoint",
+            lineage,
+            playerId,
+            await runtime.check(),
+          );
+          campaignVersion = lineage.campaignVersion;
+          admission = {
+            kind: "derived",
+            campaignId,
+            versions: lineage.versions,
+            playerId,
+          };
+          const source = await epochBundle(campaignId, campaignVersion);
+          const state = JSON.parse(row.blob);
+          const inputs = {
+            gameId: state.gameId,
+            seed: state.seed,
+            audience: "player" as const,
+          };
+          let frame;
+          try {
+            frame = validateBundle(source).replay(
+              source.portable,
+              inputs,
+              state.actionLog,
+            );
+          } catch {
+            throw new OfflineError("incompatible_checkpoint");
+          }
+          if (frame.blob !== row.blob)
+            throw new OfflineError("incompatible_checkpoint");
+          checkpoint = {
+            inputs,
+            blob: row.blob,
+            actions: frame.actions,
+            sessionId,
+          };
+          revision = row.offline_revision;
+        } else {
+          campaignVersion = gateNewStart(
+            runtime,
+            "offline_download",
+            campaignId,
+            playerId,
+            await runtime.check(),
+          );
+          admission = { kind: "new", campaignId, campaignVersion, playerId };
         }
-        if (frame.blob !== row.blob)
-          throw new OfflineError("incompatible_checkpoint");
-        checkpoint = {
-          inputs,
-          blob: row.blob,
-          actions: frame.actions,
-          sessionId,
-        };
-        revision = row.offline_revision;
+        const bundle = await epochBundle(campaignId, campaignVersion);
+        const base = randomUUID();
+        const inserted = await runAdmitted(admission, async () => {
+          const db = await pool.connect();
+          try {
+            await db.query("begin");
+            const admitted = await admits(db, {
+              campaignId,
+              campaignVersion,
+              versions: new Set([campaignVersion]),
+            });
+            if (!admitted) {
+              await db.query("rollback");
+              return false;
+            }
+            await db.query(
+              "insert into offline_grants(token,owner_id,bundle,checkpoint,source_revision) values($1,$2,$3,$4,$5)",
+              [
+                base,
+                owner,
+                JSON.stringify(bundle),
+                checkpoint ? JSON.stringify(checkpoint) : null,
+                revision,
+              ],
+            );
+            await db.query("commit");
+            return true;
+          } catch (error) {
+            await db.query("rollback");
+            throw error;
+          } finally {
+            db.release();
+          }
+        });
+        if (inserted)
+          return { bundle, base, owner, ...(checkpoint ? { checkpoint } : {}) };
+        if (attempt > 0)
+          throw new ContentRefusal(
+            "offline_download",
+            "concurrent_modification",
+          );
+        await runtime.catchUp();
       }
-      const base = randomUUID();
-      await pool.query(
-        "insert into offline_grants(token,owner_id,bundle,checkpoint,source_revision) values($1,$2,$3,$4,$5)",
-        [
-          base,
-          owner,
-          JSON.stringify(bundle),
-          checkpoint ? JSON.stringify(checkpoint) : null,
-          revision,
-        ],
-      );
-      return { bundle, base, owner, ...(checkpoint ? { checkpoint } : {}) };
     },
     async sync(value: unknown): Promise<SyncReceipt> {
       if (!owner) throw new OfflineError("member_required", 403);
       validateRequest(value);
       const r = value;
       const hash = createHash("sha256").update(JSON.stringify(r)).digest("hex");
+      // The grant's epoch, gated as existing content before the transaction takes its
+      // connection -- the gate reads through the pool, and may catch up: revoked since the
+      // download is 403, an epoch this process can no longer run is 409 (D4 §3). A grant's
+      // bundle never changes, so reading it ahead of the transaction is safe; a missing grant
+      // is the transaction's own 403.
+      const epoch = (
+        await pool.query(
+          "select bundle->'portable'->'campaign'->>'id' as campaign_id, bundle->'portable'->'campaign'->>'version' as campaign_version from offline_grants where token=$1 and owner_id=$2",
+          [r.grant, owner],
+        )
+      ).rows[0];
+      if (epoch)
+        await gateExisting(
+          demo.runtime,
+          "offline_sync",
+          {
+            campaignId: epoch.campaign_id,
+            campaignVersion: epoch.campaign_version,
+          },
+          owner,
+          await demo.runtime.check(),
+        );
       const db = await pool.connect();
       try {
         await db.query("begin");

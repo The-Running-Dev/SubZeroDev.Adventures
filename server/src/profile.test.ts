@@ -4,7 +4,15 @@
  * documented email-fallback risk).
  */
 import { randomUUID } from "node:crypto";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+} from "vitest";
 import { Pool } from "pg";
 import type { FastifyInstance } from "fastify";
 import { buildApp } from "./app.js";
@@ -27,15 +35,14 @@ describeIfDb("public/private profiles", () => {
 
   beforeAll(async () => {
     pool = new Pool({ connectionString: databaseUrl });
-    app = await buildApp(pool, {
-      siteUrl: "http://localhost:5173",
-      apiUrl: "http://localhost:8787",
-    });
   });
 
   afterAll(async () => {
-    await app.close();
     await pool.end();
+  });
+
+  afterEach(async () => {
+    await app?.close();
   });
 
   beforeEach(async () => {
@@ -43,6 +50,10 @@ describeIfDb("public/private profiles", () => {
       "truncate badges, achievements, auth_sessions, saves, sessions, players restart identity cascade",
     );
     await resetContentEpochs(pool);
+    app = await buildApp(pool, {
+      siteUrl: "http://localhost:5173",
+      apiUrl: "http://localhost:8787",
+    });
   });
 
   async function guestCookie(): Promise<string> {
@@ -51,6 +62,7 @@ describeIfDb("public/private profiles", () => {
       url: "/api/sessions",
       payload: { campaignId: "what-would-lucifer-do" },
     });
+    expect(response.statusCode, response.body).toBe(200);
     return cookieFrom(response);
   }
 

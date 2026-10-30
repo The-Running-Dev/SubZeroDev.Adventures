@@ -33,7 +33,12 @@ import {
 import { loadSubmissionCandidates } from "./campaigns/submissions.js";
 import { recordQuarantine, recordSourceOutcome } from "./content-sources.js";
 import { buildCandidate } from "./content/candidate.js";
-import { epochKey, loadEpochDigests } from "./content/epoch-store.js";
+import { admittingChannel, epochLockKey } from "./content/admission.js";
+import {
+  epochKey,
+  loadEpochCatalog,
+  loadEpochDigests,
+} from "./content/epoch-store.js";
 import {
   accessibleIn,
   contentRuntimeFor,
@@ -51,10 +56,20 @@ export interface CampaignProvenance {
 }
 
 export interface ServerDemo {
+  /** The process's content: what is current, what is held, and the request gate. Shared by
+   *  every `ServerDemo` built over the same pool. */
+  readonly runtime: ContentRuntime;
+  /** This publication's bundle per campaign -- what the catalog's `offline` flag reads. */
   readonly offlineBundles: ReadonlyMap<
     string,
     import("../../shared/offline/protocol.js").Bundle
   >;
+  /** The bundle of one held epoch, current or not: a checkpoint download is served from the
+   *  session's own epoch (D4 §3). Undefined when the epoch is not held or has no bundle. */
+  bundleForEpoch(
+    campaignId: string,
+    campaignVersion: string,
+  ): Promise<import("../../shared/offline/protocol.js").Bundle | undefined>;
   /** Every registered campaign, core and submission alike, listed and hidden -- access is a
    *  separate question `accessibleCampaignIds` answers, same as `hidden` always has been:
    *  registered but not access-checked is not the same as visible to a given request. */
@@ -87,7 +102,9 @@ export interface ServerDemo {
   readonly provenance: ReadonlyMap<string, CampaignProvenance>;
   /** Every campaign id a given viewer may currently reach: all of `core`, plus their own
    *  submissions regardless of visibility, plus every other player's `public` ones.
-   *  `playerId: null` is an anonymous or logged-out request -- core and public only. */
+   *  `playerId: null` is an anonymous or logged-out request -- core and public only. Read
+   *  from the runtime's current publication, not this one's: a cell not yet refreshed still
+   *  answers what is current. */
   accessibleCampaignIds(playerId: string | null): ReadonlySet<string>;
   findCampaign(campaignId: string): CatalogEntry | undefined;
   readonly store: SessionStore;
@@ -291,13 +308,41 @@ function demoFrom(
     }
   }
 
+  const bundles = new Map<
+    string,
+    Promise<import("../../shared/offline/protocol.js").Bundle | undefined>
+  >();
+  async function epochBundle(campaignId: string, campaignVersion: string) {
+    const epoch = runtime.epoch(campaignId, campaignVersion);
+    if (!epoch) return undefined;
+    const catalog = await loadEpochCatalog(pool, campaignId, campaignVersion);
+    if (!catalog) return undefined;
+    try {
+      return bundleFor(portableOf(epoch, catalog));
+    } catch {
+      return undefined;
+    }
+  }
+
   return {
+    runtime,
     offlineBundles,
+    bundleForEpoch(campaignId, campaignVersion) {
+      const key = epochLockKey(campaignId, campaignVersion);
+      let bundle = bundles.get(key);
+      if (!bundle) {
+        bundle = epochBundle(campaignId, campaignVersion);
+        bundles.set(key, bundle);
+        bundle.catch(() => bundles.delete(key));
+      }
+      return bundle;
+    },
     all,
     core,
     catalog: core.filter((campaign) => !campaign.hidden),
     provenance,
-    accessibleCampaignIds: (playerId) => accessibleIn(entries, playerId),
+    accessibleCampaignIds: (playerId) =>
+      accessibleIn(runtime.view()?.entries ?? entries, playerId),
     contentDigest: contentDigestOf(entries),
     coreContentDigest: contentDigestOf(entries.filter(isCore)),
     appliedExtensions: entries.flatMap((entry) => entry.epoch.extensions),
@@ -321,7 +366,7 @@ function demoFrom(
     store: createInMemorySessionStore({
       engine,
       registry,
-      content: runtime.channel,
+      content: admittingChannel(runtime.channel),
       persistence: createPostgresPersistence(pool, KINDS, counters),
       profiles: createPostgresProfileStore(pool),
       recordIds,

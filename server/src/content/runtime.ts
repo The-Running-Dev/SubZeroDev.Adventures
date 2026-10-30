@@ -43,6 +43,13 @@ export interface ContentView {
   readonly stateSeq: number;
   /** In publication order. An entry whose epoch this process cannot restore is left out. */
   readonly entries: readonly ViewEntry[];
+  /** The entries left out above: listed as unavailable, never started (D4 §1). */
+  readonly withheld: readonly WithheldEntry[];
+}
+
+export interface WithheldEntry extends EntryRow {
+  readonly epoch: EpochRow;
+  readonly result: RestoreResult;
 }
 
 export interface ContentRuntime {
@@ -57,6 +64,18 @@ export interface ContentRuntime {
   publish(candidate: Candidate): Promise<ContentView>;
   /** The current publication, or undefined before the first one. */
   view(): ContentView | undefined;
+  /** Re-hydrates: another process published, or a session names an epoch not yet held. One
+   *  catch-up at a time; a caller arriving during one waits for it. */
+  catchUp(): Promise<void>;
+  /**
+   * The request gate (D3 §5.2): may this request serve non-core content? It reads
+   * `content_current.state_seq` -- the same as what this process applied continues; higher
+   * catches up first; lower means the database went backwards under this process (a restore),
+   * which latches the gate closed until a restart; unreadable is closed for this request.
+   */
+  check(): Promise<boolean>;
+  /** A held epoch's stored row, current or not. */
+  epoch(campaignId: string, campaignVersion: string): EpochRow | undefined;
   /** Held aside at hydration: the running kind refuses it (§3.3, §3.6). */
   unsupported(
     campaignId: string,
@@ -134,8 +153,14 @@ export function createContentRuntime(pool: Pool): ContentRuntime {
   const archive = createContentArchive({ kinds: KINDS, initial: EMPTY });
   const epochs = new Map<string, EpochRow>();
   const unsupported = new Map<string, RestoreResult>();
+  const unsupportedRows = new Map<string, EpochRow>();
   let current: ContentView | undefined;
   let hydrated: Promise<void> | undefined;
+  let catching: Promise<void> | undefined;
+  // The highest `state_seq` this process has applied. Never moves backwards: a hydration that
+  // reads an older head than one already applied leaves `current` as it was.
+  let appliedSeq = 0;
+  let latched = false;
   // §3.2 step 4: a commit this process could not activate means the database names content the
   // archive does not hold. Nothing after it can be trusted until a restart re-hydrates.
   let activationFailed: string | undefined;
@@ -146,14 +171,28 @@ export function createContentRuntime(pool: Pool): ContentRuntime {
     entries: readonly EntryRow[],
   ): ContentView {
     const out: ViewEntry[] = [];
+    const withheld: WithheldEntry[] = [];
     for (const entry of entries) {
       const key = epochKey(entry.campaignId, entry.campaignVersion);
       const registry = archive.resolve(entry.campaignId, entry.campaignVersion);
       const epoch = epochs.get(key);
-      if (!registry || !epoch) continue;
-      out.push({ ...entry, registry, epoch });
+      if (registry && epoch) {
+        out.push({ ...entry, registry, epoch });
+        continue;
+      }
+      const result = unsupported.get(key);
+      const row = unsupportedRows.get(key);
+      if (result && row) withheld.push({ ...entry, epoch: row, result });
     }
-    return { publicationId, stateSeq, entries: out };
+    return { publicationId, stateSeq, entries: out, withheld };
+  }
+
+  function apply(view: ContentView): ContentView {
+    if (view.stateSeq >= appliedSeq) {
+      appliedSeq = view.stateSeq;
+      current = view;
+    }
+    return current!;
   }
 
   async function hydrate(): Promise<void> {
@@ -172,15 +211,15 @@ export function createContentRuntime(pool: Pool): ContentRuntime {
         );
       if (result.outcome === "unsupported") {
         unsupported.set(key, result);
+        unsupportedRows.set(key, row);
         continue;
       }
       epochs.set(key, row);
     }
     const head = await loadCurrent(pool);
-    current =
-      head.publicationId === null
-        ? undefined
-        : viewOf(head.publicationId, head.stateSeq, head.entries);
+    if (head.publicationId === null)
+      appliedSeq = Math.max(appliedSeq, head.stateSeq);
+    else apply(viewOf(head.publicationId, head.stateSeq, head.entries));
   }
 
   function activate(candidate: Candidate): void {
@@ -251,8 +290,7 @@ export function createContentRuntime(pool: Pool): ContentRuntime {
           entriesDigest(head.entries) === offered
         ) {
           activate(candidate);
-          current = viewOf(head.publicationId, head.stateSeq, head.entries);
-          return current;
+          return apply(viewOf(head.publicationId, head.stateSeq, head.entries));
         }
         const result = await commitPublication(pool, {
           parent: head.publicationId,
@@ -266,8 +304,7 @@ export function createContentRuntime(pool: Pool): ContentRuntime {
         });
         if (result.ok) {
           activate(candidate);
-          current = viewOf(result.publicationId, result.stateSeq, entries);
-          return current;
+          return apply(viewOf(result.publicationId, result.stateSeq, entries));
         }
         if (result.reason === "stale_parent" && attempt === 0) {
           // Another process published first: take in what it published, then try once more
@@ -283,6 +320,43 @@ export function createContentRuntime(pool: Pool): ContentRuntime {
       }
     },
     view: () => current,
+    epoch: (campaignId, campaignVersion) =>
+      epochs.get(epochKey(campaignId, campaignVersion)),
+    async catchUp() {
+      await this.ready();
+      catching ??= hydrate().finally(() => {
+        catching = undefined;
+      });
+      return catching;
+    },
+    async check() {
+      try {
+        await this.ready();
+      } catch {
+        return false;
+      }
+      if (latched) return false;
+      let seq: number;
+      try {
+        const { rows } = await pool.query<{ state_seq: string }>(
+          "select state_seq from content_current",
+        );
+        seq = Number(rows[0]!.state_seq);
+      } catch {
+        return false;
+      }
+      if (seq === appliedSeq) return true;
+      if (seq < appliedSeq) {
+        latched = true;
+        return false;
+      }
+      try {
+        await this.catchUp();
+      } catch {
+        return false;
+      }
+      return true;
+    },
     unsupported: (campaignId, campaignVersion) =>
       unsupported.get(epochKey(campaignId, campaignVersion)),
   };

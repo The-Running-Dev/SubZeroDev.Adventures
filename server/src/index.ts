@@ -7,6 +7,7 @@ import {
 } from "./deployment.js";
 import { loadDiscussionForum } from "./discussions/registry.js";
 import { migrateOnStart } from "./migrate-on-start.js";
+import { sweepExpiredSessions } from "./maintenance.js";
 
 const port = Number(process.env.PORT ?? 8787);
 const siteUrl = process.env.SITE_URL ?? "http://localhost:5173";
@@ -40,12 +41,18 @@ if (!databaseUrl) throw new Error("DATABASE_URL is required");
 
 const pool = new Pool({ connectionString: databaseUrl });
 
-// Off unless asked for: the deployment stack still migrates through its one-shot `migrate`
-// container, which runs the maintenance sweep too. `true` brings the schema up here, under
-// an advisory lock, before anything binds a port (migrate-on-start.ts). `migrations` is
-// relative to the working directory, the same as the CLI's default.
+// Off unless asked for. The deployment stack sets it; the dev stack still migrates through
+// its one-shot `migrate` container. `true` brings the schema up here, under an advisory
+// lock, before anything binds a port (migrate-on-start.ts). `migrations` is relative to the
+// working directory, the same as the CLI's default.
+//
+// The deterministic upkeep that the one-shot container ran after `node-pg-migrate up`
+// (issue #12) runs here too, once per start and after the migrations, so retiring that
+// container does not retire the sweep. Like the container, a failure stops the start.
 if (process.env.MIGRATE_ON_START === "true") {
   await migrateOnStart(pool, { dir: "migrations" });
+  const swept = await sweepExpiredSessions(pool);
+  console.log(`maintenance: swept ${swept} expired auth session(s)`);
 }
 
 // Reads DISCUSSIONS_REPO/DISCUSSIONS_TOKEN/DISCUSSIONS_CATEGORY -- unset (any of the

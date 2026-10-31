@@ -23,8 +23,8 @@
 #   runtime  -- the default, and what container.yml pushes to GHCR. tsc-emitted JS,
 #               production-only dependencies, non-root.
 #
-# Both end at the same entrypoint, so both compose files say `command: serve` and
-# `command: migrate` without either knowing which target it got.
+# Both end at the same entrypoint, so the compose files say `command: serve` (and, in the
+# dev file, `command: migrate`) without either knowing which target it got.
 
 ARG NODE_IMAGE=node:24-bookworm-slim
 

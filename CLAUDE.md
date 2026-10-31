@@ -119,16 +119,19 @@ mirrors how `SubZeroDev.com` and `SubZeroDev.Blog/tools/blog-mcp` are laid out.
 docker compose -f server/docker-compose.yml up -d --build
 ```
 
-Both files say `command: serve` and `command: migrate`. Those are
-`server/docker-entrypoint.sh`'s vocabulary, not paths — the `dev` target reaches them via
-`tsx` from source and `runtime` via emitted JS in `dist/`, and neither compose file knows
-which. Set `ADVENTURES_DB_PORT` if 5432 is already taken locally.
+The dev file says `command: serve` and `command: migrate`; the deployment file says only
+`command: serve`. Those are `server/docker-entrypoint.sh`'s vocabulary, not paths — the
+`dev` target reaches them via `tsx` from source and `runtime` via emitted JS in `dist/`, and
+neither compose file knows which. Set `ADVENTURES_DB_PORT` if 5432 is already taken locally.
 
 `MIGRATE_ON_START=true` makes `serve` apply pending migrations itself before it binds a port,
 under a waiting Postgres advisory lock so concurrent starts take turns
-(`server/src/migrate-on-start.ts`, issue #9 stage 3). Neither compose file sets it: the
-`migrate` one-shot still owns migrations there, and also runs the maintenance sweep, so
-retiring it is a deployment change of its own. The API's probes are `/livez` (no
+(`server/src/migrate-on-start.ts`, issue #9 stage 3), and then run the maintenance sweep
+(`server/src/maintenance.ts`) once. **The deployment stack sets it and has no `migrate`
+service**: the API is the only thing that touches the schema, `/readyz` answers only once the
+schema is current, and nothing orders against a sibling container. The dev stack does not set
+it: its one-shot `migrate` container still runs migrations and the sweep before `api` starts,
+which keeps the entrypoint's `migrate` command and `maintenance-cli.ts` alive. The API's probes are `/livez` (no
 dependency, never touches Postgres), `/readyz` (Postgres answers within 2 seconds) and the
 original `/healthz` (readiness plus the content status). `/readyz` is the one Platform's
 edge probes.

@@ -1,6 +1,7 @@
 /**
  * Entry point for the `migrate` case of docker-entrypoint.sh -- run once per deploy, after
- * schema migrations, by the same one-shot container. Not a long-running process: connects,
+ * schema migrations, by the same one-shot container (the dev stack; the deployment stack
+ * sweeps from `index.ts` under `MIGRATE_ON_START=true` instead). Not a long-running process: connects,
  * sweeps, exits.
  */
 import { Pool } from "pg";

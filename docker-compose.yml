@@ -91,6 +91,12 @@ x-adventures-api-common: &adventures-api-common
     DATABASE_URL: "postgres://adventures:${DB_PASSWORD:?Set DB_PASSWORD in .env}@db:5432/adventures"
     NODE_ENV: production
     PORT: "8787"
+    # The API brings its own schema up before it binds a port (server/src/migrate-on-start.ts),
+    # under a waiting Postgres advisory lock so two starts take turns, and then runs the
+    # deterministic upkeep (server/src/maintenance.ts) that the one-shot `migrate` container
+    # used to run. There is no separate migrate step to order against: `/readyz` answers
+    # only once the schema is current. Issue #9 stage 3; The-Running-Dev/SubZeroDev.Platform#97.
+    MIGRATE_ON_START: "true"
     SITE_URL: "${SITE_URL:-https://adventures.subzerodev.com}"
     API_URL: "${API_URL:-https://adventures-api.subzerodev.com}"
     # Comma-separated extra browser origins allowed through CORS and the write-origin
@@ -172,7 +178,7 @@ services:
       timeout: 3s
       retries: 20
     # Only adventures-internal, deliberately. Nothing publishes a port for it either, so
-    # Postgres is reachable from `api`/`migrate` and nothing else -- putting it on the
+    # Postgres is reachable from `api` and nothing else -- putting it on the
     # shared proxy-net would expose it to every unrelated container on that network.
     networks:
       - adventures-internal
@@ -180,7 +186,7 @@ services:
   # The external deletion ledger (server/src/content/ledger.ts): deletions only, appended and
   # never updated, so that a restore of `adventures-db` cannot bring deleted content back.
   # A database of its own on a volume of its own, on adventures-internal only like `db`.
-  # The API creates its one table on first use; `migrate` does not touch it.
+  # The API creates its one table on first use; the migrations never touch it.
   ledger-db:
     image: postgres:17
     container_name: adventures-ledger-db
@@ -200,21 +206,6 @@ services:
     networks:
       - adventures-internal
 
-  migrate:
-    <<: *adventures-api-common
-    container_name: adventures-migrate
-    # `serve` and `migrate` are the image entrypoint's own vocabulary
-    # (server/docker-entrypoint.sh), not paths into it -- see server/Dockerfile.
-    command: migrate
-    # Overrides the anchor's `unless-stopped`. This is a one-shot that is *supposed* to
-    # exit 0; inheriting a restart policy would loop it forever after a clean run.
-    restart: "no"
-    networks:
-      - adventures-internal
-    depends_on:
-      db:
-        condition: service_healthy
-
   api:
     <<: *adventures-api-common
     container_name: adventures-api
@@ -230,8 +221,6 @@ services:
         condition: service_healthy
       ledger-db:
         condition: service_healthy
-      migrate:
-        condition: service_completed_successfully
 
 volumes:
   adventures-db:

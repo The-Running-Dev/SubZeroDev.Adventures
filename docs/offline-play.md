@@ -88,8 +88,8 @@ exclusion structural: existing online aggregate queries cannot accidentally coun
 
 ## Deployment and recovery
 
-Uses the existing VPS API plus static frontend image and Portainer stack. Apply the normal
-migration service before API startup. Foreground sync is explicit and needs no background
+Uses the existing VPS API plus static frontend image and Portainer stack. The API applies
+its own migrations on start (`MIGRATE_ON_START=true` in the Portainer stack). Foreground sync is explicit and needs no background
 sync permission. Quota/write failures leave the prior committed run intact and offer retry
 or export; a failed/incomplete download is never ready. Browser data deletion cannot be
 undone; export provides a portable backup including the required runtime and bundle.

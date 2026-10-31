@@ -1,6 +1,6 @@
 #!/bin/sh
-# Gives both build targets one command vocabulary, so docker-compose.yml and
-# server/docker-compose.yml say `command: serve` and `command: migrate` identically even
+# Gives both build targets one command vocabulary, so the compose files say
+# `command: serve` (and, in server/docker-compose.yml, `command: migrate`) identically even
 # though `dev` runs TypeScript through tsx from source and `runtime` runs emitted JS from
 # dist/. Without this, the two compose files would have to name different entry paths for
 # the same two operations, and the deployment file would encode the image's internal
@@ -22,6 +22,9 @@ migrate)
 	# and its connection from DATABASE_URL. Both stages set WORKDIR so that `migrations/`
 	# sits directly beneath it, and put node_modules/.bin on PATH.
 	node-pg-migrate up
+	# (The deployment stack no longer runs this container: it sets MIGRATE_ON_START=true
+	# and the API migrates and sweeps itself. This command remains for the dev stack and
+	# for one-off `docker compose run`s.)
 	# Deterministic upkeep (server/src/maintenance.ts) rides along on the same one-shot
 	# container run rather than a chance-based sweep on the live `serve` path -- see
 	# issue #12. Deliberately unquoted, same reasoning as ADVENTURES_SERVE_CMD above.

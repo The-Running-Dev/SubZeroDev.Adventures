@@ -15,6 +15,7 @@ import type { PortableCampaign } from "@the-running-dev/game-engine";
 import { answerNotFound, buildApp, requestLogSerializers } from "../app.js";
 import { createServerDemo, type ServerDemo } from "../composition.js";
 import type { CampaignSource } from "../campaigns/source.js";
+import { takeCapture } from "../captures/store.js";
 import { addSubmission } from "../content-sources.js";
 import { mergePlayers } from "../principal.js";
 import { answerDeletion } from "../routes/content.js";
@@ -344,6 +345,37 @@ describeIfDb("deletion against Postgres", () => {
     const refused = await thrown(startMine(demo));
     expect(refused).toBeInstanceOf(ContentRefusal);
     expect((refused as ContentRefusal).code).toBe("unknown_campaign");
+  });
+
+  it("purges the captures that replay through a deleted epoch, and keeps the rest", async () => {
+    const demo = await published();
+    const capture = (sessionId: string) =>
+      takeCapture(pool, demo.store, {
+        sessionId,
+        playerId: owner,
+        trigger: "report",
+        retentionDays: 30,
+      });
+    const purged = await capture(await startMine(demo));
+    const { sessionId: core } = await as(demo, owner).createSession({
+      campaignId: "a",
+      audience: "player",
+      profileId: owner,
+    });
+    const kept = await capture(core);
+
+    expect(
+      await deleteSource(pool, createMemoryLedger(), sourceId, actor()),
+    ).toBe("done");
+
+    expect(
+      await count("session_captures where capture_id = $1", [
+        purged!.captureId,
+      ]),
+    ).toBe(0);
+    expect(
+      await count("session_captures where capture_id = $1", [kept!.captureId]),
+    ).toBe(1);
   });
 
   it("purges even when the ledger is unreachable, and the reconciler appends it later", async () => {

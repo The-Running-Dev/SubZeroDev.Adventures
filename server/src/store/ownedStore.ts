@@ -76,6 +76,44 @@ export async function assertSaveOwned(
 }
 
 /**
+ * Ownership, then the content gate, before `captures/store.ts` captures a session: a capture
+ * reads the session's whole history, so it is gated as existing content on every epoch that
+ * history names, the way `branchSession` is. `playerId` null is an admin acting on a player's
+ * report -- no ownership check, and the content gate is answered for the session's owner.
+ * Answers the owner, or undefined when there is no such session, so the engine's own
+ * `unknown_session` answers it.
+ */
+export async function gateCapture(
+  pool: Pool,
+  demo: ServerDemo,
+  sessionId: string,
+  playerId: string | null,
+): Promise<string | undefined> {
+  const operation = "captureSession";
+  const row = await storedContentRow(pool, "sessions", sessionId, true);
+  if (row === undefined) {
+    if (playerId !== null)
+      await answerTombstone(pool, "sessions", sessionId, playerId, operation);
+    return undefined;
+  }
+  if (
+    row.profileId === null ||
+    (playerId !== null && row.profileId !== playerId)
+  )
+    throw new OwnershipError(operation);
+  if (row.campaignVersion === null) return row.profileId;
+  const { runtime } = demo;
+  await gateExisting(
+    runtime,
+    operation,
+    lineageOf(row.blob!),
+    row.profileId,
+    await runtime.check(),
+  );
+  return row.profileId;
+}
+
+/**
  * A row that is gone may have been purged with its content (engine plan 54, D3 §6). For the
  * tombstone's window its owner -- which follows an account merge -- is told so, `410
  * campaign_deleted`; everyone else gets the `403` the live row gave them, so the deletion

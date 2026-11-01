@@ -16,6 +16,7 @@ import type { AppConfig } from "./app.js";
 import { createMultiSourceCampaignSource } from "./campaigns/multi-source.js";
 import { createDiskCampaignSource } from "./campaigns/source.js";
 import type { CampaignSource } from "./campaigns/source.js";
+import { DEFAULT_CAPTURE_RETENTION_DAYS } from "./captures/store.js";
 import type { DiscussionForum } from "./discussions/forum.js";
 import {
   createPostgresLedger,
@@ -116,6 +117,31 @@ export function parseBackupRetentionDays(raw: string | undefined): number {
   return days;
 }
 
+const MAX_CAPTURE_RETENTION_DAYS = 3650;
+
+/**
+ * `CAPTURE_RETENTION_DAYS` as `index.ts` read it: how many days a session capture is kept
+ * (docs/session-capture.md). Unset or blank is the decided default; anything else must be a
+ * whole number from 1 to 3650, and is otherwise a startup failure, for the reason
+ * `parseSessionCacheLimit` gives. Zero is refused rather than read as "keep nothing": that is
+ * turning capture off, which is a different decision from a retention window.
+ */
+export function parseCaptureRetentionDays(raw: string | undefined): number {
+  const value = raw?.trim() ?? "";
+  if (value === "") return DEFAULT_CAPTURE_RETENTION_DAYS;
+  const days = /^\d+$/.test(value) ? Number(value) : Number.NaN;
+  // The ceiling keeps `make_interval(days => ...)` inside Postgres's integer range.
+  if (
+    !Number.isSafeInteger(days) ||
+    days < 1 ||
+    days > MAX_CAPTURE_RETENTION_DAYS
+  )
+    throw new Error(
+      `CAPTURE_RETENTION_DAYS must be a whole number of days from 1 to ${MAX_CAPTURE_RETENTION_DAYS}, got "${raw}"`,
+    );
+  return days;
+}
+
 /** The full `AppConfig` the deployed process hands `buildApp`. `env` is what `index.ts`
  *  read out of the environment; everything else is a property of the deployment. */
 export function deploymentConfig(
@@ -127,6 +153,7 @@ export function deploymentConfig(
     readonly discussionForum: DiscussionForum | undefined;
     readonly sessionCacheLimit: number;
     readonly backupRetentionDays: number;
+    readonly captureRetentionDays: number;
     /** `LEDGER_DATABASE_URL`. Unset is a ledger that cannot be reached: every reconcile fails,
      *  so the server serves core content and withholds everything else (D3 §5.3) -- the
      *  deployed process never runs on a ledger that a database restore would roll back. */
@@ -142,6 +169,7 @@ export function deploymentConfig(
     discussionForum: env.discussionForum,
     sessionCacheLimit: env.sessionCacheLimit,
     backupRetentionDays: env.backupRetentionDays,
+    captureRetentionDays: env.captureRetentionDays,
     ledger:
       env.ledgerDatabaseUrl === undefined || env.ledgerDatabaseUrl === ""
         ? createUnreachableLedger()

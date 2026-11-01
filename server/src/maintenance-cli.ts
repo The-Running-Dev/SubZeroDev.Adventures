@@ -5,7 +5,7 @@
  * sweeps, exits.
  */
 import { Pool } from "pg";
-import { sweepExpiredSessions } from "./maintenance.js";
+import { sweepExpiredCaptures, sweepExpiredSessions } from "./maintenance.js";
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error("DATABASE_URL is required");
@@ -13,4 +13,6 @@ if (!databaseUrl) throw new Error("DATABASE_URL is required");
 const pool = new Pool({ connectionString: databaseUrl });
 const swept = await sweepExpiredSessions(pool);
 console.log(`maintenance: swept ${swept} expired auth session(s)`);
+const captures = await sweepExpiredCaptures(pool);
+console.log(`maintenance: swept ${captures} expired session capture(s)`);
 await pool.end();

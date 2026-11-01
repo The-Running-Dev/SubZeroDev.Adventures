@@ -6,9 +6,9 @@
  *    every affected epoch key, and `state_seq` moved. From that commit on, every process refuses
  *    the content (§5.2), and nothing cancels the deletion.
  * 2. **Append** the contentless entry to the external ledger, and keep the sequence it was given.
- * 3. **Purge**, in one transaction: the dependent sessions, saves, grants, runs, receipts and
- *    achievement rows, with tombstones; the historical publication entries, replaced by markers;
- *    the epochs; the source row; a `reason: deletion` publication when the current one still
+ * 3. **Purge**, in one transaction: the dependent sessions, saves, grants, runs, receipts,
+ *    session captures and achievement rows, with tombstones; the historical publication
+ *    entries, replaced by markers; the epochs; the source row; a `reason: deletion` publication when the current one still
  *    names an affected epoch; and the row marked purged, its clear-text keys dropped.
  *
  * The purge does not wait for the append. Either failing leaves the row `pending`, and the
@@ -436,6 +436,16 @@ export async function purgeDeletion(
     await client.query(
       "delete from offline_grants where token = any($1::uuid[])",
       [tokens],
+    );
+    // A capture replays through every epoch it names, so it goes with any of them, and with its
+    // session. It gets no tombstone: its owner reads it from a listing, never by a kept id.
+    await client.query(
+      `delete from session_captures c
+        where c.session_id = any($3::uuid[])
+           or exists (select 1 from ${AFFECTED} a
+                       where a.campaign_id = c.campaign_id
+                         and a.campaign_version = any(c.campaign_versions))`,
+      [ids, versions, sessions.rows.map((s) => s.session_id)],
     );
     await client.query("delete from saves where save_id = any($1::uuid[])", [
       saves.rows.map((v) => v.save_id),

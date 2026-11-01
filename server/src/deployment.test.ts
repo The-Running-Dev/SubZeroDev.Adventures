@@ -20,8 +20,10 @@ import {
   DEFAULT_SESSION_CACHE_LIMIT,
   deploymentConfig,
   parseBackupRetentionDays,
+  parseCaptureRetentionDays,
   parseSessionCacheLimit,
 } from "./deployment.js";
+import { DEFAULT_CAPTURE_RETENTION_DAYS } from "./captures/store.js";
 
 // `createMultiSourceCampaignSource` only stores the pool for a later query; nothing in
 // `deploymentConfig` touches it, and asserting on the config must not need a database.
@@ -36,6 +38,7 @@ describe("deploymentConfig", () => {
       discussionForum: undefined,
       sessionCacheLimit: DEFAULT_SESSION_CACHE_LIMIT,
       backupRetentionDays: 7,
+      captureRetentionDays: DEFAULT_CAPTURE_RETENTION_DAYS,
       ledgerDatabaseUrl: undefined,
     });
 
@@ -51,10 +54,12 @@ describe("deploymentConfig", () => {
       discussionForum: undefined,
       sessionCacheLimit: 250,
       backupRetentionDays: 7,
+      captureRetentionDays: 12,
       ledgerDatabaseUrl: undefined,
     });
 
     expect(config.sessionCacheLimit).toBe(250);
+    expect(config.captureRetentionDays).toBe(12);
   });
 
   it("always passes a ledger and the backup retention, so neither falls to a test default", async () => {
@@ -65,6 +70,7 @@ describe("deploymentConfig", () => {
       discussionForum: undefined,
       sessionCacheLimit: DEFAULT_SESSION_CACHE_LIMIT,
       backupRetentionDays: 14,
+      captureRetentionDays: DEFAULT_CAPTURE_RETENTION_DAYS,
       ledgerDatabaseUrl: undefined,
     });
 
@@ -113,6 +119,29 @@ describe("parseSessionCacheLimit", () => {
     "refuses %s at startup",
     (raw) => {
       expect(() => parseSessionCacheLimit(raw)).toThrow(/SESSION_CACHE_LIMIT/);
+    },
+  );
+});
+
+describe("parseCaptureRetentionDays", () => {
+  it("defaults to 30 days when unset or blank", () => {
+    expect(DEFAULT_CAPTURE_RETENTION_DAYS).toBe(30);
+    expect(parseCaptureRetentionDays(undefined)).toBe(30);
+    expect(parseCaptureRetentionDays("  ")).toBe(30);
+  });
+
+  it("accepts a positive whole number of days", () => {
+    expect(parseCaptureRetentionDays("1")).toBe(1);
+    expect(parseCaptureRetentionDays(" 90 ")).toBe(90);
+    expect(parseCaptureRetentionDays("3650")).toBe(3650);
+  });
+
+  it.each(["0", "-1", "1.5", "7d", "1e1", "3651"])(
+    "refuses %s at startup",
+    (raw) => {
+      expect(() => parseCaptureRetentionDays(raw)).toThrow(
+        /CAPTURE_RETENTION_DAYS/,
+      );
     },
   );
 });

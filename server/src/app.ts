@@ -7,6 +7,7 @@ import Fastify, {
 import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
 import type { Pool } from "pg";
+import type { SessionLayer } from "@the-running-dev/game-engine";
 import {
   createServerDemo,
   createServerDemoFromCurrent,
@@ -30,6 +31,12 @@ import { registerRankingRoutes } from "./routes/ranking.js";
 import { registerAdminRoutes } from "./routes/admin.js";
 import { registerContentRoutes } from "./routes/content.js";
 import { registerDiscussionRoutes } from "./routes/discussions.js";
+import { registerCaptureRoutes } from "./routes/captures.js";
+import {
+  DEFAULT_CAPTURE_RETENTION_DAYS,
+  faultCapture,
+} from "./captures/store.js";
+import { sweepExpiredCaptures } from "./maintenance.js";
 import {
   backfillDependencies,
   deleteSource,
@@ -89,6 +96,8 @@ export interface AppConfig {
    *  confirmation states. `index.ts` refuses to start without a valid one; undefined only in a
    *  test, where the confirmation leaves it out. */
   readonly backupRetentionDays?: number;
+  /** How long a session capture is kept (`CAPTURE_RETENTION_DAYS`, docs/session-capture.md). */
+  readonly captureRetentionDays?: number;
 }
 
 /**
@@ -133,6 +142,7 @@ export async function buildApp(
     sessionCacheLimit,
     ledger = createMemoryLedger(),
     backupRetentionDays,
+    captureRetentionDays = DEFAULT_CAPTURE_RETENTION_DAYS,
   }: AppConfig,
 ): Promise<FastifyInstance> {
   const app = Fastify({
@@ -209,9 +219,17 @@ export async function buildApp(
   //
   // Every build gets the same counters, so the admin status page reports the process, not
   // whichever build happens to be serving.
+  //
+  // An error-severity event from a session is a fault capture's trigger (docs/session-capture.md):
+  // the handler checks its owner's consent, and reports a failure by code alone.
+  const captureFault = faultCapture(pool, captureRetentionDays, (message) =>
+    app.log.warn(message),
+  );
   const sessionCache = {
     sessionCacheLimit,
     counters: createSessionPersistenceCounters(),
+    onSessionFault: (layer: SessionLayer, sessionId: string) =>
+      void captureFault(layer, sessionId),
   };
   const { cell, ready } = createContentCell(() =>
     createServerDemo(pool, campaignSource, sessionCache),
@@ -260,6 +278,9 @@ export async function buildApp(
     void sweepTombstones(pool).catch((error: unknown) =>
       warn("tombstone sweep failed", error),
     );
+    void sweepExpiredCaptures(pool).catch((error: unknown) =>
+      warn("capture sweep failed", error),
+    );
   }, RECONCILE_INTERVAL_MS);
   timer.unref();
   app.addHook("onClose", async () => {
@@ -291,6 +312,7 @@ export async function buildApp(
   registerAdminRoutes(app, pool, cell, campaignSource, sessionCache, deletions);
   registerContentRoutes(app, pool, cell, deletions);
   registerDiscussionRoutes(app, pool, discussionForum);
+  registerCaptureRoutes(app, pool, cell, captureRetentionDays);
 
   return app;
 }

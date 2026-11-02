@@ -109,6 +109,9 @@ x-adventures-api-common: &adventures-api-common
     # re-read from Postgres on its next request. Unset or blank is the provisional default,
     # 1000 (server/src/deployment.ts); anything but a positive whole number fails the start.
     SESSION_CACHE_LIMIT: "${SESSION_CACHE_LIMIT:-}"
+    # Days a session capture is kept (docs/session-capture.md). Unset or blank is 30
+    # (server/src/deployment.ts); anything but a whole number from 1 to 3650 fails the start.
+    CAPTURE_RETENTION_DAYS: "${CAPTURE_RETENTION_DAYS:-}"
     # Required, at most 30 -- see the operator prerequisites above.
     BACKUP_RETENTION_DAYS: "${BACKUP_RETENTION_DAYS:?Set BACKUP_RETENTION_DAYS in .env}"
     # `ledger-db` below. Unset would serve core content only, so it is assembled here and the

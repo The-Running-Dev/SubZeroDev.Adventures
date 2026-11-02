@@ -3,11 +3,12 @@ import { buildApp } from "./app.js";
 import {
   deploymentConfig,
   parseBackupRetentionDays,
+  parseCaptureRetentionDays,
   parseSessionCacheLimit,
 } from "./deployment.js";
 import { loadDiscussionForum } from "./discussions/registry.js";
 import { migrateOnStart } from "./migrate-on-start.js";
-import { sweepExpiredSessions } from "./maintenance.js";
+import { sweepExpiredCaptures, sweepExpiredSessions } from "./maintenance.js";
 
 const port = Number(process.env.PORT ?? 8787);
 const siteUrl = process.env.SITE_URL ?? "http://localhost:5173";
@@ -33,6 +34,11 @@ const sessionCacheLimit = parseSessionCacheLimit(
 const backupRetentionDays = parseBackupRetentionDays(
   process.env.BACKUP_RETENTION_DAYS,
 );
+// How long a session capture is kept (`deployment.ts`'s `parseCaptureRetentionDays`,
+// docs/session-capture.md). Unset is the decided default of 30 days.
+const captureRetentionDays = parseCaptureRetentionDays(
+  process.env.CAPTURE_RETENTION_DAYS,
+);
 // The external deletion ledger, a database a restore of DATABASE_URL does not roll back
 // (`content/ledger.ts`). Unset serves core content only.
 const ledgerDatabaseUrl = process.env.LEDGER_DATABASE_URL;
@@ -53,6 +59,8 @@ if (process.env.MIGRATE_ON_START === "true") {
   await migrateOnStart(pool, { dir: "migrations" });
   const swept = await sweepExpiredSessions(pool);
   console.log(`maintenance: swept ${swept} expired auth session(s)`);
+  const captures = await sweepExpiredCaptures(pool);
+  console.log(`maintenance: swept ${captures} expired session capture(s)`);
 }
 
 // Reads DISCUSSIONS_REPO/DISCUSSIONS_TOKEN/DISCUSSIONS_CATEGORY -- unset (any of the
@@ -71,6 +79,7 @@ const app = await buildApp(
     discussionForum,
     sessionCacheLimit,
     backupRetentionDays,
+    captureRetentionDays,
     ledgerDatabaseUrl,
   }),
 );

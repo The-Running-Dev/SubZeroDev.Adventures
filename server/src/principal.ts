@@ -238,6 +238,13 @@ async function mergeOnce(
       `update discussion_posts set player_id = $1 where player_id = $2`,
       [toPlayerId, fromPlayerId],
     );
+    // Session captures follow their sessions (docs/session-capture.md), rather than cascading
+    // away with the guest's row and taking a report the player made with them. Fault-capture
+    // consent does not carry over: it is the surviving account's own setting.
+    await client.query(
+      `update session_captures set player_id = $1 where player_id = $2`,
+      [toPlayerId, fromPlayerId],
+    );
     // What a content deletion left naming the guest follows the surviving account (engine plan
     // 54, D3 §5.6), and all of it references `players` `on delete restrict`, so none of it can
     // be lost with the guest's row. Submissions are kept, where a merge used to cascade them

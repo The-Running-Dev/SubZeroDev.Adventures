@@ -311,6 +311,44 @@ Every admin after the first is granted from the admin page itself
 
 ### Why it is installed this way
 
+#### 2026-11-01 — Session capture: report and fault triggers, opt-in fault consent, 30 days, owner reads the full fixture
+
+Context: engine spec 08 makes a played session a `ReplayFixture` (`SessionLayer.captureSession`)
+and leaves four obligations to the host (08 §8): lawful basis and consent, the
+capture-to-account mapping, retention, and access control. The engine is pinned at the commit
+that ships it. `docs/session-capture.md` is the design; `server/src/captures/store.ts` and
+`server/src/routes/captures.ts` are the code.
+
+Chosen, by the owner:
+
+- **Triggers:** a player's report (`POST /api/sessions/:id/capture`), an admin acting on one
+  (`POST /api/admin/captures`), and automatic capture on an `error`-severity event, at most once
+  per session.
+- **Consent:** a report carries it in the request (`consent: true`, else `400
+consent_required`); fault capture is an opt-in account setting, off by default, recorded as
+  `players.fault_capture_consented_at`.
+- **Retention:** 30 days, `CAPTURE_RETENTION_DAYS` (1 to 3650), filtered on every read and swept
+  by the maintenance tick.
+- **Access:** admins and the capture's owner. **The owner gets the full fixture, seed
+  included — a deliberate departure from 08 §2.1**, which notes that the seed lets a player
+  predict draws. The owner already holds the history the fixture replays, and a player asking
+  for their own data back gets all of it.
+
+The mapping is `session_captures.player_id`, beside the fixture, never inside it. Deletion
+reaches captures four ways: on request, the account's cascade, an account merge (repointed, like
+every player-owned table), and `content/deletion.ts`'s purge. Promotion to the engine's corpus
+stays manual (08 §7).
+
+Rejected: report-only (no evidence for a fault nobody reports); fault capture on by default (a
+background capture of every faulting player's history, with nothing they agreed to); a redacted
+owner download without the seed (the owner can already see every draw's outcome, so hiding the
+seed buys little and costs the player a fixture that does not replay); admins only (a player
+could not get their own report back).
+
+Reversibility: cheap for the window and the access rule; the consent column and table are
+additive. Withdrawing the owner download is a route change, but a fixture already downloaded
+stays downloaded.
+
 #### 2026-10-29 — The external deletion ledger is a second Postgres, `ledger-db`
 
 Context: engine plan 54 (D3 §5.4) requires every permanent content deletion to be copied to a

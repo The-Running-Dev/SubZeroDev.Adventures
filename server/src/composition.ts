@@ -8,13 +8,14 @@ import type { Pool } from "pg";
 import {
   canonicalDigest,
   createEngine,
-  createInMemorySessionStore,
+  createSessionLayer,
   defaultRecordIdSource,
   type Campaign,
   type CampaignProvenance as AuthoredProvenance,
   type ContentRegistry,
   type Engine,
-  type SessionStore,
+  type SessionHost,
+  type SessionLayer,
 } from "@the-running-dev/game-engine";
 import {
   catalogEntryOf,
@@ -108,7 +109,9 @@ export interface ServerDemo {
    *  answers what is current. */
   accessibleCampaignIds(playerId: string | null): ReadonlySet<string>;
   findCampaign(campaignId: string): CatalogEntry | undefined;
-  readonly store: SessionStore;
+  /** The session layer: a `SessionStore` plus `captureSession` (engine spec 08), which only
+   *  `captures/store.ts` calls. */
+  readonly store: SessionLayer;
   /** The raw `Engine`, exposed for `replay.ts` -- it drives `deserialize`/`submitAction`/
    *  `scene`/`serialize` directly against a session's stored blob, outside the session
    *  store's own id-keyed surface. Never call `.createGame` on this one for a replay --
@@ -160,6 +163,29 @@ export interface SessionCacheOptions {
   readonly sessionCacheLimit?: number;
   /** Shared with the admin status route; a fresh set when omitted. */
   readonly counters?: SessionPersistenceCounters;
+  /** Called for a session that emitted an `error`-severity event (engine spec 08 §3), after
+   *  the faulting command returned and released the session -- `captureSession` takes the
+   *  same lock, so it cannot run inside the command. `captures/store.ts`'s `faultCapture`. */
+  readonly onSessionFault?: (layer: SessionLayer, sessionId: string) => void;
+}
+
+type EmittedRecord = Parameters<
+  NonNullable<SessionHost["recordSink"]>["write"]
+>[0];
+
+/** The record sink that reports faults. Inert without `onSessionFault`. */
+function faultSink(
+  onSessionFault: SessionCacheOptions["onSessionFault"],
+  layer: () => SessionLayer,
+): SessionHost["recordSink"] {
+  if (!onSessionFault) return undefined;
+  return {
+    write(record: EmittedRecord) {
+      const { sessionId } = record;
+      if (record.event.severity !== "error" || sessionId === undefined) return;
+      setImmediate(() => onSessionFault(layer(), sessionId));
+    },
+  };
 }
 
 export async function createServerDemo(
@@ -274,7 +300,7 @@ function demoFrom(
   pool: Pool,
   runtime: ContentRuntime,
   view: ContentView,
-  { sessionCacheLimit, counters }: SessionCacheOptions,
+  { sessionCacheLimit, counters, onSessionFault }: SessionCacheOptions,
 ): ServerDemo {
   const { entries } = view;
   const campaigns = new Map<string, Campaign>();
@@ -318,6 +344,17 @@ function demoFrom(
     archive: runtime.archive,
   });
   const recordIds = defaultRecordIdSource;
+  const recordSink = faultSink(onSessionFault, () => store);
+  const store: SessionLayer = createSessionLayer({
+    engine,
+    registry,
+    content: admittingChannel(runtime.channel),
+    persistence: createPostgresPersistence(pool, KINDS, counters),
+    profiles: createPostgresProfileStore(pool),
+    recordIds,
+    ...(recordSink === undefined ? {} : { recordSink }),
+    ...(sessionCacheLimit === undefined ? {} : { sessionCacheLimit }),
+  });
 
   const offlineBundles = new Map<
     string,
@@ -389,14 +426,6 @@ function demoFrom(
           },
         },
       }),
-    store: createInMemorySessionStore({
-      engine,
-      registry,
-      content: admittingChannel(runtime.channel),
-      persistence: createPostgresPersistence(pool, KINDS, counters),
-      profiles: createPostgresProfileStore(pool),
-      recordIds,
-      ...(sessionCacheLimit === undefined ? {} : { sessionCacheLimit }),
-    }),
+    store,
   };
 }

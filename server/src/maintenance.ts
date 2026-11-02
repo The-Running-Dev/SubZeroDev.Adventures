@@ -15,3 +15,13 @@ export async function sweepExpiredSessions(pool: Pool): Promise<number> {
   );
   return rowCount ?? 0;
 }
+
+/** Session captures past their retention (`captures/store.ts`, `CAPTURE_RETENTION_DAYS`).
+ *  Every read already filters on `expires_at`; this is what removes the rows. `app.ts` runs it
+ *  on its maintenance interval too, so a long-lived process does not wait for a deploy. */
+export async function sweepExpiredCaptures(pool: Pool): Promise<number> {
+  const { rowCount } = await pool.query(
+    `delete from session_captures where expires_at <= now()`,
+  );
+  return rowCount ?? 0;
+}

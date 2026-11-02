@@ -44,6 +44,7 @@ import {
   type CampaignProgress,
 } from "./identity";
 import { PlatformStats } from "./PlatformStats";
+import { ReportProblem } from "../captures/ReportProblem";
 
 /**
  * Every registered campaign has an entry, hidden ones included -- a direct
@@ -848,6 +849,12 @@ function PlayAppReady({
                     {t("offline:checkpoint")}
                   </Link>
                 )}
+              {demo.apiUrl && profileAvailable && (
+                <ReportProblem
+                  apiUrl={demo.apiUrl}
+                  sessionId={state.sessionId}
+                />
+              )}
               <button className="cabinet-button quiet" onClick={returnToShelf}>
                 {t(isOnboarding ? "skip" : "quit")}
               </button>

@@ -35,6 +35,7 @@ export function createLocaleInstance() {
       "play",
       "community",
       "content",
+      "captures",
       "onboarding",
       "creator",
       "admin",

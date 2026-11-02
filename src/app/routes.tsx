@@ -29,6 +29,9 @@ const PublicProfile = lazy(() =>
 const MyContent = lazy(() =>
   import("../content/MyContent").then((m) => ({ default: m.MyContent })),
 );
+const MyCaptures = lazy(() =>
+  import("../captures/MyCaptures").then((m) => ({ default: m.MyCaptures })),
+);
 const StartPage = lazy(() =>
   import("../start/StartPage").then((m) => ({ default: m.StartPage })),
 );
@@ -105,6 +108,7 @@ export function AppRoutes() {
         <Route path="ranking" element={<Ranking apiUrl={apiUrl} />} />
         <Route path="profile" element={<OwnProfile apiUrl={apiUrl} />} />
         <Route path="content" element={<MyContent apiUrl={apiUrl} />} />
+        <Route path="captures" element={<MyCaptures apiUrl={apiUrl} />} />
         <Route path="start" element={<StartPage apiUrl={apiUrl} />} />
         <Route path="discussions" element={<Discussions apiUrl={apiUrl} />} />
         <Route path="discussions/:threadId" element={<ThreadRoute />} />

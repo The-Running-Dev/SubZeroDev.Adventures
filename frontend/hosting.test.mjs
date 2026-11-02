@@ -41,6 +41,7 @@ for (const path of [
   "/profile",
   "/ranking",
   "/content",
+  "/captures",
   "/start",
   "/play/foo",
   "/discussions/123",

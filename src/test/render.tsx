@@ -19,6 +19,7 @@ export function render(
     "OwnProfile",
     "PublicProfile",
     "MyContent",
+    "MyCaptures",
     "Discussions",
   ];
   const name = typeof ui.type === "function" ? ui.type.name : "";
@@ -30,6 +31,7 @@ export function render(
         Ranking: "/ranking",
         OwnProfile: "/profile",
         MyContent: "/content",
+        MyCaptures: "/captures",
         Discussions: "/discussions",
       } as Record<string, string>
     )[name] ?? window.location.pathname;

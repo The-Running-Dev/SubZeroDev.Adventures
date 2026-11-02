@@ -243,6 +243,10 @@ describe("PlayApp cabinet presentation", () => {
     expect(
       screen.getByText("PROGRAM LOADED. YOUR STORY BEGINS HERE."),
     ).toBeVisible();
+    // A local session has no server to capture it.
+    expect(
+      screen.queryByRole("button", { name: "Report a problem" }),
+    ).not.toBeInTheDocument();
   });
 
   it("marks the authored scene as a labelled region with a short real heading, not the prose itself (W66.8)", async () => {

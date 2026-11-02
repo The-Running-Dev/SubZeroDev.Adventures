@@ -1,6 +1,7 @@
 export const accountEn = {
   admin: "Admin",
   profile: "Profile",
+  captures: "Problem reports",
   signOut: "Sign out",
   guestNote: "Progress lives only in this browser until you sign in.",
   signIn: "Sign In",
@@ -48,6 +49,7 @@ export const accountEn = {
 export const accountBg = {
   admin: "Администриране",
   profile: "Профил",
+  captures: "Доклади за проблеми",
   signOut: "Изход",
   guestNote:
     "Достъпът до напредъка зависи от този браузър, докато не влезеш в профила си.",

@@ -29,17 +29,19 @@ export function AppShell() {
               ? "profile"
               : path === "/content"
                 ? "content"
-                : path === "/start"
-                  ? "start"
-                  : path === "/discussions"
-                    ? "discussions"
-                    : path.startsWith("/discussions/")
-                      ? "thread"
-                      : path.startsWith("/u/")
-                        ? "publicProfile"
-                        : path === "/oauth/consent"
-                          ? "consent"
-                          : "missing";
+                : path === "/captures"
+                  ? "captures"
+                  : path === "/start"
+                    ? "start"
+                    : path === "/discussions"
+                      ? "discussions"
+                      : path.startsWith("/discussions/")
+                        ? "thread"
+                        : path.startsWith("/u/")
+                          ? "publicProfile"
+                          : path === "/oauth/consent"
+                            ? "consent"
+                            : "missing";
     document.title = `${t(key)} · SubZeroDev Adventures`;
   }, [location.pathname, t]);
   const { theme, changeTheme } = useTheme();

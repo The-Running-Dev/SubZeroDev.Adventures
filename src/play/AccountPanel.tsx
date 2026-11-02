@@ -162,6 +162,15 @@ export function AccountPanel({
                 {t("profile")}
               </Link>
             )}
+            {profileAvailable && (
+              <Link
+                className="cabinet-button"
+                to="/captures"
+                onClick={() => setOpen(false)}
+              >
+                {t("captures")}
+              </Link>
+            )}
             {member ? (
               <button
                 className="cabinet-button"

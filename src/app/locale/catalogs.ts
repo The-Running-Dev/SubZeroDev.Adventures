@@ -7,6 +7,7 @@ import { validationEn, validationBg } from "./validation";
 import { onboardingEn, onboardingBg } from "./onboarding";
 import { contentEn, contentBg } from "./content";
 import { communityEn, communityBg } from "./community";
+import { capturesEn, capturesBg } from "./captures";
 import { BADGE_DEFINITIONS } from "../../play/badges";
 import { badgesBg } from "./badges.bg";
 export const resources = {
@@ -20,6 +21,7 @@ export const resources = {
     onboarding: onboardingEn,
     content: contentEn,
     community: communityEn,
+    captures: capturesEn,
     play: {
       renderError: "Something broke while rendering this adventure.",
       scene: "Scene",
@@ -206,6 +208,7 @@ export const resources = {
       content: "My content",
       start: "Getting started",
       discussions: "Discussions",
+      captures: "Problem reports",
       thread: "Thread",
       consent: "Sign-in request",
       missing: "Page not found",
@@ -221,6 +224,7 @@ export const resources = {
     onboarding: onboardingBg,
     content: contentBg,
     community: communityBg,
+    captures: capturesBg,
     play: {
       renderError: "Възникна грешка при показването на приключението.",
       scene: "Сцена",
@@ -408,6 +412,7 @@ export const resources = {
       content: "Моето съдържание",
       start: "Първи стъпки",
       discussions: "Дискусии",
+      captures: "Доклади за проблеми",
       thread: "Тема",
       consent: "Заявка за вход",
       missing: "Страницата не е намерена",

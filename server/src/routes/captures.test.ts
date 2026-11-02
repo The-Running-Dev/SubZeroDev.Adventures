@@ -16,12 +16,11 @@ import {
 } from "vitest";
 import { Pool } from "pg";
 import type { FastifyInstance } from "fastify";
-import { createInMemoryProfileStore } from "@the-running-dev/game-engine";
 import {
   buildReplayOutcome,
+  createReplayContext,
   runReplayFixture,
 } from "@the-running-dev/game-engine/authoring";
-import { KINDS } from "../../../shared/campaign-registry.js";
 import { buildApp } from "../app.js";
 import { faultCapture, type StoredCapture } from "../captures/store.js";
 import { createServerDemoFromCurrent } from "../composition.js";
@@ -150,26 +149,25 @@ describeIfDb("session captures", () => {
       expect.objectContaining({ actionId: "laugh" }),
     ]);
 
+    // The current publication, so a withdrawn campaign would report `campaign_withdrawn`
+    // (engine 07 §6); each runner call gets its own context, so achievements do not carry over.
     const demo = await createServerDemoFromCurrent(pool);
-    const registry = demo.engine.content.resolve(
-      fixture.config.campaignId,
-      fixture.campaignVersion,
+    const replayed = await buildReplayOutcome(
+      createReplayContext(demo.engine, demo.registry),
+      fixture,
     );
-    expect(registry).toBeDefined();
-    const context = {
-      engine: demo.engine,
-      kinds: KINDS,
-      registry: registry!,
-      profiles: createInMemoryProfileStore(),
-      profileId: "replay",
-    };
-    const replayed = await buildReplayOutcome(context, fixture);
     expect(replayed.kind).toBe("outcome");
     if (replayed.kind !== "outcome") return;
     expect(replayed.outcome.finalStatus).toBe(status);
     expect(replayed.outcome.acceptedActions).toBe(1);
     expect(
-      (await runReplayFixture(context, fixture, replayed.outcome)).kind,
+      (
+        await runReplayFixture(
+          createReplayContext(demo.engine, demo.registry),
+          fixture,
+          replayed.outcome,
+        )
+      ).kind,
     ).toBe("match");
   });
 

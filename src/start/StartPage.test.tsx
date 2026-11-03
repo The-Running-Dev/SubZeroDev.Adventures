@@ -78,11 +78,16 @@ describe("StartPage", () => {
     const user = userEvent.setup();
     render(<StartPage />);
     await user.click(screen.getByRole("button", { name: /Write a campaign/i }));
-    expect(await screen.findByText(/CAMPAIGN AUTHORING/)).toBeInTheDocument();
+    // The wizard is a lazy chunk that pulls in the engine. A cold transform of it takes
+    // 1.5-6 s on a loaded Windows host, past both findByText's 1-second default and the
+    // 5-second test default, though not on CI's; the raised timeouts follow App.test.tsx.
+    expect(
+      await screen.findByText(/CAMPAIGN AUTHORING/, {}, { timeout: 10000 }),
+    ).toBeInTheDocument();
     // The authoring door is not gated on having finished a run -- the mockup locked it, this
     // page deliberately does not (see StartPage.tsx's header).
     expect(screen.queryByText(/finish a run first/i)).not.toBeInTheDocument();
-  });
+  }, 15000);
 
   /*
    * The "Getting started" link itself is inside the collapsed "More" disclosure, which

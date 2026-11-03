@@ -247,7 +247,8 @@ describeIfDb("session captures", () => {
         url: `/api/captures/${captureId}`,
         headers: { cookie: stranger.cookie },
       });
-      expect(response.statusCode).toBe(403);
+      expect(response.statusCode).toBe(404);
+      expect(errorOf(response)).toBe("unknown_capture");
       expect(response.body).not.toContain("submissions");
     }
     const listed = await app.inject({
@@ -281,6 +282,27 @@ describeIfDb("session captures", () => {
     expect(captures.map((c) => c.captureId)).toEqual([captureId]);
     // Summaries only: a listing never carries the fixture.
     expect(adminList.body).not.toContain("submissions");
+  });
+
+  it("answers a stranger exactly as it answers a capture id that was never issued", async () => {
+    const owner = await played();
+    const { captureId } = await capture(owner.cookie, owner.sessionId);
+    const stranger = await played();
+
+    for (const method of ["GET", "DELETE"] as const) {
+      const answer = async (id: string) => {
+        const response = await app.inject({
+          method,
+          url: `/api/captures/${id}`,
+          headers: { cookie: stranger.cookie },
+        });
+        return { status: response.statusCode, body: response.json() };
+      };
+      expect(await answer(captureId), method).toEqual(
+        await answer(randomUUID()),
+      );
+    }
+    expect(await count("session_captures")).toBe(1);
   });
 
   it("lets an admin capture a player's session on their report, owned by that player", async () => {

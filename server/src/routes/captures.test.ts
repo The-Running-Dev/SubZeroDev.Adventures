@@ -210,7 +210,8 @@ describeIfDb("session captures", () => {
       headers: { cookie: stranger },
       payload: { consent: true },
     });
-    expect(response.statusCode).toBe(403);
+    expect(response.statusCode).toBe(404);
+    expect(errorOf(response)).toBe("unknown_session");
     expect(await count("session_captures")).toBe(0);
   });
 

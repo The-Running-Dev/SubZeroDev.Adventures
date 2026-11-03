@@ -4,7 +4,6 @@ import { isDeepStrictEqual } from "node:util";
 import type { Pool } from "pg";
 import type { LoggedAction } from "@the-running-dev/game-engine";
 import type { ServerDemo } from "../composition.js";
-import { storedContentRow } from "../persistence.js";
 import { OwnershipError } from "../store/ownedStore.js";
 import {
   admits,
@@ -112,9 +111,8 @@ export function ownedOfflineStore(
           if (!owner) throw new OfflineError("member_required", 403);
           if (typeof sessionId !== "string" || !uuid.test(sessionId))
             throw new OfflineError("invalid_checkpoint", 400);
-          const stored = await storedContentRow(pool, "sessions", sessionId);
-          if (stored !== undefined && stored.profileId !== owner)
-            throw new OwnershipError("offline_checkpoint");
+          // Someone else's session is not this owner's row, so it is refused exactly as an
+          // id that was never issued is (#86).
           const { rows } = await pool.query(
             "select blob, offline_revision, replay_compatible from sessions where session_id=$1 and profile_id=$2",
             [sessionId, owner],

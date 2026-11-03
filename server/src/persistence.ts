@@ -429,9 +429,8 @@ export async function listSavesForPlayer(
  *
  * Returns `undefined` for a row that does not exist at all, distinct from `null` for a
  * row that exists but carries no `profile_id` — the caller (`store/ownedStore.ts`) needs
- * to tell those apart: a missing id should still surface as the store's own 404
- * (`unknown_session`/`unknown_save`), not get preempted by a 403 that implies something
- * real is being withheld.
+ * to tell those apart: a missing row may still carry a tombstone its owner is answered by,
+ * while a row with no owner is answered exactly as an id never issued (#86).
  */
 export async function sessionOwner(
   pool: Pool,

@@ -249,7 +249,8 @@ const campaign = "what-would-lucifer-do";
       headers: { cookie: other.cookie },
       payload: { sessionId: created.sessionId },
     });
-    expect(response.statusCode).toBe(403);
+    expect(response.statusCode).toBe(409);
+    expect(response.json().error.code).toBe("invalid_checkpoint");
   });
   it.each(["bundleId", "runtimeId", "engineVersion", "kindVersion"] as const)(
     "refuses changed %s",
@@ -432,7 +433,8 @@ const campaign = "what-would-lucifer-do";
             headers: { cookie: other.cookie },
             payload: { sessionId },
           });
-          expect(denied.statusCode, denied.body).toBe(403);
+          expect(denied.statusCode, denied.body).toBe(409);
+          expect(denied.json().error.code).toBe("invalid_checkpoint");
           expect(
             (await pool.query("select count(*)::int n from offline_grants"))
               .rows[0].n,

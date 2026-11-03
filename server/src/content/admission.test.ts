@@ -16,7 +16,7 @@ import {
 } from "@the-running-dev/game-engine";
 import { createServerDemo, type ServerDemo } from "../composition.js";
 import type { CampaignSource } from "../campaigns/source.js";
-import { OwnershipError, ownedStore } from "../store/ownedStore.js";
+import { ownedStore } from "../store/ownedStore.js";
 import {
   admittingChannel,
   ContentRefusal,
@@ -430,6 +430,6 @@ describeIfDb("admission against Postgres", () => {
     expect((await store.loadGame(save.saveId)).sessionId).toBeDefined();
     await expect(
       as(demo, other).branchSession(sessionId, 0),
-    ).rejects.toBeInstanceOf(OwnershipError);
+    ).rejects.toMatchObject({ code: "unknown_session" });
   });
 });

@@ -137,7 +137,11 @@ export function registerCaptureRoutes(
     deleted: await deleteCapturesOf(pool, request.principal.playerId),
   }));
 
-  /** The capture when the caller may reach it, else the refusal already sent. */
+  /**
+   * The capture when the caller may reach it, else the refusal already sent. A capture the
+   * caller may not reach is answered exactly as one that does not exist, so a capture id
+   * discloses nothing to anyone but its owner and an admin (#86).
+   */
   async function reachable(
     reply: FastifyReply,
     captureId: string,
@@ -147,12 +151,11 @@ export function registerCaptureRoutes(
     const found = UUID.test(captureId)
       ? await readCapture(pool, captureId)
       : undefined;
-    if (!found) {
+    if (
+      !found ||
+      (found.playerId !== playerId && !(await isAdmin(pool, playerId)))
+    ) {
       await refuse(reply, 404, operation, "unknown_capture");
-      return undefined;
-    }
-    if (found.playerId !== playerId && !(await isAdmin(pool, playerId))) {
-      await refuse(reply, 403, operation, "forbidden");
       return undefined;
     }
     return found;

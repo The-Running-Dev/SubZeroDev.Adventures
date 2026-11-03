@@ -17,9 +17,7 @@
  */
 import { randomUUID } from "node:crypto";
 import type { Pool } from "pg";
-import type { SessionLayer } from "@the-running-dev/game-engine";
-
-export type ReplayFixture = Awaited<ReturnType<SessionLayer["captureSession"]>>;
+import type { ReplayFixture, SessionLayer } from "@the-running-dev/game-engine";
 
 export type CaptureTrigger = "report" | "fault";
 

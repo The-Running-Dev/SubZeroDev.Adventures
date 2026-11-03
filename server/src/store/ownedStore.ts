@@ -10,8 +10,9 @@
  *   `StoredSessionRecord` (blob, audience, replayCompatible) that `SessionStore`'s
  *   projection-only surface has no operation for, so it cannot go through `ownedStore`.
  *
- * Both paths throw the same `OwnershipError`, caught once in `routes/session.ts`'s shared
- * error handler (registered on the one Fastify instance both route modules share).
+ * Both paths answer a caller who does not own the id exactly as the store answers an id it
+ * never issued (`notIssued`, #86): a `403` beside a `404` told anyone holding a candidate id
+ * whether it was live.
  */
 import type { Pool } from "pg";
 import {
@@ -30,6 +31,8 @@ import {
 } from "../content/admission.js";
 import { TOMBSTONE_LIVE } from "../content/deletion.js";
 
+/** `offline/store.ts`'s refusal of a grant its caller does not hold: the one place a `403`
+ *  still answers, since a grant that does not exist is refused the same way. */
 export class OwnershipError extends Error {
   readonly operation: string;
 
@@ -41,15 +44,30 @@ export class OwnershipError extends Error {
 }
 
 /**
+ * The store's answer for an id it never issued, which is also every non-owner's answer (#86),
+ * so holding someone else's id tells a caller nothing an invented one would not. `operation`
+ * is the one the store names in that answer: the engine reads every existing session under
+ * `session`, whichever operation asked.
+ */
+function notIssued(
+  table: "sessions" | "saves",
+  operation: string,
+): SessionStoreError {
+  return new SessionStoreError(
+    operation,
+    table === "sessions" ? "unknown_session" : "unknown_save",
+  );
+}
+
+/**
  * Every session and save this server has ever created carries a `profile_id`: the one
  * route that mints either (`POST /api/sessions`, and `POST /api/sessions/:id/branch`,
  * which copies its parent's `profileId`) sits behind `requirePrincipal`, which mints a
  * guest identity rather than ever leaving a request anonymous (`principal.ts`). So a row
  * that exists but carries no owner is not a legitimate unclaimed-by-a-guest state -- it
  * would mean authorization by knowledge of the id alone, which this guard exists to rule
- * out. `undefined` (no such row at all) is passed through instead of denied here, so a
- * bad id still reaches the store's own 404 rather than being preempted by a 403 that
- * implies something real is being withheld.
+ * out, so it is answered as one that was never issued. `undefined` (no such row at all)
+ * passes through to the caller's own 404.
  */
 export async function assertSessionOwned(
   pool: Pool,
@@ -60,7 +78,7 @@ export async function assertSessionOwned(
   const owner = await sessionOwner(pool, sessionId);
   if (owner === undefined)
     await answerTombstone(pool, "sessions", sessionId, playerId, operation);
-  else if (owner !== playerId) throw new OwnershipError(operation);
+  else if (owner !== playerId) throw notIssued("sessions", operation);
 }
 
 export async function assertSaveOwned(
@@ -72,7 +90,7 @@ export async function assertSaveOwned(
   const owner = await saveOwner(pool, saveId);
   if (owner === undefined)
     await answerTombstone(pool, "saves", saveId, playerId, operation);
-  else if (owner !== playerId) throw new OwnershipError(operation);
+  else if (owner !== playerId) throw notIssued("saves", operation);
 }
 
 /**
@@ -100,7 +118,7 @@ export async function gateCapture(
     row.profileId === null ||
     (playerId !== null && row.profileId !== playerId)
   )
-    throw new OwnershipError(operation);
+    throw notIssued("sessions", operation);
   if (row.campaignVersion === null) return row.profileId;
   const { runtime } = demo;
   await gateExisting(
@@ -116,8 +134,10 @@ export async function gateCapture(
 /**
  * A row that is gone may have been purged with its content (engine plan 54, D3 §6). For the
  * tombstone's window its owner -- which follows an account merge -- is told so, `410
- * campaign_deleted`; everyone else gets the `403` the live row gave them, so the deletion
- * discloses nothing new. No live tombstone: the store's own 404, as for an id never issued.
+ * campaign_deleted`; everyone else gets the never-issued answer the live row gave them, so the
+ * deletion discloses nothing new. That is thrown here, not left to the store, because the
+ * store may still hold the purged session in its cache. No live tombstone: the store's own
+ * 404, as for an id never issued. `missing` is the operation that answer names (`notIssued`).
  */
 async function answerTombstone(
   pool: Pool,
@@ -125,6 +145,7 @@ async function answerTombstone(
   id: string,
   playerId: string,
   operation: string,
+  missing = operation,
 ): Promise<void> {
   const { rows } = await pool.query(
     table === "sessions"
@@ -136,7 +157,7 @@ async function answerTombstone(
   if (!tombstone) return;
   if (tombstone.profile_id === playerId)
     throw new ContentRefusal(operation, "campaign_deleted");
-  throw new OwnershipError(operation);
+  throw notIssued(table, missing);
 }
 
 /**
@@ -172,15 +193,22 @@ export function ownedStore(
   const { runtime } = demo;
 
   /** Ownership, then the content gate, for an operation serving an existing session. A row
-   *  that does not exist passes through to the store's own 404. */
+   *  that does not exist passes through to the store's own 404, and so does a stranger. */
   async function existingSession(
     sessionId: string,
     operation: string,
   ): Promise<void> {
     const row = await storedContentRow(pool, "sessions", sessionId);
     if (row === undefined)
-      return answerTombstone(pool, "sessions", sessionId, playerId, operation);
-    if (row.profileId !== playerId) throw new OwnershipError(operation);
+      return answerTombstone(
+        pool,
+        "sessions",
+        sessionId,
+        playerId,
+        operation,
+        "session",
+      );
+    if (row.profileId !== playerId) throw notIssued("sessions", "session");
     if (row.campaignVersion === null) return;
     await gateExisting(
       runtime,
@@ -217,10 +245,11 @@ export function ownedStore(
   ): Promise<T> {
     return admitted(async () => {
       const row = await storedContentRow(pool, table, id, true);
+      const missing = table === "sessions" ? "session" : operation;
       // No such row: a tombstone's answer, else the store's own 404, under an admission that
       // admits nothing.
       if (row === undefined) {
-        await answerTombstone(pool, table, id, playerId, operation);
+        await answerTombstone(pool, table, id, playerId, operation, missing);
         return {
           kind: "derived",
           campaignId: "",
@@ -228,7 +257,7 @@ export function ownedStore(
           playerId,
         };
       }
-      if (row.profileId !== playerId) throw new OwnershipError(operation);
+      if (row.profileId !== playerId) throw notIssued(table, missing);
       const lineage = lineageOf(row.blob!);
       await gateExisting(
         runtime,

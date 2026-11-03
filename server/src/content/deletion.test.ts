@@ -11,7 +11,10 @@ import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Pool } from "pg";
 import Fastify from "fastify";
-import type { PortableCampaign } from "@the-running-dev/game-engine";
+import {
+  SessionStoreError,
+  type PortableCampaign,
+} from "@the-running-dev/game-engine";
 import { answerNotFound, buildApp, requestLogSerializers } from "../app.js";
 import { createServerDemo, type ServerDemo } from "../composition.js";
 import type { CampaignSource } from "../campaigns/source.js";
@@ -19,7 +22,7 @@ import { takeCapture } from "../captures/store.js";
 import { addSubmission } from "../content-sources.js";
 import { mergePlayers } from "../principal.js";
 import { answerDeletion } from "../routes/content.js";
-import { OwnershipError, ownedStore } from "../store/ownedStore.js";
+import { ownedStore } from "../store/ownedStore.js";
 import { ContentRefusal } from "./admission.js";
 import { buildCandidate } from "./candidate.js";
 import {
@@ -445,7 +448,7 @@ describeIfDb("deletion against Postgres", () => {
     }
   });
 
-  it("answers a purged session 410 to its owner, 403 to anyone else, and 404 otherwise", async () => {
+  it("answers a purged session 410 to its owner, and anyone else as an id never issued", async () => {
     const demo = await published();
     const sessionId = await startMine(demo);
     await deleteSource(pool, createMemoryLedger(), sourceId, actor());
@@ -455,14 +458,15 @@ describeIfDb("deletion against Postgres", () => {
     expect((own as ContentRefusal).code).toBe("campaign_deleted");
     expect((own as ContentRefusal).status).toBe(410);
 
-    expect(await thrown(as(demo, other).getView(sessionId))).toBeInstanceOf(
-      OwnershipError,
-    );
-
     const never = await thrown(as(demo, owner).getView(randomUUID()));
-    expect(never).toBeDefined();
-    expect(never).not.toBeInstanceOf(ContentRefusal);
-    expect(never).not.toBeInstanceOf(OwnershipError);
+    expect(never).toBeInstanceOf(SessionStoreError);
+    expect(never).toMatchObject({ code: "unknown_session" });
+    // The wire carries only the operation and the code (`routes/session.ts`).
+    const { operation, code } = never as SessionStoreError;
+    expect(await thrown(as(demo, other).getView(sessionId))).toMatchObject({
+      operation,
+      code,
+    });
   });
 
   it("carries tombstones and submissions to the account a guest merges into", async () => {

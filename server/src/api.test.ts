@@ -361,7 +361,7 @@ describeIfDb("server API", () => {
     expect(corrupted.json()).toMatchObject({ ok: false });
   });
 
-  it("denies a session to a player who does not own it", async () => {
+  it("answers a player who does not own a session as if it did not exist", async () => {
     const ownerCookie = await guestCookie();
     const created = await app
       .inject({
@@ -379,7 +379,8 @@ describeIfDb("server API", () => {
       headers: { cookie: strangerCookie },
     });
 
-    expect(response.statusCode).toBe(403);
+    expect(response.statusCode).toBe(404);
+    expect(response.json().error.code).toBe("unknown_session");
   });
 
   it("denies a session with no recorded owner to anyone -- not reachable by id alone", async () => {
@@ -406,7 +407,8 @@ describeIfDb("server API", () => {
       headers: { cookie },
     });
 
-    expect(response.statusCode).toBe(403);
+    expect(response.statusCode).toBe(404);
+    expect(response.json().error.code).toBe("unknown_session");
   });
 
   it("still 404s a nonexistent session id, rather than the ownership guard preempting it", async () => {
@@ -418,6 +420,72 @@ describeIfDb("server API", () => {
     });
 
     expect(response.statusCode).toBe(404);
+  });
+
+  // #86: a 403 for someone else's id beside a 404 for a missing one told any caller holding a
+  // candidate id that it was live. A non-owner now gets the unknown id's own answer, byte for byte.
+  it("answers a non-owner exactly as it answers an id that was never issued", async () => {
+    const ownerCookie = await guestCookie();
+    const { sessionId } = await app
+      .inject({
+        method: "POST",
+        url: "/api/sessions",
+        headers: { cookie: ownerCookie },
+        payload: { campaignId: "what-would-lucifer-do", seed: "probe-seed" },
+      })
+      .then((r) => r.json() as { sessionId: string });
+    const { saveId } = await app
+      .inject({
+        method: "POST",
+        url: `/api/sessions/${sessionId}/save`,
+        headers: { cookie: ownerCookie },
+      })
+      .then((r) => r.json() as { saveId: string });
+    const strangerCookie = await guestCookie();
+    const never = "00000000-0000-4000-8000-000000000000";
+
+    const routes = (session: string, save: string) =>
+      [
+        ["GET", `/api/sessions/${session}/scene`],
+        ["GET", `/api/sessions/${session}/view`],
+        ["GET", `/api/sessions/${session}/strings`],
+        ["GET", `/api/sessions/${session}/replay`],
+        ["POST", `/api/sessions/${session}/replay/verify`],
+        ["POST", `/api/sessions/${session}/resume`],
+        ["POST", `/api/sessions/${session}/actions/preview`, { actionId: "x" }],
+        ["POST", `/api/sessions/${session}/actions`, { actionId: "x" }],
+        ["POST", `/api/sessions/${session}/save`],
+        ["POST", `/api/sessions/${session}/branch`, { atSeq: 0 }],
+        ["POST", `/api/saves/${save}/load`],
+        [
+          "DELETE",
+          `/api/saves/${save}`,
+          { expectedSavedAt: "1970-01-01T00:00:00.000Z" },
+        ],
+      ] as const;
+    const answer = async ([method, url, payload]: readonly [
+      "GET" | "POST" | "DELETE",
+      string,
+      object?,
+    ]) => {
+      const response = await app.inject({
+        method,
+        url,
+        headers: { cookie: strangerCookie },
+        ...(payload ? { payload } : {}),
+      });
+      return { status: response.statusCode, body: response.body };
+    };
+
+    const owned = routes(sessionId, saveId);
+    const unknown = routes(never, never);
+    for (const [index, route] of owned.entries()) {
+      const theirs = await answer(route);
+      expect(theirs.status, `${route[0]} ${route[1]}`).toBe(404);
+      expect(theirs, `${route[0]} ${route[1]}`).toEqual(
+        await answer(unknown[index]!),
+      );
+    }
   });
 
   it("denies replay of a session to a player who does not own it", async () => {
@@ -440,7 +508,7 @@ describeIfDb("server API", () => {
       url: `/api/sessions/${created.sessionId}/replay`,
       headers: { cookie: strangerCookie },
     });
-    expect(replayResponse.statusCode).toBe(403);
+    expect(replayResponse.statusCode).toBe(404);
 
     const branchResponse = await app.inject({
       method: "POST",
@@ -448,7 +516,7 @@ describeIfDb("server API", () => {
       headers: { cookie: strangerCookie },
       payload: { atSeq: 0 },
     });
-    expect(branchResponse.statusCode).toBe(403);
+    expect(branchResponse.statusCode).toBe(404);
   });
 
   it("branches a session at a past step without mutating the original", async () => {
@@ -558,7 +626,8 @@ describeIfDb("server API", () => {
       headers: { cookie: strangerCookie },
       payload: { expectedSavedAt: listedSave!.savedAt },
     });
-    expect(deniedDelete.statusCode).toBe(403);
+    expect(deniedDelete.statusCode).toBe(404);
+    expect(deniedDelete.json().error.code).toBe("unknown_save");
 
     // The engine's own `deleteSave` compares `expectedSavedAt` against the stored record
     // before ever reaching persistence -- a stale precondition is `concurrent_modification`

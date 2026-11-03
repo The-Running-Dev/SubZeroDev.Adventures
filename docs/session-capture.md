@@ -73,7 +73,9 @@ typed error through the existing `SessionStoreError` mapping, and nothing is sto
 | `DELETE /api/captures/:id` | owner or admin                                               |
 | `GET /api/admin/captures`  | admin; every unexpired capture, summaries only               |
 
-No route mints a principal: a request with no account gets `403`.
+No route mints a principal: a request with no account gets `403`. A signed-in caller who is
+neither the owner nor an admin gets `404 unknown_capture`, exactly the answer for an id that
+was never issued, so a capture id discloses nothing to them.
 
 ## Rules the code keeps
 

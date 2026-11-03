@@ -13,8 +13,9 @@ import {
   type Campaign,
   type CampaignProvenance as AuthoredProvenance,
   type ContentRegistry,
+  type EmittedRecord,
+  type EmittedRecordSink,
   type Engine,
-  type SessionHost,
   type SessionLayer,
 } from "@the-running-dev/game-engine";
 import {
@@ -118,6 +119,10 @@ export interface ServerDemo {
    *  its `IdSource` is the default random one, so a fresh `createGame` would mint a new
    *  `gameId` unrelated to the session being replayed. Use `createReplayEngine` for that. */
   readonly engine: Engine;
+  /** This publication's construction registry: its default epoch per campaign. What a replay
+   *  context reads withdrawal from (`createReplayContext`, engine 07 §6) -- never a registry
+   *  resolved at a fixture's own version, which always holds the campaign. */
+  readonly registry: ContentRegistry;
   /**
    * `defaultIdSource.newGameId` is `crypto.randomUUID()` (06-extensibility.md §5.1) --
    * deliberately unpredictable, and never derived from `seed`. A real session's `gameId`
@@ -169,15 +174,11 @@ export interface SessionCacheOptions {
   readonly onSessionFault?: (layer: SessionLayer, sessionId: string) => void;
 }
 
-type EmittedRecord = Parameters<
-  NonNullable<SessionHost["recordSink"]>["write"]
->[0];
-
 /** The record sink that reports faults. Inert without `onSessionFault`. */
 function faultSink(
   onSessionFault: SessionCacheOptions["onSessionFault"],
   layer: () => SessionLayer,
-): SessionHost["recordSink"] {
+): EmittedRecordSink | undefined {
   if (!onSessionFault) return undefined;
   return {
     write(record: EmittedRecord) {
@@ -412,6 +413,7 @@ function demoFrom(
     findCampaign: (campaignId) =>
       all.find((campaign) => campaign.campaignId === campaignId),
     engine,
+    registry,
     createReplayEngine: (gameId) =>
       createEngine({
         kinds: KINDS,

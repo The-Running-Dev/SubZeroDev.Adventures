@@ -2,7 +2,7 @@
  * The liveness/readiness split (issue #9, stage 3). No database: the pool is a stand-in
  * whose `select 1` answers, fails or hangs, which is all the probes ask of it.
  */
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import Fastify, { type FastifyInstance } from "fastify";
 import type { Pool } from "pg";
 import type { ContentCell, ContentStatus } from "./content-cell.js";
@@ -44,6 +44,7 @@ describe("health routes", () => {
   let app: FastifyInstance;
 
   afterEach(async () => {
+    vi.unstubAllEnvs();
     await app.close();
   });
 
@@ -75,6 +76,19 @@ describe("health routes", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({ ok: true });
+  });
+
+  it("reports the build revision when the image carries one", async () => {
+    vi.stubEnv("ADVENTURES_BUILD_REVISION", "0123456789abcdef0123456789abcdef01234567");
+    await serve(poolThat(true).pool);
+
+    const response = await app.inject({ method: "GET", url: "/readyz" });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      ok: true,
+      revision: "0123456789abcdef0123456789abcdef01234567",
+    });
   });
 
   it("is not ready when the database does not answer", async () => {

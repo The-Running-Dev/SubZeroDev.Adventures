@@ -44,3 +44,8 @@ dist-ssr/
 .DS_Store
 Thumbs.db
 *.log
+
+# OpenTofu (deploy/)
+deploy/.terraform/
+deploy/backend.hcl
+deploy/*.tfvars.json

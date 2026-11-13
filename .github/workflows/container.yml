@@ -1,20 +1,13 @@
 name: Container
 
 # Builds, smoke-tests and publishes the API and frontend images to GHCR through the shared
-# container workflow, and (when DEPLOY_ENABLED is set) triggers the Portainer stack webhook
-# to redeploy them -- the same mechanism SubZeroDev.com uses. Pull requests build and
-# smoke-test both images and push nothing. The deploy half is a no-op until DEPLOY_ENABLED
-# is set, so this workflow is safe to run before the Portainer stack exists.
+# container workflow. Pull requests build and smoke-test both images and push nothing.
 #
-# This repo does not manage the VPS or SSH into it. The Portainer stack (pointed at this
-# repo's root docker-compose.yml) owns its own environment variables -- DB_PASSWORD,
-# OIDC_CLIENT_ID, OIDC_CLIENT_SECRET, and the proxy-net network -- configured directly
-# in Portainer's UI, not written by this workflow. The webhook redeploy re-pulls whatever
-# image tag the stack is already configured for (docker-compose.yml defaults
-# ADVENTURES_API_IMAGE to :latest, which this workflow also pushes).
-#
-# Required repository secret for the deploy half:
-#   PORTAINER_REDEPLOY_WEBHOOK_URL -- the stack's webhook URL from Portainer
+# Deploys go through the Infra repository's deploy workflow (D38). The Portainer credentials live only
+# there; this repository holds INFRA_DISPATCH_TOKEN (production environment), which can start that
+# workflow and nothing else. deploy/ (OpenTofu) writes the token and the stack's configuration. The
+# deployed image is the API, pinned by digest; its /readyz reports the commit, which the deploy waits for.
+# The frontend rides :latest and is pulled by the same redeploy.
 #
 # The checks to require are `api / Result` and `web / Result`.
 
@@ -86,11 +79,19 @@ jobs:
         --security-opt=no-new-privileges:true
       smoke-scripts: scripts/test-frontend-container.mjs
       node-version: "24"
-      deploy: ${{ vars.DEPLOY_ENABLED == 'true' }}
-      # Once the frontend is on the VPS, wait until it serves this commit, then check its
-      # routing from the outside. Empty skips both.
-      health-url: ${{ vars.FRONTEND_HOST == 'vps' && 'https://adventures.subzerodev.com/__build-id' || '' }}
-      health-expect: ${{ github.sha }}
-      post-deploy: ${{ vars.FRONTEND_HOST == 'vps' && 'scripts/verify-hosting.mjs' || '' }}
-    secrets:
-      DEPLOY_WEBHOOK_URL: ${{ secrets.PORTAINER_REDEPLOY_WEBHOOK_URL }}
+
+  deploy:
+    name: Deploy
+    needs: [api, web]
+    if: github.event_name == 'push' && vars.DEPLOY_ENABLED == 'true' && needs.api.outputs.pushed == 'true' && needs.web.outputs.pushed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    environment: production
+    permissions:
+      contents: read
+    steps:
+      - uses: The-Running-Dev/GitHub-ActionTemplates/actions/infra-deploy@c71f9720badd37b94b96da0c77633acc3a113647 # v2.2.0
+        with:
+          app: adventures
+          digest: ${{ needs.api.outputs.digest }}
+          token: ${{ secrets.INFRA_DISPATCH_TOKEN }}

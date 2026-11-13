@@ -40,14 +40,17 @@ export function registerHealthRoute(
   // needs, so it is the one this checks. Content is not: `ready()` is awaited before any
   // route registers, so a catalog always exists by the time this answers, and a failed
   // *refresh* leaves the previous catalog serving -- degraded, which `/healthz` reports,
-  // not unready. The body says nothing beyond `ok`: the edge's readiness check reads the
-  // status code and nothing else, and this route is unauthenticated.
+  // not unready. The body says nothing beyond `ok` and the commit this image was built from:
+  // the edge's readiness check reads the status code, and the deploy (Infra's deploy workflow)
+  // waits until `revision` is the commit it shipped. The route is unauthenticated, and the
+  // revision is already public as the image's `org.opencontainers.image.revision` label.
   app.get("/readyz", async (_request, reply) => {
     if (!(await databaseAnswers(pool, databaseTimeoutMs))) {
       reply.code(503);
       return { ok: false };
     }
-    return { ok: true };
+    const revision = process.env.ADVENTURES_BUILD_REVISION;
+    return revision ? { ok: true, revision } : { ok: true };
   });
 
   // The original combined probe, kept as it was: the readiness answer plus the content

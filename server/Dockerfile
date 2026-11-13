@@ -121,6 +121,8 @@ CMD ["serve"]
 FROM ${NODE_IMAGE} AS runtime
 ARG ADVENTURES_BUILD_REVISION=development
 LABEL org.opencontainers.image.revision=${ADVENTURES_BUILD_REVISION}
+# /readyz reports it, so a deploy can wait until the running API is the commit it shipped.
+ENV ADVENTURES_BUILD_REVISION=${ADVENTURES_BUILD_REVISION}
 LABEL org.opencontainers.image.source=https://github.com/The-Running-Dev/SubZeroDev.Adventures
 
 # Reproduces the repository's own directory layout rather than flattening it, because two

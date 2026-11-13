@@ -86,6 +86,7 @@ module "app" {
   # The deletion ledger's database password, created once. adventures-ledger starts empty with it.
   generated = ["LEDGER_DB_PASSWORD"]
 
+  branch        = "refs/heads/feat/infra-deploy" # TEMPORARY until this change is on main
   health_path   = "/readyz"
   portainer_url = var.portainer_url
   portainer_credentials = {
@@ -100,15 +101,15 @@ module "app" {
 
 # Adopt what already exists, so nothing is recreated.
 import {
-  to = module.app.portainer_stack.this
-  id = "3-14-standalone-repository" # <endpoint>-<stack>-<type>-<method>
-}
-
-import {
   to = module.app.cloudflare_dns_record.route["adventures-api"]
   id = "e958380ca90211dfa0fc68c5c2df277f/3e88076223863a1e455fc166533c33df"
 }
 
 output "public_url" {
   value = "https://adventures-api.subzerodev.com"
+}
+
+import {
+  to = module.app.github_actions_variable.deploy_enabled
+  id = "SubZeroDev.Adventures:DEPLOY_ENABLED"
 }

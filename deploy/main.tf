@@ -85,8 +85,6 @@ module "app" {
 
   # The deletion ledger's database password, created once. adventures-ledger starts empty with it.
   generated = ["LEDGER_DB_PASSWORD"]
-
-  branch        = "refs/heads/feat/infra-deploy" # TEMPORARY until this change is on main
   health_path   = "/readyz"
   portainer_url = var.portainer_url
   portainer_credentials = {

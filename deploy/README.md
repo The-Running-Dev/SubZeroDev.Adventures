@@ -19,6 +19,7 @@ stack's values from a private var-file outside the repository.
    ```
 
    `DB_PASSWORD` must stay exactly what it is: it lives inside the `adventures-db` volume.
+
 2. `./deploy/tofu.ps1 plan`. Expect the stack and the API DNS record to be imported, the stack updated in
    place (adds `ledger-db` and `cloudflared`), the tunnel created, and the GitHub secrets written. Nothing
    is recreated.

@@ -79,7 +79,10 @@ describe("health routes", () => {
   });
 
   it("reports the build revision when the image carries one", async () => {
-    vi.stubEnv("ADVENTURES_BUILD_REVISION", "0123456789abcdef0123456789abcdef01234567");
+    vi.stubEnv(
+      "ADVENTURES_BUILD_REVISION",
+      "0123456789abcdef0123456789abcdef01234567",
+    );
     await serve(poolThat(true).pool);
 
     const response = await app.inject({ method: "GET", url: "/readyz" });

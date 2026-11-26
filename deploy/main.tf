@@ -67,7 +67,11 @@ module "app" {
 
   # Only the API goes through the tunnel. adventures.subzerodev.com stays on GitHub Pages until
   # FRONTEND_HOST is `vps` (container.yml), so its DNS record is not managed here.
-  routes = { adventures-api = "http://adventures-api:8787" }
+  #
+  # The route points at Platform's edge (the `adventures-edge` stack, PassThrough mode, on proxy-net), which
+  # forwards to adventures-api:8787. Rollback: set it back to "http://adventures-api:8787" and apply; see
+  # deploy/README.md, "Platform's edge".
+  routes = { adventures-api = "http://adventures-edge:8080" }
 
   image = {
     variable = "ADVENTURES_API_IMAGE"
@@ -84,7 +88,7 @@ module "app" {
   secrets = var.secrets
 
   # The deletion ledger's database password, created once. adventures-ledger starts empty with it.
-  generated = ["LEDGER_DB_PASSWORD"]
+  generated     = ["LEDGER_DB_PASSWORD"]
   health_path   = "/readyz"
   portainer_url = var.portainer_url
   portainer_credentials = {

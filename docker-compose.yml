@@ -217,6 +217,23 @@ services:
     <<: *adventures-api-common
     container_name: adventures-api
     command: serve
+    # Readiness, for whatever gates on this container (a rollout, `docker compose up --wait`;
+    # issue #26): healthy once `/readyz` is 200, which needs Postgres to answer. Docker never
+    # restarts an unhealthy container, so a database outage cannot become a restart loop
+    # (server/src/health.ts). The runtime image is node:*-slim, which has no curl or wget.
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:8787/readyz').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+      start_interval: 2s
     # Publishes no port: the reverse proxy reaches it over proxy-net. The service name
     # `api` is too generic to rely on for resolution on a network shared with unrelated
     # stacks, so the proxy should target the container name above.

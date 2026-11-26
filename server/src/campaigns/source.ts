@@ -13,6 +13,7 @@ import { dirname, join } from "node:path";
 import {
   digestPortableCampaign,
   type PortableCampaign,
+  type PortableCampaignAttachment,
 } from "@the-running-dev/game-engine";
 import {
   type PortableExtension,
@@ -39,6 +40,9 @@ async function readVerifiedCampaign(
 export interface LoadedContent {
   readonly campaigns: readonly PortableCampaign[];
   readonly extensions: readonly PortableExtension[];
+  /** The manifest's published attachments (engine S141), passed to the registry build
+   *  unchanged. Absent means none: a pasted payload carries no manifest to publish them. */
+  readonly attachments?: readonly PortableCampaignAttachment[];
 }
 
 export interface CampaignSource {
@@ -88,7 +92,11 @@ export function createDiskCampaignSource(dir?: string): CampaignSource {
           ),
         ),
       ]);
-      return { campaigns, extensions };
+      return {
+        campaigns,
+        extensions,
+        attachments: manifest.attachments ?? [],
+      };
     },
   };
 }
@@ -173,7 +181,11 @@ export function createHttpCampaignSource(
           ),
         ),
       ]);
-      return { campaigns, extensions };
+      return {
+        campaigns,
+        extensions,
+        attachments: manifest.attachments ?? [],
+      };
     },
   };
 }

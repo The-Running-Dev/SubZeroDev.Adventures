@@ -6,7 +6,11 @@
 import { createServer, type Server } from "node:http";
 import { afterEach, describe, expect, it } from "vitest";
 import { digestPortableCampaign } from "@the-running-dev/game-engine";
-import { createHttpCampaignSource } from "./source.js";
+import { buildCatalog } from "../../../shared/campaign-registry.js";
+import {
+  createDiskCampaignSource,
+  createHttpCampaignSource,
+} from "./source.js";
 
 /** A manifest entry with a digest that actually matches `campaign` -- `source.ts` now
  *  verifies every fetched campaign against its manifest entry (the engine's graduated
@@ -85,6 +89,37 @@ describe("createHttpCampaignSource", () => {
 
     expect(loaded.campaigns).toEqual([campaignA, campaignB]);
     expect(loaded.extensions).toEqual([]);
+    expect(loaded.attachments).toEqual([]);
+  });
+
+  it("loads the manifest's attachments unchanged", async () => {
+    const attachment = {
+      kindId: "story-graph",
+      hostCampaignId: "a",
+      include: {
+        alias: "side",
+        ref: { id: "b", version: "1.0.0" },
+        binding: { exits: { back: "start" } },
+      },
+      payload: {
+        hostNodeId: "start",
+        choice: { id: "detour", labelKey: "b.detour" },
+      },
+    };
+    const manifest = {
+      formatVersion: 2,
+      campaigns: [],
+      attachments: [attachment],
+    };
+    const started = await startServer((path) =>
+      path === "/manifest.json"
+        ? { status: 200, body: manifest }
+        : { status: 404 },
+    );
+    server = started.server;
+
+    const loaded = await createHttpCampaignSource(started.url).load();
+    expect(loaded.attachments).toEqual([attachment]);
   });
 
   it("loads no extensions when the manifest declares none", async () => {
@@ -210,5 +245,29 @@ describe("createHttpCampaignSource", () => {
       timeoutMs: 50,
     });
     await expect(source.load()).rejects.toThrow();
+  });
+});
+
+describe("createDiskCampaignSource", () => {
+  it("attaches the published side quest to the hand-authored getting-started host", async () => {
+    const loaded = await createDiskCampaignSource().load();
+    expect(loaded.attachments).toHaveLength(1);
+
+    const { registry, all } = buildCatalog(
+      loaded.campaigns,
+      loaded.extensions,
+      loaded.attachments,
+    );
+    const host = registry.campaigns.get("getting-started")!;
+    // The engine stamps a host an attachment reaches (S141); without the attachments the
+    // authored version would come back unchanged.
+    expect(host.version).toMatch(/^1\.0\.0\+att\.[0-9a-f]{12}$/);
+    expect(all.find((e) => e.campaignId === "getting-started")?.version).toBe(
+      host.version,
+    );
+    expect(
+      all.find((e) => e.campaignId === "getting-started-side-quest")?.hidden,
+    ).toBe(true);
+    expect(JSON.stringify(host.content)).toContain("what_was_that");
   });
 });

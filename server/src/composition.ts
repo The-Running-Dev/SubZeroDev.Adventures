@@ -196,8 +196,11 @@ export async function createServerDemo(
 ): Promise<ServerDemo> {
   const runtime = contentRuntimeFor(pool);
   await runtime.ready();
-  const { campaigns: trustedPortables, extensions: trustedExtensions } =
-    await campaignSource.load();
+  const {
+    campaigns: trustedPortables,
+    extensions: trustedExtensions,
+    attachments: trustedAttachments = [],
+  } = await campaignSource.load();
   // A source deleted between this read and the commit refuses the publication under its lock
   // (D3 §5.2); one rebuild reads the submissions again without it.
   for (let attempt = 0; ; attempt++) {
@@ -207,6 +210,7 @@ export async function createServerDemo(
         runtime,
         trustedPortables,
         trustedExtensions,
+        trustedAttachments,
         options,
       );
     } catch (error) {
@@ -220,6 +224,7 @@ async function publishFrom(
   runtime: ContentRuntime,
   trustedPortables: Parameters<typeof buildCandidate>[0],
   trustedExtensions: Parameters<typeof buildCandidate>[1],
+  trustedAttachments: Parameters<typeof buildCandidate>[6],
   options: SessionCacheOptions,
 ): Promise<ServerDemo> {
   const { candidates, rowsById } = await loadSubmissionCandidates(pool);
@@ -238,6 +243,7 @@ async function publishFrom(
     (campaignId, campaignVersion) =>
       held.get(epochKey(campaignId, campaignVersion)),
     runtime.isBlocked,
+    trustedAttachments,
   );
 
   // Bookkeeping for the submission tier's own outcome -- a candidate is either quarantined

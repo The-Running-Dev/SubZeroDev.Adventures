@@ -4,6 +4,8 @@ import {
   digestPortableCampaign,
   type CampaignSummary,
   type PortableCampaign,
+  type PortableCampaignAttachment,
+  type PortableManifest,
   type SessionPersistence,
   type StoredSaveRecord,
   type SessionStore,
@@ -14,10 +16,6 @@ import {
   type CatalogEntry,
   type StatBounds,
 } from "../../shared/campaign-registry";
-import {
-  type PortableExtension,
-  type PortableManifestWithExtensions,
-} from "../../shared/campaign-extension";
 import { createRemoteSessionStore, fetchSaveIndex } from "./remote-store";
 import { browserStorageAvailable } from "./onboarding";
 // The router reads these before any play code loads, so they live in an engine-free module.
@@ -133,10 +131,14 @@ async function fetchJson<T>(path: string): Promise<T> {
   return (await response.json()) as T;
 }
 
-async function loadPortableCampaigns(): Promise<readonly PortableCampaign[]> {
-  const manifest =
-    await fetchJson<PortableManifestWithExtensions>("manifest.json");
-  return Promise.all(
+/** One manifest read for the campaigns and the attachments it publishes -- the two must come
+ *  from the same manifest, since an attachment names a campaign by `{id, version}`. */
+async function loadPortableContent(): Promise<{
+  readonly portables: readonly PortableCampaign[];
+  readonly attachments: readonly PortableCampaignAttachment[];
+}> {
+  const manifest = await fetchJson<PortableManifest>("manifest.json");
+  const portables = await Promise.all(
     manifest.campaigns.map(async (entry) => {
       const portable = await fetchJson<PortableCampaign>(entry.file);
       const digest = digestPortableCampaign(portable);
@@ -147,20 +149,7 @@ async function loadPortableCampaigns(): Promise<readonly PortableCampaign[]> {
       return portable;
     }),
   );
-}
-
-// Local mode is never the deployed configuration (CLAUDE.md, "Why the merge has to happen
-// at content level" -- `deploy.yml` always sets `VITE_API_URL`), but the unit test suite
-// forces it (`vite.config.ts`), so it still has to exercise extension merging honestly
-// rather than silently skip it.
-async function loadPortableExtensions(): Promise<readonly PortableExtension[]> {
-  const manifest =
-    await fetchJson<PortableManifestWithExtensions>("manifest.json");
-  return Promise.all(
-    (manifest.extensions ?? []).map((fileName) =>
-      fetchJson<PortableExtension>(fileName),
-    ),
-  );
+  return { portables, attachments: manifest.attachments ?? [] };
 }
 
 export interface BrowserDemo {
@@ -176,11 +165,8 @@ export interface BrowserDemo {
 }
 
 async function createLocalBrowserDemo(): Promise<BrowserDemo> {
-  const [portables, extensions] = await Promise.all([
-    loadPortableCampaigns(),
-    loadPortableExtensions(),
-  ]);
-  const { registry, all } = buildCatalog(portables, extensions);
+  const { portables, attachments } = await loadPortableContent();
+  const { registry, all } = buildCatalog(portables, [], attachments);
 
   return {
     catalog: Object.freeze(all.filter((campaign) => !campaign.hidden)),

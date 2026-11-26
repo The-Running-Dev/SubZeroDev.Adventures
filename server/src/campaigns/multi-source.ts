@@ -22,7 +22,10 @@
  * not exist yet keeps 404ing.
  */
 import type { Pool } from "pg";
-import type { PortableCampaign } from "@the-running-dev/game-engine";
+import type {
+  PortableCampaign,
+  PortableCampaignAttachment,
+} from "@the-running-dev/game-engine";
 import type { PortableExtension } from "../../../shared/campaign-extension.js";
 import {
   createHttpCampaignSource,
@@ -63,6 +66,7 @@ export interface EntryOutcome {
 export interface FanOutResult {
   readonly campaigns: readonly PortableCampaign[];
   readonly extensions: readonly PortableExtension[];
+  readonly attachments: readonly PortableCampaignAttachment[];
   readonly outcomes: readonly EntryOutcome[];
   readonly ok: boolean;
 }
@@ -176,6 +180,11 @@ export async function loadAllSources(
   const extensions = settled.flatMap((result) =>
     result.status === "fulfilled" ? result.value.content.extensions : [],
   );
+  const attachments = settled.flatMap((result) =>
+    result.status === "fulfilled"
+      ? (result.value.content.attachments ?? [])
+      : [],
+  );
 
   if (ok) {
     const seen = new Set<string>();
@@ -203,7 +212,7 @@ export async function loadAllSources(
     }
   }
 
-  return { campaigns, extensions, outcomes, ok };
+  return { campaigns, extensions, attachments, outcomes, ok };
 }
 
 /** Exported for `campaigns/submissions.ts`, which builds a `SourceEntry` from a
@@ -315,7 +324,11 @@ export function createMultiSourceCampaignSource(
         );
       }
 
-      return { campaigns: result.campaigns, extensions: result.extensions };
+      return {
+        campaigns: result.campaigns,
+        extensions: result.extensions,
+        attachments: result.attachments,
+      };
     },
     builtinStatus: () => builtinStatus,
   };

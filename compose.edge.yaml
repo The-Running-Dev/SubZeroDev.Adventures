@@ -1,0 +1,15 @@
+# Attaches Adventures' tunnel connector to Platform's edge at the fixed address the edge trusts for
+# X-Forwarded-For (SubZeroDev.Platform deploy/adventures-edge: compose.yaml and README.md, "Trusted
+# proxy"). The `adventures-edge` stack creates the network, so this file belongs in the stack only once
+# that stack is up: deploy/main.tf lists it, together with the route to the edge. Layer it over
+# compose.tunnel.yaml.
+services:
+  cloudflared:
+    networks:
+      proxy-net: {}
+      adventures-edge-ingress:
+        ipv4_address: 10.213.80.10
+
+networks:
+  adventures-edge-ingress:
+    external: true

@@ -1,6 +1,12 @@
 # Cloudflare Tunnel connector for the VPS. It joins `proxy-net`, where both `adventures-api` and
 # `adventures-web` already live, so nothing is published on the host. TUNNEL_TOKEN comes from the
 # stack environment (deploy/, OpenTofu). Layer it over docker-compose.yml.
+#
+# It also joins `adventures-edge-ingress`, the network SubZeroDev.Platform's `adventures-edge` stack creates,
+# at 10.213.80.10: the address the edge trusts for X-Forwarded-For (Platform deploy/adventures-edge,
+# compose.yaml and README.md, "Trusted proxy"). The tunnel route reaches the edge as
+# `adventures-edge-ingress:8080`, a name that resolves on that network only. The network must exist before
+# this file deploys; see deploy/README.md, "Platform's edge".
 services:
   cloudflared:
     image: cloudflare/cloudflared:2025.11.1
@@ -16,6 +22,12 @@ services:
       driver: json-file
       options: { max-size: 10m, max-file: "3" }
     networks:
-      - proxy-net
+      proxy-net: {}
+      adventures-edge-ingress:
+        ipv4_address: 10.213.80.10
     depends_on:
       - api
+
+networks:
+  adventures-edge-ingress:
+    external: true

@@ -603,6 +603,96 @@ describeIfDb("/api/admin/content/sources", () => {
     expect(result.statusCode).toBe(200);
   });
 
+  // #27's mid-run half: the session exists *before* the extension is published, so the
+  // choice is only reachable once the session adopts the new content epoch. The test above
+  // starts its session afterwards and so never exercises adoption. Adoption happens only at
+  // the engine's adoption points (contract C25): an action submitted straight away resolves
+  // on the old epoch and is refused -- a refused action never adopts -- while `resume`,
+  // which the client calls on open, adopts in place.
+  it("lets a session started before an extension was published take its added choice after resuming", async () => {
+    const admin = await adminCookie();
+    const created = await app.inject({
+      method: "POST",
+      url: "/api/sessions",
+      headers: { cookie: admin },
+      payload: { campaignId: "builtin-campaign" },
+    });
+    expect(created.statusCode).toBe(200);
+    const { sessionId } = created.json() as { sessionId: string };
+
+    const extension = {
+      formatVersion: 1,
+      id: "test-extension",
+      extends: "builtin-campaign",
+      nodes: {
+        side_quest: {
+          id: "side_quest",
+          kind: "ending",
+          textKey: "ext.side_quest.text",
+          endingId: "side_quest",
+        },
+      },
+      addChoices: [
+        {
+          nodeId: "start",
+          choice: {
+            id: "take_side_quest",
+            labelKey: "ext.side_quest.label",
+            goto: "side_quest",
+          },
+        },
+      ],
+      strings: {
+        "ext.side_quest.text": "A side quest.",
+        "ext.side_quest.label": "Take the side quest",
+      },
+    };
+    const added = await app.inject({
+      method: "POST",
+      url: "/api/admin/content/sources",
+      headers: { cookie: admin },
+      payload: { kind: "pasted", payload: extension },
+    });
+    expect((added.json() as { refresh: { ok: boolean } }).refresh.ok).toBe(
+      true,
+    );
+
+    type ActionResult = {
+      ok: boolean;
+      errors: { code: string }[];
+      scene?: { status: string; body: { text: string } };
+    };
+    const take = () =>
+      app.inject({
+        method: "POST",
+        url: `/api/sessions/${sessionId}/actions`,
+        headers: { cookie: admin },
+        payload: { actionId: "take_side_quest" },
+      });
+
+    const early = (await take()).json() as ActionResult;
+    expect(early.ok).toBe(false);
+    expect(early.errors.map((e) => e.code)).toEqual(["unknown_action"]);
+
+    const resumed = await app.inject({
+      method: "POST",
+      url: `/api/sessions/${sessionId}/resume`,
+      headers: { cookie: admin },
+    });
+    expect(resumed.statusCode).toBe(200);
+    const { scene } = resumed.json() as {
+      scene: { body: { text: string }; actions: { id: string }[] };
+    };
+    // Same position, now offering the extension's choice beside the original one.
+    expect(scene.body.text).toBe("You are at the start.");
+    expect(scene.actions.map((a) => a.id)).toEqual(["go", "take_side_quest"]);
+
+    const taken = (await take()).json() as ActionResult;
+    expect(taken.ok).toBe(true);
+    expect(taken.scene?.status).toBe("ended");
+    expect(taken.scene?.body.text).toBe("A side quest.");
+  });
+
   it("rejects a pasted payload that is neither a campaign nor an extension", async () => {
     const admin = await adminCookie();
     const response = await app.inject({

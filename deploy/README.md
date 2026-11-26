@@ -55,16 +55,19 @@ forwards `/readyz`, so the health check still reads Adventures' own revision.
   `GET https://<its health hostname>/health/ready` is `200`. Until then the tunnel would route players to a
   container that does not exist.
 - That stack has created `adventures-edge-ingress` (`docker network inspect adventures-edge-ingress`), and
-  `10.213.80.10` is free on it. `compose.edge.yaml` attaches `cloudflared` there at that fixed address,
+  `10.213.80.10` is free on it. `compose.tunnel.yaml` attaches `cloudflared` there at that fixed address,
   which the edge lists in `GameEdge:TrustedProxies`. The edge then budgets each player by the address
   Cloudflare puts in `X-Forwarded-For`, not by the connector's. Without the network, the stack update fails
-  and Adventures keeps running as it was. Portainer reads only the files in `compose_files`, so merging this
-  file changes nothing until the apply.
+  and Adventures keeps running as it was.
+- `cloudflared` is on that network at `10.213.80.10`. A push to `main` redeploys the stack from the
+  repository, so the attachment arrives with the first deploy after it merges; the route does not move until
+  the apply. The attachment lives in `compose.tunnel.yaml`, not in a file of its own, because adding a file to
+  `compose_files` makes the Portainer provider replace the whole stack.
 
 ### Cutover
 
-1. `./deploy/tofu.ps1 plan`: the tunnel configuration's `adventures-api` service and the stack's
-   additional files (`compose.edge.yaml`) change, in place.
+1. `./deploy/tofu.ps1 plan`: only the tunnel configuration's `adventures-api` service changes, in place.
+   Anything else, above all a replacement of the stack, means stop.
 2. `./deploy/tofu.ps1 apply`.
 3. At `https://adventures-api.subzerodev.com`: `GET /readyz` is `200`, an API read returns Adventures' own
    answer, and a sign-in sets the session cookie (SubZeroDev.Platform `workloads/game-edge/README.md`,
@@ -78,9 +81,10 @@ forwards `/readyz`, so the health check still reads Adventures' own revision.
 3. `GET /api/me` at the public host is `200`, and a signed-in player is still signed in. The edge holds no
    state; it can be stopped or left running.
 
-`compose.edge.yaml` can stay through a rollback. Before the `adventures-edge` stack or its network is
-removed, drop `compose.edge.yaml` from `compose_files` and apply. Otherwise the next Adventures deploy fails
-on the missing network, and Compose cannot remove the network while `cloudflared` is attached to it.
+The network attachment can stay through a rollback. Before the `adventures-edge` stack or its network is
+removed, take `adventures-edge-ingress` out of `compose.tunnel.yaml` and let that deploy finish. Otherwise the
+next Adventures deploy fails on the missing network, and Compose cannot remove the network while
+`cloudflared` is attached to it.
 
 In an emergency the same change can be made on the tunnel in the Cloudflare dashboard. The next `plan` then
 shows the drift; commit the route to match before applying anything else.

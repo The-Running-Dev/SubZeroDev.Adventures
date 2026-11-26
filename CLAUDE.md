@@ -94,8 +94,8 @@ npm run sync:campaigns
 
 This reads `SubZeroDev.Adventures.Content` — the same published feed the deployed server's
 only content source points at (`server/src/deployment.ts`) — verifying each fetched campaign
-against its manifest entry's digest before writing it, and preserving the two hand-authored
-`getting-started` files (see `scripts/sync-campaigns.mjs`'s header, and the decision log
+against its manifest entry's digest before writing it, and preserving the hand-authored
+`getting-started.json` (see `scripts/sync-campaigns.mjs`'s header, and the decision log
 below for why it no longer runs the engine's exporter). Nothing enforces that the result
 stays in lockstep with the feed — it is a fixture snapshot, not shipped content, so it is
 free to drift until a test actually needs the refresh, **and as of 2026-09-19 it does**: the
@@ -320,6 +320,26 @@ Every admin after the first is granted from the admin page itself
   committing into rather than importing a convention from elsewhere.
 
 ### Why it is installed this way
+
+#### 2026-11-26 — The trusted catalog composes manifest attachments; the hand-authored extension is retired
+
+Context: engine 0.15.0 (S141) contracts published extensions as a module campaign plus a
+`PortableManifest.attachments` entry, composed by `buildValidatedContentRegistry` and stamped
+`<authored>+att.<12 hex>` on the host. The Content feed now publishes the getting-started side
+quest that way, and this repository read only `manifest.extensions`, so the deployed catalog
+dropped it.
+
+Chosen: the browser local mode, both server sources and `sync:campaigns` pass the trusted
+manifest's `attachments` through `buildCatalog` / `buildTieredCatalog` / `hydrateCatalog` to
+the engine unchanged. Epoch keys and catalog entries use the registry's stamped version, since
+that is the key the archive holds. `getting-started-extension.json` is replaced by the feed's
+`getting-started-side-quest.json` and the manifest's attachment; the two `getting-started`
+hosts share node ids, so the feed's attachment reaches the local one. `sync:campaigns` imports
+`digestManifestResolution` from the package root, superseding the 2026-08-15 deep import.
+
+Not changed: player-submitted and admin-source extensions still run through `mergeExtensions`
+and `deriveVersion` (`+ext`). Re-expressing them as module plus attachment is a follow-up — it
+touches the submission schema, the migrations that store `extensionsDigest`, and the admin UI.
 
 #### 2026-11-26 — The publisher refreshes the running catalog through a shared-secret route
 

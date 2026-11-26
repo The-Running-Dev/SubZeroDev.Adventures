@@ -1,0 +1,84 @@
+{
+  "formatVersion": 2,
+  "catalog": {
+    "title": "Getting Started: Side Quest",
+    "description": "A completely unnecessary mini-path, attached to Getting Started to prove content composition works.",
+    "duration": "~30 seconds",
+    "contentNotice": "Self-aware nonsense. No real danger.",
+    "featured": false,
+    "hidden": true
+  },
+  "campaign": {
+    "id": "getting-started-side-quest",
+    "version": "1.0.0",
+    "titleKey": "gssq.campaign.title",
+    "kindId": "story-graph",
+    "content": {
+      "descriptionKey": "gssq.campaign.description",
+      "variables": {},
+      "nodes": {
+        "side_quest_landing": {
+          "id": "side_quest_landing",
+          "kind": "choice",
+          "textKey": "gssq.side_quest_landing.text",
+          "choices": [
+            {
+              "id": "proceed",
+              "goto": "side_quest_end",
+              "labelKey": "gssq.side_quest_landing.proceed"
+            }
+          ]
+        },
+        "side_quest_end": {
+          "id": "side_quest_end",
+          "kind": "choice",
+          "textKey": "gssq.side_quest_end.text",
+          "choices": [
+            {
+              "id": "continue",
+              "goto": "side_quest_exit",
+              "labelKey": "gssq.side_quest_end.continue"
+            }
+          ]
+        },
+        "side_quest_exit": {
+          "id": "side_quest_exit",
+          "kind": "ending",
+          "textKey": "gssq.side_quest_exit.text",
+          "endingId": "back",
+          "outcome": "neutral"
+        }
+      },
+      "startNodeId": "side_quest_landing",
+      "achievements": [
+        {
+          "id": "off_the_beaten_graph",
+          "hidden": true,
+          "condition": {
+            "field": "visited.side_quest_landing",
+            "operator": "greater_or_equal",
+            "value": 1
+          },
+          "nameKey": "gssq.achievement_off_the_beaten_graph.name",
+          "descriptionKey": "gssq.achievement_off_the_beaten_graph.description"
+        }
+      ],
+      "module": {
+        "inputs": [],
+        "outputs": []
+      }
+    }
+  },
+  "strings": {
+    "gssq.achievement_off_the_beaten_graph.description": "Wandered into content that wasn't even supposed to be here. That's the platform working as intended.",
+    "gssq.achievement_off_the_beaten_graph.name": "Off The Beaten Graph",
+    "gssq.attach.what_was_that": "—wait, what was that?",
+    "gssq.campaign.description": "A completely unnecessary mini-path that proves content composition works.",
+    "gssq.campaign.title": "Getting Started: Side Quest",
+    "gssq.side_quest_end.continue": "Back to it.",
+    "gssq.side_quest_end.text": "Anyway, where were we?",
+    "gssq.side_quest_exit.text": "Back to the orientation.",
+    "gssq.side_quest_landing.proceed": "Proceed anyway.",
+    "gssq.side_quest_landing.text": "SIDE QUEST DETECTED.\n\nA completely unnecessary mini-path has appeared. It exists only to prove that content composition works — this entire node, and the choice that got you here, live in a separate file that was grafted onto the campaign you're playing. Nothing about the original file changed."
+  }
+}

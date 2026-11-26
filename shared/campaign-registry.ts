@@ -16,6 +16,7 @@ import {
   type Campaign,
   type ContentRegistry,
   type PortableCampaign,
+  type PortableCampaignAttachment,
   type PortableCatalog,
   type ValidationError,
   type ValidationWarning,
@@ -218,6 +219,11 @@ export type HydrateResult =
 export function hydrateCatalog(
   portables: readonly PortableCampaign[],
   extensions: readonly PortableExtension[],
+  /** A manifest's published attachments (`PortableManifest.attachments`, engine S141): each
+   *  includes a module campaign into its host at registry build, and the engine stamps every
+   *  host one reaches as `<authored>+att.<12 hex>`. Passed to the engine unchanged -- the
+   *  composition is its, not this file's. */
+  attachments: readonly PortableCampaignAttachment[] = [],
 ): HydrateResult {
   let merged: readonly PortableCampaign[];
   try {
@@ -233,6 +239,7 @@ export function hydrateCatalog(
   const registry = buildValidatedContentRegistry(
     hydrated.map((h) => h.built),
     KINDS,
+    attachments,
   );
   if (!registry.ok || !registry.value)
     return {
@@ -242,8 +249,14 @@ export function hydrateCatalog(
       warnings: registry.warnings,
     };
 
+  // The registry's campaign, not the authored one: an attachment stamps its host's version
+  // and composes the module's content into it, and the entry must name what a session plays.
   const all = hydrated.map(({ built, catalog }) =>
-    catalogEntryOf(built.campaign, registry.value!.strings, catalog),
+    catalogEntryOf(
+      registry.value!.campaigns.get(built.campaign.id)!,
+      registry.value!.strings,
+      catalog,
+    ),
   );
 
   const campaignStringKeys = new Map<string, ReadonlySet<string>>(
@@ -274,8 +287,9 @@ export function hydrateCatalog(
 export function buildCatalog(
   portables: readonly PortableCampaign[],
   extensions: readonly PortableExtension[] = [],
+  attachments: readonly PortableCampaignAttachment[] = [],
 ): BuiltCatalog {
-  const result = hydrateCatalog(portables, extensions);
+  const result = hydrateCatalog(portables, extensions, attachments);
   if (!result.ok) throw new Error(result.error);
   return result.value;
 }
@@ -325,8 +339,15 @@ export function buildTieredCatalog(
   trustedPortables: readonly PortableCampaign[],
   trustedExtensions: readonly PortableExtension[],
   candidates: readonly CandidateSource[],
+  /** The trusted tier's attachments. A candidate carries none: a submission is one campaign or
+   *  one extension (`campaigns/submissions.ts`), so only a trusted manifest attaches. */
+  trustedAttachments: readonly PortableCampaignAttachment[] = [],
 ): TieredCatalog {
-  const trusted = buildCatalog(trustedPortables, trustedExtensions);
+  const trusted = buildCatalog(
+    trustedPortables,
+    trustedExtensions,
+    trustedAttachments,
+  );
 
   const candidatePortables = candidates.filter(
     (c): c is CandidateSource & { portable: PortableCampaign } =>
@@ -340,6 +361,7 @@ export function buildTieredCatalog(
   const combined = hydrateCatalog(
     [...trustedPortables, ...candidatePortables.map((c) => c.portable)],
     [...trustedExtensions, ...candidateExtensions.map((c) => c.extension)],
+    trustedAttachments,
   );
   if (combined.ok) return { ...combined.value, quarantined: [], trusted };
 
@@ -354,6 +376,7 @@ export function buildTieredCatalog(
     const attempt = hydrateCatalog(
       [...acceptedPortables, candidate.portable],
       acceptedExtensions,
+      trustedAttachments,
     );
     if (attempt.ok) {
       accepted = attempt.value;
@@ -363,10 +386,11 @@ export function buildTieredCatalog(
     }
   }
   for (const candidate of candidateExtensions) {
-    const attempt = hydrateCatalog(acceptedPortables, [
-      ...acceptedExtensions,
-      candidate.extension,
-    ]);
+    const attempt = hydrateCatalog(
+      acceptedPortables,
+      [...acceptedExtensions, candidate.extension],
+      trustedAttachments,
+    );
     if (attempt.ok) {
       accepted = attempt.value;
       acceptedExtensions = [...acceptedExtensions, candidate.extension];

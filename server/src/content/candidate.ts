@@ -11,6 +11,7 @@ import {
   type CampaignProvenance as AuthoredProvenance,
   type ContentRegistry,
   type PortableCampaign,
+  type PortableCampaignAttachment,
   type PortableCatalog,
   type StoredEpoch,
 } from "@the-running-dev/game-engine";
@@ -99,6 +100,8 @@ export function buildCandidate(
    *  submission naming it is quarantined until its author bumps the version. */
   deleted: (campaignId: string, campaignVersion: string) => boolean = () =>
     false,
+  /** The trusted manifest's attachments (engine S141). A submission carries none. */
+  trustedAttachments: readonly PortableCampaignAttachment[] = [],
 ): Candidate {
   let tiered;
   try {
@@ -106,6 +109,7 @@ export function buildCandidate(
       trustedPortables,
       trustedExtensions,
       candidates,
+      trustedAttachments,
     );
   } catch (error) {
     throw new CoreContentError(
@@ -179,7 +183,7 @@ export function buildCandidate(
         version: derived.get(portable.campaign.id)!.version,
       },
     })) as PortableCampaign[];
-    const built = hydrateCatalog(versioned, extensions);
+    const built = hydrateCatalog(versioned, extensions, trustedAttachments);
     // `buildTieredCatalog` already accepted this exact set under authored versions, and the
     // version is no validation input, so a failure here is a defect rather than content.
     if (!built.ok) throw new CoreContentError(built.error);
@@ -187,7 +191,10 @@ export function buildCandidate(
     const scratch = createContentArchive({ kinds: KINDS, initial: EMPTY });
     const epochs: CandidateEpoch[] = [];
     for (const portable of built.value.portables) {
-      const { id, version } = portable.campaign;
+      const { id } = portable.campaign;
+      // The registry's version, not the portable's: an attachment stamps its host
+      // `<authored>+att.<12 hex>` at registry build, and that is the key the archive holds.
+      const { version } = built.value.registry.campaigns.get(id)!;
       const registry = singleCampaignRegistry(built.value.registry, id);
       const published = scratch.publish(registry);
       if (!published.ok) {

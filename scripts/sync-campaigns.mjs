@@ -16,30 +16,28 @@
  * this when a test actually needs the refresh, then diff the result and update the visual
  * baselines if rendered output changed (CLAUDE.md, "Visual Baselines").
  *
- * `getting-started.json` / `getting-started-extension.json` are the one exception: the
- * `/start` wizard's ready-made sample campaign (efb9ec1), hand-authored here rather than
- * published. The feed does publish a campaign under that id, and its bytes are not these --
- * so the local pair survives this script and the manifest is patched to describe what is
- * actually on disk. `browser-client.test.ts` and `PlayApp.test.tsx` import both files
- * directly, and `composition.ts`'s `?campaign=getting-started` path resolves them through
- * this same `manifest.json`, so they are read before the wholesale `rm` below and written
- * back afterward.
+ * `getting-started.json` is the one exception: the `/start` wizard's ready-made sample
+ * campaign (efb9ec1), hand-authored here rather than published. The feed does publish a
+ * campaign under that id, and its bytes are not these -- so the local file survives this
+ * script and the manifest is patched to describe what is actually on disk.
+ * `browser-client.test.ts` and `PlayApp.test.tsx` import it directly, and `composition.ts`'s
+ * `?campaign=getting-started` path resolves it through this same `manifest.json`, so it is
+ * read before the wholesale `rm` below and written back afterward. Its side quest is not
+ * hand-authored: the feed publishes it as a module campaign plus a manifest attachment
+ * (engine S141), and both arrive with the rest of the feed. The two share node ids, so the
+ * feed's attachment reaches the local host too.
  */
 
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 
-import { digestPortableCampaign } from "@the-running-dev/game-engine";
-// `digestManifestResolution` is deliberately unexported from the engine package's public
-// surface (`src/index.ts`'s own comment: author-time-only), and the engine's own publishing
-// tooling reaches it by a relative import for exactly that reason. This script is the same
-// kind of author-time tooling, so it reaches it the same way rather than restating the recipe
-// -- a second copy of "sha-256 over the canonical ordered {id, version} list" would be free
-// to drift from the one `PortableManifest.resolution`'s own contract names. Importing from
-// the built submodule adds no precondition the line above does not already impose: the
-// package entry point resolves into `dist/` too, so `npm run setup` is required either way.
-import { digestManifestResolution } from "../engine/src/engine/dist/portable/digest.js";
+// `digestManifestResolution` is a package-root export since engine 0.15.0 (S141): a host
+// verifying a manifest that carries attachments needs the same recipe the publisher used.
+import {
+  digestManifestResolution,
+  digestPortableCampaign,
+} from "@the-running-dev/game-engine";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const targetCampaigns = join(repoRoot, "public", "campaigns");
@@ -50,8 +48,7 @@ const targetCampaigns = join(repoRoot, "public", "campaigns");
 const FEED = "https://the-running-dev.github.io/SubZeroDev.Adventures.Content/";
 
 const HAND_AUTHORED_CAMPAIGN = "getting-started.json";
-const HAND_AUTHORED_EXTENSION = "getting-started-extension.json";
-const HAND_AUTHORED_FILES = [HAND_AUTHORED_CAMPAIGN, HAND_AUTHORED_EXTENSION];
+const HAND_AUTHORED_FILES = [HAND_AUTHORED_CAMPAIGN];
 
 async function fetchText(file) {
   const response = await fetch(new URL(file, FEED));
@@ -92,13 +89,16 @@ if (manifest.formatVersion !== 2) {
 // silently disagrees with its own manifest is one every consumer of it then fails on, far
 // from here. This first check covers the manifest's own self-consistency -- a mismatch means
 // the feed published one, not that this script computed one wrong.
-const publishedResolution = digestManifestResolution(manifest.campaigns);
+const publishedResolution = digestManifestResolution(
+  manifest.campaigns,
+  manifest.attachments,
+);
 if (
   manifest.resolution !== undefined &&
   manifest.resolution !== publishedResolution
 ) {
   throw new Error(
-    `Published manifest.resolution ${manifest.resolution} does not match its own campaign list (${publishedResolution}).`,
+    `Published manifest.resolution ${manifest.resolution} does not match its own campaign and attachment lists (${publishedResolution}).`,
   );
 }
 
@@ -126,16 +126,12 @@ for (const [file, contents] of handAuthored) {
   await writeFile(join(targetCampaigns, file), contents);
 }
 
-// Gated on the restore having found anything at all, not on the campaign specifically: the
-// loop above writes each file back independently, so an extension can reach disk while the
-// campaign it belongs to does not, and an extension the manifest does not list is one
-// `loadPortableExtensions` (`composition.ts`) silently never loads.
-if (handAuthored.size > 0) {
+const restoredCampaign = handAuthored.get(HAND_AUTHORED_CAMPAIGN);
+if (restoredCampaign) {
   const manifestPath = join(targetCampaigns, "manifest.json");
 
   let campaigns = manifest.campaigns;
-  const restoredCampaign = handAuthored.get(HAND_AUTHORED_CAMPAIGN);
-  if (restoredCampaign) {
+  {
     const portable = JSON.parse(restoredCampaign.toString("utf8"));
     const entry = {
       file: HAND_AUTHORED_CAMPAIGN,
@@ -145,7 +141,7 @@ if (handAuthored.size > 0) {
     };
     // Replaced where the feed already publishes this file or id, rather than appended
     // unconditionally: the write-back above overwrites the fetched bytes, so a second entry
-    // would carry a digest nothing on disk can match. `loadPortableCampaigns`
+    // would carry a digest nothing on disk can match. `loadPortableContent`
     // (`composition.ts`) throws that mismatch inside a `Promise.all`, taking down the whole
     // catalog load rather than just this one campaign.
     const collision = campaigns.findIndex(
@@ -157,35 +153,25 @@ if (handAuthored.size > 0) {
         : campaigns.with(collision, entry);
   }
 
-  const extensions = handAuthored.has(HAND_AUTHORED_EXTENSION)
-    ? [...new Set([...(manifest.extensions ?? []), HAND_AUTHORED_EXTENSION])]
-    : manifest.extensions;
-
   const overrides = {
     campaigns,
-    ...(extensions ? { extensions } : {}),
     // Recomputed rather than carried over. `resolution` is a digest over the ordered
-    // `{id, version}` list (`PortableManifest`'s own doc comment), so splicing a campaign in
-    // invalidates the published value -- and a replacement that happens to land on the same
-    // id and version leaves it unchanged only by coincidence, not by contract.
+    // `{id, version}` list and the attachments (`PortableManifest`'s own doc comment), so
+    // splicing a campaign in invalidates the published value -- and a replacement that
+    // happens to land on the same id and version leaves it unchanged only by coincidence,
+    // not by contract.
     ...(manifest.resolution !== undefined
-      ? { resolution: digestManifestResolution(campaigns) }
+      ? {
+          resolution: digestManifestResolution(campaigns, manifest.attachments),
+        }
       : {}),
   };
-  // Rebuilt in the published manifest's own key order rather than mutated in place -- the
-  // feed omits `extensions` entirely when it has none, so assigning it would append the key
-  // after `resolution` instead of before it. Iterating the parsed keys rather than naming the
-  // ones this script knows about also carries through any field a future manifest adds,
-  // instead of stripping it on every sync.
+  // Rebuilt in the published manifest's own key order rather than mutated in place.
+  // Iterating the parsed keys rather than naming the ones this script knows about carries
+  // through any field a future manifest adds, instead of stripping it on every sync.
   const patched = {};
   for (const key of Object.keys(manifest)) {
-    if (key === "resolution" && overrides.extensions && !manifest.extensions) {
-      patched.extensions = overrides.extensions;
-    }
     patched[key] = key in overrides ? overrides[key] : manifest[key];
-  }
-  if (overrides.extensions && !patched.extensions) {
-    patched.extensions = overrides.extensions;
   }
 
   // Matches the published formatting (2-space, LF, trailing newline) directly. Handing the
@@ -193,9 +179,7 @@ if (handAuthored.size > 0) {
   // `.prettierignore`, so `prettier --write` on this path exits 0 having changed nothing.
   await writeFile(manifestPath, JSON.stringify(patched, null, 2) + "\n");
 
-  console.log(
-    `Re-added ${handAuthored.size} hand-authored file(s) to manifest.json...`,
-  );
+  console.log(`Re-added ${HAND_AUTHORED_CAMPAIGN} to manifest.json...`);
 }
 
 const files = await readdir(targetCampaigns);

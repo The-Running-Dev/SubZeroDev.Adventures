@@ -68,6 +68,16 @@ What lives here backs `browser-client.test.ts`, `PlayApp.test.tsx` (both import 
 fetch-stub fixtures), the visual-regression baselines, and `buildApp`'s disk-backed default
 `campaignSource` (`server/src/app.ts`) that the rest of the server test suite runs against.
 
+**What gates published content is in the Content repository, not here.** This repository's CI
+used to verify `public/campaigns/` was not stale against the engine's exporter. That check was
+removed deliberately when content moved out (issue #23), and nothing here replaces it. Its
+replacement is the Content repository's Pages deploy (`.github/workflows/deploy.yml`): every
+publish runs `test` (which builds the validated content registry), `export:content`,
+`check:clean`, `validate:content` and `build:site`, and fails before deploying if any of them
+fails. Its `Main` ruleset requires a pull request, so every content change is a diff before
+players see it. The server still validates what it fetches and keeps the previous catalog on
+failure, so a bad publish never replaces a good catalog.
+
 It has **one runtime job**, added in 2026-09 (issue #53, decision log below): it is the
 snapshot a deployment boots from when the _first_ build off the published source fails, so
 unbuildable published content cannot exit the process before it binds a port. That is a

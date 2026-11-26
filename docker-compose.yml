@@ -222,7 +222,13 @@ services:
     # restarts an unhealthy container, so a database outage cannot become a restart loop
     # (server/src/health.ts). The runtime image is node:*-slim, which has no curl or wget.
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8787/readyz').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:8787/readyz').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))",
+        ]
       interval: 10s
       timeout: 5s
       retries: 3

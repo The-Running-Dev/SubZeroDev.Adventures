@@ -63,11 +63,16 @@ module "app" {
 
   name          = "adventures" # The existing Portainer stack name; the compose project (volume names) is set by `name:` in docker-compose.yml
   repository    = "The-Running-Dev/SubZeroDev.Adventures"
-  compose_files = ["docker-compose.yml", "compose.tunnel.yaml"]
+  compose_files = ["docker-compose.yml", "compose.tunnel.yaml", "compose.edge.yaml"]
 
   # Only the API goes through the tunnel. adventures.subzerodev.com stays on GitHub Pages until
   # FRONTEND_HOST is `vps` (container.yml), so its DNS record is not managed here.
-  routes = { adventures-api = "http://adventures-api:8787" }
+  #
+  # The route points at Platform's edge (the `adventures-edge` stack, PassThrough mode), which forwards to
+  # adventures-api:8787. compose.edge.yaml attaches cloudflared to the edge's network at the address the
+  # edge trusts; `adventures-edge-ingress` resolves on that network only. Rollback: set the route back to
+  # "http://adventures-api:8787" and apply; see deploy/README.md, "Platform's edge".
+  routes = { adventures-api = "http://adventures-edge-ingress:8080" }
 
   image = {
     variable = "ADVENTURES_API_IMAGE"
@@ -84,7 +89,7 @@ module "app" {
   secrets = var.secrets
 
   # The deletion ledger's database password, created once. adventures-ledger starts empty with it.
-  generated = ["LEDGER_DB_PASSWORD"]
+  generated     = ["LEDGER_DB_PASSWORD"]
   health_path   = "/readyz"
   portainer_url = var.portainer_url
   portainer_credentials = {

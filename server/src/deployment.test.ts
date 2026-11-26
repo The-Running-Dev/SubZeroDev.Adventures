@@ -21,6 +21,7 @@ import {
   deploymentConfig,
   parseBackupRetentionDays,
   parseCaptureRetentionDays,
+  parseContentRefreshSecret,
   parseSessionCacheLimit,
 } from "./deployment.js";
 import { DEFAULT_CAPTURE_RETENTION_DAYS } from "./captures/store.js";
@@ -60,6 +61,23 @@ describe("deploymentConfig", () => {
 
     expect(config.sessionCacheLimit).toBe(250);
     expect(config.captureRetentionDays).toBe(12);
+  });
+
+  it("passes the content refresh secret through, so the publisher's trigger is on", () => {
+    const secret = "0123456789abcdef0123456789abcdef";
+    const config = deploymentConfig(noPool, {
+      siteUrl: "https://example.invalid",
+      apiUrl: "https://api.example.invalid",
+      previewOrigins: [],
+      discussionForum: undefined,
+      sessionCacheLimit: DEFAULT_SESSION_CACHE_LIMIT,
+      backupRetentionDays: 7,
+      captureRetentionDays: DEFAULT_CAPTURE_RETENTION_DAYS,
+      ledgerDatabaseUrl: undefined,
+      contentRefreshSecret: secret,
+    });
+
+    expect(config.contentRefreshSecret).toBe(secret);
   });
 
   it("always passes a ledger and the backup retention, so neither falls to a test default", async () => {
@@ -141,6 +159,29 @@ describe("parseCaptureRetentionDays", () => {
     (raw) => {
       expect(() => parseCaptureRetentionDays(raw)).toThrow(
         /CAPTURE_RETENTION_DAYS/,
+      );
+    },
+  );
+});
+
+describe("parseContentRefreshSecret", () => {
+  it("is off when unset or blank", () => {
+    expect(parseContentRefreshSecret(undefined)).toBeUndefined();
+    expect(parseContentRefreshSecret("")).toBeUndefined();
+    expect(parseContentRefreshSecret("   ")).toBeUndefined();
+  });
+
+  it("accepts 32 characters or more, trimmed", () => {
+    const secret = "0123456789abcdef0123456789abcdef";
+    expect(parseContentRefreshSecret(secret)).toBe(secret);
+    expect(parseContentRefreshSecret(` ${secret}x `)).toBe(`${secret}x`);
+  });
+
+  it.each(["x", "short-secret", "0123456789abcdef0123456789abcde"])(
+    "refuses %s at startup",
+    (raw) => {
+      expect(() => parseContentRefreshSecret(raw)).toThrow(
+        /CONTENT_REFRESH_SECRET must be at least 32 characters/,
       );
     },
   );

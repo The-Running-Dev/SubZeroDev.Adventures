@@ -80,7 +80,7 @@ module "app" {
   env = var.env
 
   # DB_PASSWORD (must stay what the adventures-db volume holds), GITHUB_CLIENT_SECRET, OIDC_CLIENT_SECRET,
-  # DISCUSSIONS_TOKEN.
+  # DISCUSSIONS_TOKEN, CONTENT_REFRESH_SECRET.
   secrets = var.secrets
 
   # The deletion ledger's database password, created once. adventures-ledger starts empty with it.

@@ -13,7 +13,7 @@ stack's values from a private var-file outside the repository.
 
    ```powershell
    ./scripts/export-stack-env.ps1 -StackId 14 `
-     -SecretNames DB_PASSWORD,GITHUB_CLIENT_SECRET,OIDC_CLIENT_SECRET,DISCUSSIONS_TOKEN `
+     -SecretNames DB_PASSWORD,GITHUB_CLIENT_SECRET,OIDC_CLIENT_SECRET,DISCUSSIONS_TOKEN,CONTENT_REFRESH_SECRET `
      -Extra @{ BACKUP_RETENTION_DAYS = '30' } `
      -Out "$HOME\.subzerodev\adventures.tfvars.json"
    ```

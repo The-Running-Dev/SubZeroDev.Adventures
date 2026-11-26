@@ -30,6 +30,7 @@ import { registerProfileRoutes } from "./routes/profile.js";
 import { registerRankingRoutes } from "./routes/ranking.js";
 import { registerAdminRoutes } from "./routes/admin.js";
 import { registerContentRoutes } from "./routes/content.js";
+import { registerContentRefreshRoute } from "./routes/content-refresh.js";
 import { registerDiscussionRoutes } from "./routes/discussions.js";
 import { registerCaptureRoutes } from "./routes/captures.js";
 import {
@@ -98,6 +99,10 @@ export interface AppConfig {
   readonly backupRetentionDays?: number;
   /** How long a session capture is kept (`CAPTURE_RETENTION_DAYS`, docs/session-capture.md). */
   readonly captureRetentionDays?: number;
+  /** The content publisher's shared secret for `POST /api/content/refresh`
+   *  (`routes/content-refresh.ts`, issue #21), fed from `CONTENT_REFRESH_SECRET` by `index.ts`
+   *  through `deployment.ts`. Undefined leaves the route answering `503 not_configured`. */
+  readonly contentRefreshSecret?: string;
 }
 
 /**
@@ -143,6 +148,7 @@ export async function buildApp(
     ledger = createMemoryLedger(),
     backupRetentionDays,
     captureRetentionDays = DEFAULT_CAPTURE_RETENTION_DAYS,
+    contentRefreshSecret,
   }: AppConfig,
 ): Promise<FastifyInstance> {
   const app = Fastify({
@@ -311,6 +317,7 @@ export async function buildApp(
   registerRankingRoutes(app, pool, cell);
   registerAdminRoutes(app, pool, cell, campaignSource, sessionCache, deletions);
   registerContentRoutes(app, pool, cell, deletions);
+  registerContentRefreshRoute(app, cell, contentRefreshSecret);
   registerDiscussionRoutes(app, pool, discussionForum);
   registerCaptureRoutes(app, pool, cell, captureRetentionDays);
 

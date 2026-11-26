@@ -311,6 +311,36 @@ Every admin after the first is granted from the admin page itself
 
 ### Why it is installed this way
 
+#### 2026-11-26 — The publisher refreshes the running catalog through a shared-secret route
+
+Context: issue #21. The catalog was built once at boot, and an admin's Sync button
+(`POST /api/admin/content/refresh`, #29) was the only way to rebuild it. Nothing told the
+running server that the content repository had published, so new campaigns waited for a deploy
+or for someone to press the button.
+
+Chosen: `POST /api/content/refresh` (`server/src/routes/content-refresh.ts`), called by the
+content repository's publish workflow with `Authorization: Bearer <CONTENT_REFRESH_SECRET>`. It
+is service-to-service, not a principal: it never reaches `principal.ts`, mints no guest, and
+the identity seam stays about players. The secret is hashed on both sides and compared with
+`timingSafeEqual`. Unset is `503 not_configured`, the `routes/discussions.ts` posture; a value
+under 32 characters fails the start (`deployment.ts`'s `parseContentRefreshSecret`). The
+rebuild is the content cell's own `refresh()`: it publishes only a build that succeeded and
+joins a refresh already in flight, so two publishes, or a publish overlapping a Sync, run one
+rebuild. A failed rebuild answers `502`, unlike the admin route's `200 { ok: false }`, because a
+red publish run is the only place anyone will see it.
+
+Rejected: polling the sources on a timer (the issue rules it out: a timer either lags a
+publish or spends rebuilds on nothing); a player account with the admin role
+for the workflow (makes a CI job a principal and puts a session credential in a workflow
+secret); a webhook signature (HMAC over the body) — there is no body worth signing, and the
+caller is ours.
+
+One process today (`docker-compose.yml` runs one `adventures-api`). Under replicas a call
+reaches one process; fanning it out is #9's.
+
+Reversibility: cheap — unsetting `CONTENT_REFRESH_SECRET` turns the trigger off, and the route
+is one registration in `app.ts`.
+
 #### 2026-11-01 — Session capture: report and fault triggers, opt-in fault consent, 30 days, owner reads the full fixture
 
 Context: engine spec 08 makes a played session a `ReplayFixture` (`SessionLayer.captureSession`)

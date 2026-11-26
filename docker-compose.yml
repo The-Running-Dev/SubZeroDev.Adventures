@@ -133,6 +133,10 @@ x-adventures-api-common: &adventures-api-common
     DISCUSSIONS_REPO: "${DISCUSSIONS_REPO:-}"
     DISCUSSIONS_TOKEN: "${DISCUSSIONS_TOKEN:-}"
     DISCUSSIONS_CATEGORY: "${DISCUSSIONS_CATEGORY:-}"
+    # The content publisher's trigger (routes/content-refresh.ts). Optional like the
+    # DISCUSSIONS_* trio: unset answers 503 not_configured, not a startup precondition; set
+    # shorter than 32 characters fails the start. See .env.example.
+    CONTENT_REFRESH_SECRET: "${CONTENT_REFRESH_SECRET:-}"
 
 services:
   frontend:

@@ -142,6 +142,30 @@ export function parseCaptureRetentionDays(raw: string | undefined): number {
   return days;
 }
 
+/** The shortest `CONTENT_REFRESH_SECRET` a deployment will start with: 32 characters, which is
+ *  what `openssl rand -hex 16` prints. */
+export const MIN_CONTENT_REFRESH_SECRET_LENGTH = 32;
+
+/**
+ * `CONTENT_REFRESH_SECRET` as `index.ts` read it: the shared secret the content publisher
+ * sends to `POST /api/content/refresh` (`routes/content-refresh.ts`, issue #21). Unset or
+ * blank is "no trigger" -- the route answers `503 not_configured` and an admin's Sync button
+ * is still the way to refresh. A value shorter than the minimum is a startup failure rather
+ * than a weak secret quietly accepted: that route rebuilds the whole catalog on demand, from
+ * the open internet.
+ */
+export function parseContentRefreshSecret(
+  raw: string | undefined,
+): string | undefined {
+  const value = raw?.trim() ?? "";
+  if (value === "") return undefined;
+  if (value.length < MIN_CONTENT_REFRESH_SECRET_LENGTH)
+    throw new Error(
+      `CONTENT_REFRESH_SECRET must be at least ${MIN_CONTENT_REFRESH_SECRET_LENGTH} characters, got ${value.length}`,
+    );
+  return value;
+}
+
 /** The full `AppConfig` the deployed process hands `buildApp`. `env` is what `index.ts`
  *  read out of the environment; everything else is a property of the deployment. */
 export function deploymentConfig(
@@ -158,6 +182,8 @@ export function deploymentConfig(
      *  so the server serves core content and withholds everything else (D3 §5.3) -- the
      *  deployed process never runs on a ledger that a database restore would roll back. */
     readonly ledgerDatabaseUrl: string | undefined;
+    /** `CONTENT_REFRESH_SECRET`, already through `parseContentRefreshSecret`. */
+    readonly contentRefreshSecret?: string | undefined;
   },
 ): AppConfig {
   return {
@@ -174,5 +200,6 @@ export function deploymentConfig(
       env.ledgerDatabaseUrl === undefined || env.ledgerDatabaseUrl === ""
         ? createUnreachableLedger()
         : createPostgresLedger(env.ledgerDatabaseUrl),
+    contentRefreshSecret: env.contentRefreshSecret,
   };
 }

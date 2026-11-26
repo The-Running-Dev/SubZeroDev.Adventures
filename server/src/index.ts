@@ -4,6 +4,7 @@ import {
   deploymentConfig,
   parseBackupRetentionDays,
   parseCaptureRetentionDays,
+  parseContentRefreshSecret,
   parseSessionCacheLimit,
 } from "./deployment.js";
 import { loadDiscussionForum } from "./discussions/registry.js";
@@ -38,6 +39,12 @@ const backupRetentionDays = parseBackupRetentionDays(
 // docs/session-capture.md). Unset is the decided default of 30 days.
 const captureRetentionDays = parseCaptureRetentionDays(
   process.env.CAPTURE_RETENTION_DAYS,
+);
+// The content publisher's shared secret for `POST /api/content/refresh` (issue #21,
+// `deployment.ts`'s `parseContentRefreshSecret`). Unset leaves that trigger off; a value too
+// short to be a secret fails the start.
+const contentRefreshSecret = parseContentRefreshSecret(
+  process.env.CONTENT_REFRESH_SECRET,
 );
 // The external deletion ledger, a database a restore of DATABASE_URL does not roll back
 // (`content/ledger.ts`). Unset serves core content only.
@@ -81,6 +88,7 @@ const app = await buildApp(
     backupRetentionDays,
     captureRetentionDays,
     ledgerDatabaseUrl,
+    contentRefreshSecret,
   }),
 );
 

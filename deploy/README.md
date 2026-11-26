@@ -1,7 +1,7 @@
 # Adventures deployment (OpenTofu)
 
 Manages the production Adventures stack on the VPS through `modules/app` of SubZeroDev.Infra:
-the Portainer Git stack (stack 14, project `subzerodev-adventures`), the Cloudflare tunnel route and DNS
+the Portainer Git stack (stack 26, project `subzerodev-adventures`), the Cloudflare tunnel route and DNS
 record for `adventures-api.subzerodev.com`, and the GitHub `production` environment (`INFRA_DISPATCH_TOKEN`).
 
 Run everything through `./deploy/tofu.ps1`; it loads credentials from your User-scope environment and the
@@ -12,7 +12,7 @@ stack's values from a private var-file outside the repository.
 1. In the SubZeroDev.Infra repository, write the var-file from the running stack (prints names only):
 
    ```powershell
-   ./scripts/export-stack-env.ps1 -StackId 14 `
+   ./scripts/export-stack-env.ps1 -StackId 26 `
      -SecretNames DB_PASSWORD,GITHUB_CLIENT_SECRET,OIDC_CLIENT_SECRET,DISCUSSIONS_TOKEN,CONTENT_REFRESH_SECRET `
      -Extra @{ BACKUP_RETENTION_DAYS = '30' } `
      -Out "$HOME\.subzerodev\adventures.tfvars.json"

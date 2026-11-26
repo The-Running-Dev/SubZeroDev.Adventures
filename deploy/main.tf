@@ -1,4 +1,4 @@
-# Adopts the existing Adventures stack (Portainer stack 14) into OpenTofu through modules/app of
+# Adopts the existing Adventures stack (Portainer stack 26) into OpenTofu through modules/app of
 # SubZeroDev.Infra: Cloudflare tunnel and DNS for adventures-api, the Portainer Git stack and the GitHub
 # `production` environment. Run through deploy/tofu.ps1; see deploy/README.md.
 terraform {

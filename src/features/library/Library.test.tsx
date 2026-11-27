@@ -1,4 +1,10 @@
-import { render, screen, within, fireEvent } from "@testing-library/react";
+import {
+  render,
+  screen,
+  within,
+  fireEvent,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "../../app/App";
@@ -20,8 +26,10 @@ const campaign = (id: string, extra = {}): BrowserCampaign => ({
 let member: boolean;
 let failStats: boolean;
 let failCatalog: boolean;
+let published: BrowserCampaign[];
 beforeEach(() => {
   member = false;
+  published = [];
   failStats = false;
   failCatalog = false;
   window.history.replaceState({}, "", "/");
@@ -44,6 +52,7 @@ beforeEach(() => {
             campaign("First", { featured: true }),
             campaign("Latest"),
             campaign("Secret intro", { hidden: true }),
+            ...published,
           ],
         },
         "/api/progress": {
@@ -111,6 +120,7 @@ beforeEach(() => {
   );
 });
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   localStorage.clear();
   window.history.replaceState({}, "", "/");
@@ -134,6 +144,32 @@ describe("library home", () => {
     expect(
       screen.queryByRole("link", { name: "Play: Latest" }),
     ).not.toBeInTheDocument();
+  });
+  it("shows a campaign published while the visitor was elsewhere on their next return, with no page reload (issue #27)", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const user = userEvent.setup();
+    render(<App apiUrl="https://api.test" />);
+    await screen.findByRole("link", { name: "Play: First" });
+    expect(
+      screen.queryByRole("link", { name: "Play: Fresh" }),
+    ).not.toBeInTheDocument();
+
+    // Published server-side after the catalog was first read, and more than the
+    // catalog's staleTime (QueryProvider) ago by the time the visitor comes back.
+    published = [campaign("Fresh")];
+    vi.setSystemTime(Date.now() + 31_000);
+    const nav = screen.getByRole("navigation", { name: "Primary" });
+    await user.click(within(nav).getByRole("link", { name: "Standings" }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("link", { name: "Play: First" }),
+      ).not.toBeInTheDocument(),
+    );
+    await user.click(within(nav).getByRole("link", { name: "Disk library" }));
+
+    expect(
+      await screen.findByRole("link", { name: "Play: Fresh" }),
+    ).toBeVisible();
   });
   it("uses the latest real save and keeps personal achievements separate from public aggregates", async () => {
     member = true;
